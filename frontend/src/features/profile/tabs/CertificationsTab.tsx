@@ -1,0 +1,202 @@
+import React, { useState } from 'react';
+import { Plus, Award, UploadCloud, CheckCircle2, Sparkles, ExternalLink } from 'lucide-react';
+import { Certification } from '../../../types';
+import { api } from '../../../lib/api';
+import { PillButton } from '../../../components/common/PillButton';
+
+interface CertificationsTabProps {
+  certifications: Certification[];
+  onRefresh: () => void;
+}
+
+const PROVIDERS = [
+  'AWS',
+  'Coursera',
+  'Udemy',
+  'NPTEL',
+  'Google',
+  'Oracle',
+  'Cisco',
+  'RedHat',
+  'NVIDIA',
+  'UiPath',
+  'GeeksforGeeks',
+  'Medium',
+  'Other',
+];
+
+export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certifications, onRefresh }) => {
+  const [showModal, setShowModal] = useState(false);
+  const [provider, setProvider] = useState('AWS');
+  const [title, setTitle] = useState('');
+  const [dateCompleted, setDateCompleted] = useState('2024-03-15');
+  const [uploading, setUploading] = useState(false);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+
+  const completedCerts = certifications.filter((c) => !c.suggested);
+  const suggestedCerts = certifications.filter((c) => c.suggested);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const presigned = await api.getUploadUrl('23091A3251', file.name, 'certs');
+      setFileUrl(presigned.uploadUrl);
+    } catch (e: any) {
+      alert('Upload failed: ' + e.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSaveCert = async () => {
+    if (!title.trim()) return;
+    try {
+      await api.saveCertification('23091A3251', {
+        provider,
+        title: title.trim(),
+        date_completed: dateCompleted,
+        certificate_file_url: fileUrl || undefined,
+        suggested: false,
+      });
+      setShowModal(false);
+      setTitle('');
+      onRefresh();
+    } catch (e: any) {
+      alert('Failed to save certificate: ' + e.message);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-bold text-textPrimary">Industry Certifications</h3>
+          <p className="text-xs text-textSecondary">Upload verified technical certifications & cloud credentials</p>
+        </div>
+        <PillButton variant="primary" size="sm" onClick={() => setShowModal(true)} icon={<Plus className="w-3.5 h-3.5" />}>
+          Add Certification
+        </PillButton>
+      </div>
+
+      {/* Completed Certifications Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {completedCerts.map((cert) => (
+          <div key={cert.id || cert.title} className="bg-surface border border-borderLine rounded-xl p-5 shadow-sm flex items-start gap-4">
+            <div className="p-3 rounded-xl bg-brand-soft text-brand-primary shrink-0">
+              <Award className="w-6 h-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-primary text-white">
+                  {cert.provider}
+                </span>
+                <span className="text-xs text-textSecondary">{cert.date_completed || '2024'}</span>
+              </div>
+              <h4 className="text-sm font-bold text-textPrimary mt-1.5">{cert.title}</h4>
+              {cert.certificate_file_url && (
+                <a
+                  href={cert.certificate_file_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 text-xs font-semibold text-brand-primary hover:underline inline-flex items-center gap-1"
+                >
+                  <span>View Certificate PDF</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Suggested Certifications Section */}
+      {suggestedCerts.length > 0 && (
+        <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
+          <h4 className="text-sm font-bold text-textPrimary mb-3 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-brand-primary" />
+            <span>Recommended Certifications for your Career Goal</span>
+          </h4>
+          <div className="space-y-3">
+            {suggestedCerts.map((sc) => (
+              <div key={sc.id || sc.title} className="p-3.5 rounded-lg border border-amber-200 bg-amber-50/50 flex items-center justify-between">
+                <div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 mr-2">
+                    {sc.provider}
+                  </span>
+                  <span className="text-xs font-semibold text-textPrimary">{sc.title}</span>
+                </div>
+                <PillButton
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setProvider(sc.provider);
+                    setTitle(sc.title);
+                    setShowModal(true);
+                  }}
+                >
+                  Add to My Certs
+                </PillButton>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-base font-bold text-textPrimary mb-4">Add Certification</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1">Provider</label>
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background"
+                >
+                  {PROVIDERS.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1">Certification Title</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. AWS Certified Solutions Architect"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1">Date Completed</label>
+                <input
+                  type="date"
+                  value={dateCompleted}
+                  onChange={(e) => setDateCompleted(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1">Upload Certificate File (PDF/Image)</label>
+                <input type="file" onChange={handleFileUpload} className="text-xs text-textSecondary" />
+                {uploading && <p className="text-xs text-brand-primary mt-1">Generating pre-signed S3 upload URL...</p>}
+                {fileUrl && <p className="text-xs text-success font-semibold mt-1">✓ File ready for upload</p>}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <PillButton variant="outline" size="sm" onClick={() => setShowModal(false)}>Cancel</PillButton>
+                <PillButton variant="primary" size="sm" onClick={handleSaveCert}>Save Certificate</PillButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

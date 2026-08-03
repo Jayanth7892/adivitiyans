@@ -1,0 +1,44 @@
+import { z } from 'zod';
+
+export const REGISTRATION_NUMBER_REGEX = /^\d{5}[A-Za-z]32\d{2}$/;
+export const RGMCET_EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@rgmcet\.edu\.in$/i;
+
+export const studentSignUpSchema = z.object({
+  fullName: z.string()
+    .min(2, "Full name must be at least 2 characters")
+    .max(100, "Full name cannot exceed 100 characters"),
+  registrationNumber: z.string()
+    .trim()
+    .regex(REGISTRATION_NUMBER_REGEX, {
+      message: "10 characters required (e.g. 23091A3251). Positions 7-8 must be '32'.",
+    })
+    .transform((val) => val.toUpperCase()),
+  year: z.enum(['1st Year', '2nd Year', '3rd Year', '4th Year'], {
+    required_error: "Please select your academic year",
+  }),
+  email: z.string()
+    .trim()
+    .regex(RGMCET_EMAIL_REGEX, {
+      message: "Email must be a valid @rgmcet.edu.in address",
+    })
+    .transform((val) => val.toLowerCase()),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Za-z]/, "Must contain at least one letter")
+    .regex(/\d/, "Must contain at least one number"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+export const loginSchema = z.object({
+  email: z.string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export type StudentSignUpInput = z.infer<typeof studentSignUpSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;

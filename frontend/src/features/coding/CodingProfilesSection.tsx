@@ -1,0 +1,357 @@
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import {
+  PLATFORM_CONFIGS,
+  PlatformId,
+  PlatformStatsSnapshot,
+} from './platformData';
+import { fetchLivePlatformSnapshot } from './liveFetchers';
+import { PlatformSwitcher } from './components/PlatformSwitcher';
+import { PlatformStatsPage } from './components/PlatformStatsPage';
+import { PillButton } from '../../components/common/PillButton';
+import { Plus, Loader2 } from 'lucide-react';
+import { api } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
+
+interface CodingProfilesSectionProps {
+  onRefreshAll?: () => void;
+}
+
+export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
+  onRefreshAll,
+}) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
+
+  // Fetch real student profile from API
+  const { data: student } = useQuery({
+    queryKey: ['studentProfile'],
+    queryFn: () => api.getStudentProfile(),
+  });
+
+  // Fetch real linked handles from API
+  const { data: linkedProfiles = [], refetch: refetchCodingProfiles } = useQuery({
+    queryKey: ['codingProfiles'],
+    queryFn: () => api.getCodingProfiles(),
+  });
+
+  const studentName = student?.name || user?.name || 'Student';
+  const studentInitials = studentName
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase() || 'S';
+
+  const platformParam = (searchParams.get('platform') as PlatformId) || 'coding-stats';
+
+  const [activePlatform, setActivePlatform] = useState<PlatformId>(
+    PLATFORM_CONFIGS.some((p) => p.id === platformParam) ? platformParam : 'coding-stats'
+  );
+
+  // Keep activePlatform in sync with searchParams URL updates
+  useEffect(() => {
+    if (platformParam && PLATFORM_CONFIGS.some((p) => p.id === platformParam)) {
+      setActivePlatform(platformParam);
+    }
+  }, [platformParam]);
+
+  // Live platform snapshots store
+  const [snapshots, setSnapshots] = useState<Partial<Record<PlatformId, PlatformStatsSnapshot>>>({});
+  const [loadingPlatform, setLoadingPlatform] = useState<boolean>(false);
+
+  // Add/Link handle Modal state
+  const [linkingPlatformId, setLinkingPlatformId] = useState<PlatformId | null>(null);
+  const [handleInput, setHandleInput] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Synchronize snapshots whenever linkedProfiles changes
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadLiveSnapshots() {
+      if (!linkedProfiles || linkedProfiles.length === 0) {
+        if (isMounted) setSnapshots({});
+        return;
+      }
+
+      setLoadingPlatform(true);
+      const newSnapshots: Partial<Record<PlatformId, PlatformStatsSnapshot>> = {};
+
+      for (const item of linkedProfiles) {
+        const pId = item.platform.toLowerCase().replace(/\s+/g, '') as PlatformId;
+        const normalizedId: PlatformId =
+          pId === 'leetcode' ? 'leetcode' :
+          pId === 'github' ? 'github' :
+          pId === 'codeforces' ? 'codeforces' :
+          pId === 'codechef' ? 'codechef' :
+          pId === 'geeksforgeeks' ? 'geeksforgeeks' :
+          pId === 'hackerrank' ? 'hackerrank' : 'coding-stats';
+
+        if (item.handle) {
+          try {
+            const liveData = await fetchLivePlatformSnapshot(normalizedId, item.handle);
+            newSnapshots[normalizedId] = liveData;
+          } catch (e) {
+            console.error(`Failed to fetch live data for ${normalizedId}:`, e);
+          }
+        }
+      }
+
+      // Generate Overview snapshot if at least 1 platform is linked
+      const linkedKeys = Object.keys(newSnapshots) as PlatformId[];
+      if (linkedKeys.length > 0) {
+        let grandTotalSolved = 0;
+        const breakdownItems: any[] = [];
+        const mergedAwards: any[] = [];
+        const mergedHeatmap: Record<string, number> = {};
+        const mergedActivities: any[] = [];
+
+        linkedKeys.forEach((key) => {
+          const snap = newSnapshots[key];
+          if (snap) {
+            const solved = typeof snap.kpis[0]?.value === 'number' ? snap.kpis[0].value : 0;
+            grandTotalSolved += solved;
+
+            const config = PLATFORM_CONFIGS.find((p) => p.id === key);
+            breakdownItems.push({
+              label: config?.name || key,
+              solved,
+              total: 1000,
+              color: config?.color || '#5B4FE9',
+            });
+
+            mergedAwards.push(...snap.awards);
+
+            Object.entries(snap.heatmap).forEach(([d, c]) => {
+              mergedHeatmap[d] = (mergedHeatmap[d] || 0) + c;
+            });
+
+            mergedActivities.push(...snap.activity);
+          }
+        });
+
+        newSnapshots['coding-stats'] = {
+          platform: 'coding-stats',
+          handle: studentName,
+          profileUrl: '',
+          lastRefreshedAt: new Date().toISOString(),
+          syncStatus: 'synced',
+          kpis: [
+            { label: 'Total Problems Solved', value: grandTotalSolved },
+            { label: 'Platforms Linked', value: `${linkedKeys.length} / 6` },
+            { label: 'Student Profile', value: studentName },
+          ],
+          breakdown: breakdownItems,
+          awards: mergedAwards,
+          topicAnalysis: [
+            { label: 'Problem Solving', count: grandTotalSolved },
+          ],
+          activity: mergedActivities.slice(0, 15),
+          heatmap: mergedHeatmap,
+        };
+      }
+
+      if (isMounted) {
+        setSnapshots(newSnapshots);
+        setLoadingPlatform(false);
+      }
+    }
+
+    loadLiveSnapshots();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [linkedProfiles, studentName]);
+
+  const handleSelectPlatform = (id: PlatformId) => {
+    setActivePlatform(id);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', 'coding-profiles');
+      next.set('platform', id);
+      return next;
+    });
+  };
+
+  const handleRefreshPlatform = async (id: PlatformId) => {
+    const existing = snapshots[id];
+    if (!existing || !existing.handle) return;
+
+    setLoadingPlatform(true);
+    try {
+      const updated = await fetchLivePlatformSnapshot(id, existing.handle);
+      setSnapshots((prev) => ({
+        ...prev,
+        [id]: updated,
+      }));
+      onRefreshAll?.();
+    } catch (e: any) {
+      alert(`Could not refresh ${id}: ${e.message}`);
+    } finally {
+      setLoadingPlatform(false);
+    }
+  };
+
+  const handleSaveHandle = async () => {
+    if (!linkingPlatformId || !handleInput.trim()) return;
+    setSaving(true);
+    try {
+      const platformConfig = PLATFORM_CONFIGS.find((p) => p.id === linkingPlatformId);
+
+      // Persist to backend API
+      await api.saveCodingProfile('23091A3251', {
+        platform: (platformConfig?.name || linkingPlatformId) as any,
+        handle: handleInput.trim(),
+        streak: 0,
+        repositories_count: 0,
+        commits_count: 0,
+        prs_merged: 0,
+        score_rating: 0,
+      });
+
+      // Refetch profiles to update UI dynamically
+      await refetchCodingProfiles();
+      handleSelectPlatform(linkingPlatformId);
+      setLinkingPlatformId(null);
+      setHandleInput('');
+    } catch (e: any) {
+      alert('Failed to save platform handle: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const currentConfig = PLATFORM_CONFIGS.find((p) => p.id === activePlatform) || PLATFORM_CONFIGS[0];
+  const currentSnapshot = snapshots[activePlatform];
+
+  return (
+    <div className="flex flex-col md:flex-row gap-6 items-start">
+      {/* Sub-navigation (Platform Switcher Sidebar) */}
+      <PlatformSwitcher
+        platforms={PLATFORM_CONFIGS}
+        linkedSnapshots={snapshots}
+        activePlatform={activePlatform}
+        studentName={studentName}
+        studentInitials={studentInitials}
+        onSelectPlatform={handleSelectPlatform}
+        onLinkPlatform={(id) => {
+          setLinkingPlatformId(id);
+          setHandleInput('');
+        }}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 min-w-0 w-full">
+        {loadingPlatform && !currentSnapshot ? (
+          <div className="bg-surface border border-borderLine rounded-2xl p-12 text-center shadow-xs flex flex-col items-center justify-center gap-3">
+            <Loader2 className="w-8 h-8 text-[#1E65FF] animate-spin" />
+            <p className="text-sm font-semibold text-textPrimary">
+              Fetching real-time data for {currentConfig.name}...
+            </p>
+            <p className="text-xs text-textSecondary">Connecting to public APIs</p>
+          </div>
+        ) : currentSnapshot ? (
+          <PlatformStatsPage
+            key={activePlatform}
+            config={currentConfig}
+            snapshot={currentSnapshot}
+            onRefresh={() => handleRefreshPlatform(activePlatform)}
+          />
+        ) : (
+          /* Unlinked Platform State */
+          <div className="bg-surface border border-borderLine rounded-2xl p-10 text-center shadow-xs space-y-4">
+            <div
+              className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl shadow-sm"
+              style={{ backgroundColor: currentConfig.bgColor }}
+            >
+              {currentConfig.emoji}
+            </div>
+            <div>
+              <h3 className="text-lg font-extrabold text-textPrimary">
+                {currentConfig.name} Profile Not Connected
+              </h3>
+              <p className="text-xs text-textSecondary max-w-md mx-auto mt-1">
+                Link your real {currentConfig.name} handle to automatically fetch live solved counts, contest ratings, activity heatmaps, and badges.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <PillButton
+                variant="primary"
+                size="md"
+                onClick={() => {
+                  setLinkingPlatformId(currentConfig.id);
+                  setHandleInput('');
+                }}
+                icon={<Plus className="w-4 h-4" />}
+              >
+                Connect {currentConfig.name} Handle
+              </PillButton>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Connect Handle Modal */}
+      {linkingPlatformId && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                style={{
+                  backgroundColor:
+                    PLATFORM_CONFIGS.find((p) => p.id === linkingPlatformId)?.bgColor || '#EEF2FF',
+                }}
+              >
+                {PLATFORM_CONFIGS.find((p) => p.id === linkingPlatformId)?.emoji}
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-textPrimary">
+                  Connect {PLATFORM_CONFIGS.find((p) => p.id === linkingPlatformId)?.name}
+                </h3>
+                <p className="text-xs text-textSecondary">
+                  Enter your real profile username / handle
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-textPrimary mb-1">
+                Handle / Username *
+              </label>
+              <input
+                type="text"
+                value={handleInput}
+                onChange={(e) => setHandleInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveHandle()}
+                placeholder={`e.g. ${linkingPlatformId}_handle`}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-[#1E65FF]/30"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-borderLine">
+              <PillButton
+                variant="outline"
+                size="sm"
+                onClick={() => setLinkingPlatformId(null)}
+              >
+                Cancel
+              </PillButton>
+              <PillButton
+                variant="primary"
+                size="sm"
+                onClick={handleSaveHandle}
+                disabled={saving || !handleInput.trim()}
+              >
+                {saving ? 'Connecting...' : 'Connect Profile'}
+              </PillButton>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
