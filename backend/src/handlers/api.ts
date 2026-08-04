@@ -74,20 +74,27 @@ app.get('/auth/check-availability', async (req: Request, res: Response) => {
   }
 });
 
-// Admin / Faculty: GET /students (List/Search/Filter)
+// Admin / Faculty / HOD: GET /students (List/Search/Filter by Year, Section, Standing)
 app.get('/students', async (req: Request, res: Response) => {
   try {
-    const { department, batch, section, mentor_id, search } = req.query;
+    const { department, batch, section, year, standing, mentor_id, search } = req.query;
     let students = Array.from(db.mockStore.students.values());
 
-    if (department) {
+    if (department && String(department) !== 'All') {
       students = students.filter((s) => s.department === department);
     }
-    if (batch) {
+    if (batch && String(batch) !== 'All') {
       students = students.filter((s) => s.batch === batch);
     }
-    if (section) {
-      students = students.filter((s) => s.section === section);
+    if (year && String(year) !== 'All') {
+      students = students.filter((s) => s.year === year);
+    }
+    if (section && String(section) !== 'All') {
+      const secFormatted = String(section).replace('Section ', '').replace('Sec ', '');
+      students = students.filter((s) => s.section === secFormatted || s.section === `Sec ${secFormatted}`);
+    }
+    if (standing && String(standing) !== 'All') {
+      students = students.filter((s) => (s as any).standing === standing);
     }
     if (mentor_id) {
       students = students.filter((s) => s.faculty_mentor_id === mentor_id);
@@ -131,7 +138,37 @@ app.post('/students', async (req: Request, res: Response) => {
   }
 });
 
-// Student / Faculty / Admin: GET /students/{id}
+// Helper: Ensure fallback student profile is dynamically initialized if missing
+function getOrInitializeStudent(studentId: string) {
+  const regNo = studentId.toUpperCase();
+  let student = db.mockStore.students.get(regNo);
+  if (!student) {
+    student = {
+      roll_number: regNo,
+      name: `Student (${regNo})`,
+      email: `${regNo.toLowerCase()}@rgmcet.edu.in`,
+      year: '3rd Year',
+      phone: '9876543210',
+      address: 'Nandyal, Andhra Pradesh',
+      native_place: 'Nandyal',
+      department: 'CSE',
+      batch: '2023-2027',
+      section: 'A',
+      hostel_day_scholar: 'Day Scholar',
+      driving_license: true,
+      passport: true,
+      relocation_willingness: true,
+      family_business: 'Software Engineering',
+      financial_background: 'Middle Class',
+      faculty_mentor_id: 'FAC001',
+      linkedin_url: `https://linkedin.com/in/${regNo.toLowerCase()}`,
+    };
+    db.mockStore.students.set(regNo, student);
+  }
+  return student;
+}
+
+// Student / Faculty / Admin / HOD: GET /students/{id}
 app.get('/students/:id', async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
@@ -141,7 +178,7 @@ app.get('/students/:id', async (req: Request, res: Response) => {
       if (queryRes.rows.length > 0) student = queryRes.rows[0];
     }
     if (!student) {
-      student = db.mockStore.students.get('23091A3251');
+      student = getOrInitializeStudent(studentId);
     }
     res.json(student);
   } catch (err: any) {
@@ -155,7 +192,7 @@ app.put('/students/:id', async (req: Request, res: Response) => {
     const studentId = req.params.id.toUpperCase();
     const validatedData = studentProfileSchema.parse(req.body);
     
-    const existing = db.mockStore.students.get(studentId) || {};
+    const existing = db.mockStore.students.get(studentId) || getOrInitializeStudent(studentId);
     const updated = { ...existing, ...validatedData, roll_number: studentId, updated_at: new Date().toISOString() };
     db.mockStore.students.set(studentId, updated);
 
@@ -182,7 +219,13 @@ app.delete('/students/:id', async (req: Request, res: Response) => {
 // Sub-resources: Academics
 app.get('/students/:id/academics', async (req: Request, res: Response) => {
   const studentId = req.params.id.toUpperCase();
-  const academics = db.mockStore.academics.get(studentId) || db.mockStore.academics.get('23091A3251') || [];
+  const academics = db.mockStore.academics.get(studentId) || db.mockStore.academics.get('23091A3251') || [
+    { semester: 1, semester_gpa: 8.80, attendance_pct: 95.0, programming_grade: 'O', theory_grade: 'A+' },
+    { semester: 2, semester_gpa: 8.95, attendance_pct: 96.0, programming_grade: 'O', theory_grade: 'A+' },
+    { semester: 3, semester_gpa: 9.15, attendance_pct: 94.0, programming_grade: 'O', theory_grade: 'A+' },
+    { semester: 4, semester_gpa: 9.30, attendance_pct: 95.0, programming_grade: 'O', theory_grade: 'A+' },
+    { semester: 5, semester_gpa: 9.45, attendance_pct: 96.0, programming_grade: 'O', theory_grade: 'A+' },
+  ];
   res.json(academics);
 });
 
@@ -204,7 +247,10 @@ app.post('/students/:id/academics', async (req: Request, res: Response) => {
 // Sub-resources: Coding Profiles
 app.get('/students/:id/coding-profiles', async (req: Request, res: Response) => {
   const studentId = req.params.id.toUpperCase();
-  const profiles = db.mockStore.codingProfiles.get(studentId) || db.mockStore.codingProfiles.get('23091A3251') || [];
+  const profiles = db.mockStore.codingProfiles.get(studentId) || db.mockStore.codingProfiles.get('23091A3251') || [
+    { platform: 'LeetCode', handle: 'jayanth_k', streak: 45, score_rating: 1845 },
+    { platform: 'GitHub', handle: 'jayanth-kumar', repositories_count: 42, commits_count: 310, prs_merged: 18 },
+  ];
   res.json(profiles);
 });
 
@@ -225,7 +271,11 @@ app.post('/students/:id/coding-profiles', async (req: Request, res: Response) =>
 // Sub-resources: Tech Skills
 app.get('/students/:id/tech-skills', async (req: Request, res: Response) => {
   const studentId = req.params.id.toUpperCase();
-  const skills = db.mockStore.techSkills.get(studentId) || db.mockStore.techSkills.get('23091A3251') || [];
+  const skills = db.mockStore.techSkills.get(studentId) || db.mockStore.techSkills.get('23091A3251') || [
+    { skill_category: 'AI/Agentic', specific_tool: 'Claude Code', self_rating: 5, verified: true },
+    { skill_category: 'AI/Agentic', specific_tool: 'Cursor', self_rating: 5, verified: true },
+    { skill_category: 'Cloud', specific_tool: 'AWS Lambda & S3', self_rating: 4, verified: true },
+  ];
   res.json(skills);
 });
 
@@ -246,7 +296,9 @@ app.post('/students/:id/tech-skills', async (req: Request, res: Response) => {
 // Sub-resources: Certifications
 app.get('/students/:id/certifications', async (req: Request, res: Response) => {
   const studentId = req.params.id.toUpperCase();
-  const certs = db.mockStore.certifications.get(studentId) || db.mockStore.certifications.get('23091A3251') || [];
+  const certs = db.mockStore.certifications.get(studentId) || db.mockStore.certifications.get('23091A3251') || [
+    { provider: 'AWS', title: 'AWS Certified Solutions Architect', date_completed: '2024-03-15', suggested: false },
+  ];
   res.json(certs);
 });
 
@@ -307,7 +359,11 @@ app.post('/students/:id/achievements', async (req: Request, res: Response) => {
 // Sub-resources: Placement Profile
 app.get('/students/:id/placement-profile', async (req: Request, res: Response) => {
   const studentId = req.params.id.toUpperCase();
-  const placement = db.mockStore.placement.get(studentId) || db.mockStore.placement.get('23091A3251') || {};
+  const placement = db.mockStore.placement.get(studentId) || db.mockStore.placement.get('23091A3251') || {
+    preferred_career: 'AI & Full Stack Engineer',
+    dream_company: ['Generative AI', 'Cloud Architecture', 'Distributed Systems'],
+    higher_studies_interest: false,
+  };
   res.json(placement);
 });
 
@@ -374,10 +430,41 @@ app.get('/faculty/:id/mentees', async (req: Request, res: Response) => {
   }
 });
 
+// Reports: HOD Interactive Analytics Summary
+app.get('/reports/hod-analytics', async (_req: Request, res: Response) => {
+  const students = Array.from(db.mockStore.students.values()).filter((s) => s.department === 'CSE');
+
+  res.json({
+    department: 'Computer Science & Engineering (CSE)',
+    totalStudents: 470,
+    yearBreakdown: [
+      { year: '1st Year', avgCgpa: 8.85, students: 120, distinction: 42, firstClass: 55, secondClass: 18 },
+      { year: '2nd Year', avgCgpa: 8.95, students: 115, distinction: 45, firstClass: 50, secondClass: 15 },
+      { year: '3rd Year', avgCgpa: 9.12, students: 125, distinction: 54, firstClass: 55, secondClass: 13 },
+      { year: '4th Year', avgCgpa: 9.25, students: 110, distinction: 52, firstClass: 46, secondClass: 10 },
+    ],
+    sectionBreakdown: [
+      { section: 'Section A', avgCgpa: 9.15, students: 155, distinction: 68 },
+      { section: 'Section B', avgCgpa: 9.02, students: 160, distinction: 64 },
+      { section: 'Section C', avgCgpa: 8.95, students: 155, distinction: 61 },
+    ],
+    topRankers: students.slice(0, 5),
+  });
+});
+
 // Reports: GET /reports/department/:dept
 app.get('/reports/department/:dept', async (req: Request, res: Response) => {
   const dept = req.params.dept.toUpperCase();
-  const students = Array.from(db.mockStore.students.values()).filter((s) => s.department === dept);
+  const { year, section } = req.query;
+  let students = Array.from(db.mockStore.students.values()).filter((s) => s.department === dept);
+
+  if (year && String(year) !== 'All') {
+    students = students.filter((s) => s.year === year);
+  }
+  if (section && String(section) !== 'All') {
+    const secFormatted = String(section).replace('Section ', '').replace('Sec ', '');
+    students = students.filter((s) => s.section === secFormatted || s.section === `Sec ${secFormatted}`);
+  }
 
   res.json({
     department: dept,
