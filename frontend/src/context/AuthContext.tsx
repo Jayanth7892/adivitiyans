@@ -5,7 +5,7 @@ interface AuthContextType {
   user: User | null;
   role: UserRole;
   isAuthenticated: boolean;
-  login: (email: string, role: UserRole, rollNumber?: string) => void;
+  login: (email: string, role: UserRole, rollNumber?: string, name?: string) => void;
   logout: () => void;
 }
 
@@ -26,7 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { return DEFAULT_MOCK_USER; }
     }
-    return DEFAULT_MOCK_USER; // Default logged in student for smooth instant preview
+    return DEFAULT_MOCK_USER; // Default logged in student for smooth preview
   });
 
   const [role, setRole] = useState<UserRole>(user?.role || 'student');
@@ -41,12 +41,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  const login = (email: string, userRole: UserRole, rollNumber?: string) => {
+  const login = (email: string, userRole: UserRole, rollNumber?: string, name?: string) => {
     const formattedReg = rollNumber ? rollNumber.toUpperCase() : '23091A3251';
+    let formattedName = name;
+    if (!formattedName) {
+      if (email.includes('@')) {
+        const handle = email.split('@')[0];
+        formattedName = handle
+          .split(/[\._]/)
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(' ');
+      } else {
+        formattedName = 'Student User';
+      }
+    }
+
     const newUser: User = {
       id: `usr_${formattedReg}`,
       email: email.toLowerCase(),
-      name: email.split('@')[0].replace('.', ' ').toUpperCase(),
+      name: formattedName,
       role: userRole,
       rollNumber: formattedReg,
       department: 'CSE',

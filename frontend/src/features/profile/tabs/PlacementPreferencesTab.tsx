@@ -2,17 +2,20 @@ import React, { useState } from 'react';
 import { Target, Sparkles, Building, Check, Edit2, Save, X, BookOpen, Award } from 'lucide-react';
 import { PlacementProfile, ScoreBreakdown } from '../../../types';
 import { api } from '../../../lib/api';
+import { useAuth } from '../../../context/AuthContext';
 import { PillButton } from '../../../components/common/PillButton';
 
 interface PlacementPreferencesTabProps {
   placement?: PlacementProfile | null;
   scoreData?: ScoreBreakdown | null;
+  readOnly?: boolean;
   onRefresh: () => void;
 }
 
 export const PlacementPreferencesTab: React.FC<PlacementPreferencesTabProps> = ({
   placement,
   scoreData,
+  readOnly = false,
   onRefresh,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -24,6 +27,8 @@ export const PlacementPreferencesTab: React.FC<PlacementPreferencesTabProps> = (
   const [higherStudies, setHigherStudies] = useState(placement?.higher_studies_interest || false);
   const [needFromDept, setNeedFromDept] = useState(placement?.need_from_department || '');
   const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
+  const activeRollNo = user?.rollNumber || '23091A3251';
 
   const handleAddSpec = () => {
     if (newInput.trim() && !specializations.includes(newInput.trim())) {
@@ -37,9 +42,10 @@ export const PlacementPreferencesTab: React.FC<PlacementPreferencesTabProps> = (
   };
 
   const handleSave = async () => {
+    if (readOnly) return;
     setSaving(true);
     try {
-      await api.updatePlacementProfile('23091A3251', {
+      await api.updatePlacementProfile(activeRollNo, {
         preferred_career: career,
         dream_company: specializations,
         higher_studies_interest: higherStudies,
@@ -63,14 +69,16 @@ export const PlacementPreferencesTab: React.FC<PlacementPreferencesTabProps> = (
             <h3 className="text-base font-bold text-textPrimary">Academic Performance & Specialization Goals</h3>
             <p className="text-xs text-textSecondary">Specify your core technical focus, higher studies plans, and department support needs</p>
           </div>
-          {!isEditing ? (
-            <PillButton variant="outline" size="sm" onClick={() => setIsEditing(true)} icon={<Edit2 className="w-3.5 h-3.5" />}>
-              Edit Goals
-            </PillButton>
-          ) : (
-            <PillButton variant="outline" size="sm" onClick={() => setIsEditing(false)} icon={<X className="w-3.5 h-3.5" />}>
-              Cancel
-            </PillButton>
+          {!readOnly && (
+            !isEditing ? (
+              <PillButton variant="outline" size="sm" onClick={() => setIsEditing(true)} icon={<Edit2 className="w-3.5 h-3.5" />}>
+                Edit Goals
+              </PillButton>
+            ) : (
+              <PillButton variant="outline" size="sm" onClick={() => setIsEditing(false)} icon={<X className="w-3.5 h-3.5" />}>
+                Cancel
+              </PillButton>
+            )
           )}
         </div>
 

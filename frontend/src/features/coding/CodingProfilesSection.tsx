@@ -16,28 +16,36 @@ import { useAuth } from '../../context/AuthContext';
 
 interface CodingProfilesSectionProps {
   onRefreshAll?: () => void;
+  studentName?: string;
+  studentRollNumber?: string;
+  readOnly?: boolean;
 }
 
 export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
   onRefreshAll,
+  studentName: customStudentName,
+  studentRollNumber,
+  readOnly = false,
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
+  const activeRollNo = studentRollNumber || user?.rollNumber || '23091A3251';
+
   // Fetch real student profile from API
   const { data: student } = useQuery({
-    queryKey: ['studentProfile'],
-    queryFn: () => api.getStudentProfile(),
+    queryKey: ['studentProfile', activeRollNo],
+    queryFn: () => api.getStudentProfile(activeRollNo),
   });
 
   // Fetch real linked handles from API
   const { data: linkedProfiles = [], refetch: refetchCodingProfiles } = useQuery({
-    queryKey: ['codingProfiles'],
-    queryFn: () => api.getCodingProfiles(),
+    queryKey: ['codingProfiles', activeRollNo],
+    queryFn: () => api.getCodingProfiles(activeRollNo),
   });
 
-  const studentName = student?.name || user?.name || 'Student';
-  const studentInitials = studentName
+  const activeStudentName = customStudentName || student?.name || user?.name || 'Student';
+  const studentInitials = activeStudentName
     .split(' ')
     .map((n) => n[0])
     .join('')
@@ -70,15 +78,18 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
     let isMounted = true;
 
     async function loadLiveSnapshots() {
-      if (!linkedProfiles || linkedProfiles.length === 0) {
-        if (isMounted) setSnapshots({});
-        return;
-      }
+      const activeList =
+        linkedProfiles && linkedProfiles.length > 0
+          ? linkedProfiles
+          : [
+              { platform: 'LeetCode', handle: 'jayanth_k' },
+              { platform: 'GitHub', handle: 'jayanth-kumar' },
+            ];
 
       setLoadingPlatform(true);
       const newSnapshots: Partial<Record<PlatformId, PlatformStatsSnapshot>> = {};
 
-      for (const item of linkedProfiles) {
+      for (const item of activeList) {
         const pId = item.platform.toLowerCase().replace(/\s+/g, '') as PlatformId;
         const normalizedId: PlatformId =
           pId === 'leetcode' ? 'leetcode' :
@@ -133,14 +144,14 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
 
         newSnapshots['coding-stats'] = {
           platform: 'coding-stats',
-          handle: studentName,
+          handle: activeStudentName,
           profileUrl: '',
           lastRefreshedAt: new Date().toISOString(),
           syncStatus: 'synced',
           kpis: [
             { label: 'Total Problems Solved', value: grandTotalSolved },
             { label: 'Platforms Linked', value: `${linkedKeys.length} / 6` },
-            { label: 'Student Profile', value: studentName },
+            { label: 'Student Profile', value: activeStudentName },
           ],
           breakdown: breakdownItems,
           awards: mergedAwards,
@@ -163,7 +174,7 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [linkedProfiles, studentName]);
+  }, [linkedProfiles, activeStudentName]);
 
   const handleSelectPlatform = (id: PlatformId) => {
     setActivePlatform(id);
@@ -195,13 +206,13 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
   };
 
   const handleSaveHandle = async () => {
-    if (!linkingPlatformId || !handleInput.trim()) return;
+    if (!linkingPlatformId || !handleInput.trim() || readOnly) return;
     setSaving(true);
     try {
       const platformConfig = PLATFORM_CONFIGS.find((p) => p.id === linkingPlatformId);
 
       // Persist to backend API
-      await api.saveCodingProfile('23091A3251', {
+      await api.saveCodingProfile(activeRollNo, {
         platform: (platformConfig?.name || linkingPlatformId) as any,
         handle: handleInput.trim(),
         streak: 0,
@@ -233,12 +244,15 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
         platforms={PLATFORM_CONFIGS}
         linkedSnapshots={snapshots}
         activePlatform={activePlatform}
-        studentName={studentName}
+        studentName={activeStudentName}
         studentInitials={studentInitials}
+        readOnly={readOnly}
         onSelectPlatform={handleSelectPlatform}
         onLinkPlatform={(id) => {
-          setLinkingPlatformId(id);
-          setHandleInput('');
+          if (!readOnly) {
+            setLinkingPlatformId(id);
+            setHandleInput('');
+          }
         }}
       />
 
@@ -273,23 +287,27 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
                 {currentConfig.name} Profile Not Connected
               </h3>
               <p className="text-xs text-textSecondary max-w-md mx-auto mt-1">
-                Link your real {currentConfig.name} handle to automatically fetch live solved counts, contest ratings, activity heatmaps, and badges.
+                {readOnly
+                  ? `No ${currentConfig.name} handle linked by ${activeStudentName} yet.`
+                  : `Link your real ${currentConfig.name} handle to automatically fetch live solved counts, contest ratings, activity heatmaps, and badges.`}
               </p>
             </div>
 
-            <div className="pt-2">
-              <PillButton
-                variant="primary"
-                size="md"
-                onClick={() => {
-                  setLinkingPlatformId(currentConfig.id);
-                  setHandleInput('');
-                }}
-                icon={<Plus className="w-4 h-4" />}
-              >
-                Connect {currentConfig.name} Handle
-              </PillButton>
-            </div>
+            {!readOnly && (
+              <div className="pt-2">
+                <PillButton
+                  variant="primary"
+                  size="md"
+                  onClick={() => {
+                    setLinkingPlatformId(currentConfig.id);
+                    setHandleInput('');
+                  }}
+                  icon={<Plus className="w-4 h-4" />}
+                >
+                  Connect {currentConfig.name} Handle
+                </PillButton>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -12,6 +12,7 @@ import {
   Target,
   Camera,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { api } from '../../lib/api';
 import { PersonalInfoTab } from './tabs/PersonalInfoTab';
 import { AcademicsTab } from './tabs/AcademicsTab';
@@ -25,6 +26,8 @@ import { PlacementPreferencesTab } from './tabs/PlacementPreferencesTab';
 export const ProfilePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const activeRollNo = user?.rollNumber || '23091A3251';
 
   const currentTab = searchParams.get('tab') || 'personal-info';
 
@@ -33,15 +36,15 @@ export const ProfilePage: React.FC = () => {
   };
 
   // Queries for profile sections
-  const { data: student, refetch: refetchStudent } = useQuery({ queryKey: ['studentProfile'], queryFn: () => api.getStudentProfile() });
-  const { data: academics = [], refetch: refetchAcademics } = useQuery({ queryKey: ['academics'], queryFn: () => api.getAcademics() });
-  const { data: codingProfiles = [], refetch: refetchCoding } = useQuery({ queryKey: ['codingProfiles'], queryFn: () => api.getCodingProfiles() });
-  const { data: techSkills = [], refetch: refetchSkills } = useQuery({ queryKey: ['techSkills'], queryFn: () => api.getTechSkills() });
-  const { data: certifications = [], refetch: refetchCerts } = useQuery({ queryKey: ['certifications'], queryFn: () => api.getCertifications() });
-  const { data: softSkills = [], refetch: refetchSoft } = useQuery({ queryKey: ['softSkills'], queryFn: () => api.getSoftSkills() });
-  const { data: achievements = [], refetch: refetchAchievements } = useQuery({ queryKey: ['achievements'], queryFn: () => api.getAchievements() });
-  const { data: placement, refetch: refetchPlacement } = useQuery({ queryKey: ['placementProfile'], queryFn: () => api.getPlacementProfile() });
-  const { data: scoreData, refetch: refetchScore } = useQuery({ queryKey: ['employabilityScore'], queryFn: () => api.getEmployabilityScore() });
+  const { data: student, refetch: refetchStudent } = useQuery({ queryKey: ['studentProfile', activeRollNo], queryFn: () => api.getStudentProfile(activeRollNo) });
+  const { data: academics = [], refetch: refetchAcademics } = useQuery({ queryKey: ['academics', activeRollNo], queryFn: () => api.getAcademics(activeRollNo) });
+  const { data: codingProfiles = [], refetch: refetchCoding } = useQuery({ queryKey: ['codingProfiles', activeRollNo], queryFn: () => api.getCodingProfiles(activeRollNo) });
+  const { data: techSkills = [], refetch: refetchSkills } = useQuery({ queryKey: ['techSkills', activeRollNo], queryFn: () => api.getTechSkills(activeRollNo) });
+  const { data: certifications = [], refetch: refetchCerts } = useQuery({ queryKey: ['certifications', activeRollNo], queryFn: () => api.getCertifications(activeRollNo) });
+  const { data: softSkills = [], refetch: refetchSoft } = useQuery({ queryKey: ['softSkills', activeRollNo], queryFn: () => api.getSoftSkills(activeRollNo) });
+  const { data: achievements = [], refetch: refetchAchievements } = useQuery({ queryKey: ['achievements', activeRollNo], queryFn: () => api.getAchievements(activeRollNo) });
+  const { data: placement, refetch: refetchPlacement } = useQuery({ queryKey: ['placementProfile', activeRollNo], queryFn: () => api.getPlacementProfile(activeRollNo) });
+  const { data: scoreData, refetch: refetchScore } = useQuery({ queryKey: ['employabilityScore', activeRollNo], queryFn: () => api.getEmployabilityScore(activeRollNo) });
 
   const handleRefreshAll = () => {
     refetchStudent();
@@ -67,6 +70,15 @@ export const ProfilePage: React.FC = () => {
     { slug: 'placement-preferences', label: 'Academic Growth Target', icon: Target },
   ];
 
+  const displayName = user?.name || student?.name || 'Student Profile';
+  const displayRollNo = user?.rollNumber || student?.roll_number || '23091A3251';
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase() || 'S';
+
   // If currentTab is 'coding-profiles', render standalone matching BytsOne layout
   if (currentTab === 'coding-profiles') {
     return <CodingProfilesTab profiles={codingProfiles} onRefresh={handleRefreshAll} />;
@@ -78,10 +90,7 @@ export const ProfilePage: React.FC = () => {
       <div className="bg-surface border border-borderLine rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row items-center gap-6">
         <div className="relative group">
           <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-brand-primary text-white font-black text-2xl flex items-center justify-center shadow-md border-4 border-surface ring-2 ring-brand-soft">
-            {student?.name
-              ?.split(' ')
-              .map((n) => n[0])
-              .join('') || 'JK'}
+            {initials}
           </div>
           <button className="absolute bottom-0 right-0 p-2 rounded-full bg-surface border border-borderLine text-textPrimary shadow-sm hover:bg-background transition-all">
             <Camera className="w-3.5 h-3.5" />
@@ -90,9 +99,9 @@ export const ProfilePage: React.FC = () => {
 
         <div className="text-center md:text-left flex-1 min-w-0">
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-2.5">
-            <h1 className="text-xl md:text-2xl font-extrabold text-textPrimary">{student?.name || 'Jayanth Kumar'}</h1>
+            <h1 className="text-xl md:text-2xl font-extrabold text-textPrimary">{displayName}</h1>
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-brand-soft text-brand-primary border border-brand-primary/20">
-              {student?.roll_number || '23091A3251'}
+              {displayRollNo}
             </span>
           </div>
           <p className="text-xs text-textSecondary mt-1.5 font-medium">

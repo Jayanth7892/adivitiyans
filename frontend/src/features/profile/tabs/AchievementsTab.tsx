@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Award, Plus, Calendar, Building2 } from 'lucide-react';
 import { Achievement } from '../../../types';
 import { api } from '../../../lib/api';
+import { useAuth } from '../../../context/AuthContext';
 import { PillButton } from '../../../components/common/PillButton';
 
 interface AchievementsTabProps {
   achievements: Achievement[];
+  readOnly?: boolean;
   onRefresh: () => void;
 }
 
@@ -23,7 +25,7 @@ const ACHIEVEMENT_TYPES = [
   'Club',
 ] as const;
 
-export const AchievementsTab: React.FC<AchievementsTabProps> = ({ achievements, onRefresh }) => {
+export const AchievementsTab: React.FC<AchievementsTabProps> = ({ achievements, readOnly = false, onRefresh }) => {
   const [showModal, setShowModal] = useState(false);
   const [type, setType] = useState<any>('Hackathon');
   const [title, setTitle] = useState('');
@@ -31,12 +33,14 @@ export const AchievementsTab: React.FC<AchievementsTabProps> = ({ achievements, 
   const [date, setDate] = useState('2024-04-10');
   const [organization, setOrganization] = useState('');
   const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
+  const activeRollNo = user?.rollNumber || '23091A3251';
 
   const handleSave = async () => {
-    if (!title.trim()) return;
+    if (!title.trim() || readOnly) return;
     setSaving(true);
     try {
-      await api.saveAchievement('23091A3251', {
+      await api.saveAchievement(activeRollNo, {
         type,
         title: title.trim(),
         description: description.trim(),
@@ -58,12 +62,14 @@ export const AchievementsTab: React.FC<AchievementsTabProps> = ({ achievements, 
     <div className="space-y-6">
       <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm flex items-center justify-between">
         <div>
-          <h3 className="text-base font-bold text-textPrimary">Achievements & Milestone Timeline</h3>
-          <p className="text-xs text-textSecondary">Record hackathons, projects, paper presentations, and leadership roles</p>
+          <h3 className="text-base font-bold text-textPrimary">Achievements & Extracurriculars</h3>
+          <p className="text-xs text-textSecondary">Document hackathons, capstones, startups, and learning reflections</p>
         </div>
-        <PillButton variant="primary" size="sm" onClick={() => setShowModal(true)} icon={<Plus className="w-3.5 h-3.5" />}>
-          Add Achievement
-        </PillButton>
+        {!readOnly && (
+          <PillButton variant="primary" size="sm" onClick={() => setShowModal(true)} icon={<Plus className="w-3.5 h-3.5" />}>
+            Add Achievement
+          </PillButton>
+        )}
       </div>
 
       <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-3 before:bottom-3 before:w-0.5 before:bg-borderLine">

@@ -7,6 +7,7 @@ import { DashboardPage } from './features/dashboard/DashboardPage';
 import { ProfilePage } from './features/profile/ProfilePage';
 import { FacultyDashboardPage } from './features/faculty/FacultyDashboardPage';
 import { AdminDashboardPage } from './features/admin/AdminDashboardPage';
+import { HodDashboardPage } from './features/hod/HodDashboardPage';
 import { CodingAnalyticsPage } from './features/coding/CodingAnalyticsPage';
 import { PlatformStatsRedirect } from './features/coding/PlatformStatsRedirect';
 import { Sidebar } from './components/layout/Sidebar';
@@ -28,6 +29,9 @@ const RoleDashboardRedirect: React.FC = () => {
   }
   if (role === 'faculty') {
     return <Navigate to="/faculty/dashboard" replace />;
+  }
+  if (role === 'hod') {
+    return <Navigate to="/hod/dashboard" replace />;
   }
   return <DashboardPage />;
 };
@@ -64,10 +68,10 @@ export const App: React.FC = () => {
               <Route path="/dashboard" element={<RoleDashboardRedirect />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/profile/coding-profiles/:platform" element={<PlatformStatsRedirect />} />
-              <Route path="/program-stats/:platform text" element={<PlatformStatsRedirect />} />
               <Route path="/program-stats/:platform" element={<PlatformStatsRedirect />} />
               <Route path="/faculty/dashboard" element={<FacultyDashboardPage />} />
               <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+              <Route path="/hod/dashboard" element={<HodDashboardPage />} />
               <Route path="/coding-analytics" element={<CodingAnalyticsPage />} />
               <Route path="*" element={<RoleDashboardRedirect />} />
             </Route>

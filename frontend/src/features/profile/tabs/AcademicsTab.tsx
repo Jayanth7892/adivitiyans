@@ -4,17 +4,21 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Plus, Award, GraduationCap, TrendingUp, ArrowUpRight, ArrowDownRight, Edit2, Calendar, CheckCircle2 } from 'lucide-react';
 import { AcademicRecord } from '../../../types';
 import { api } from '../../../lib/api';
+import { useAuth } from '../../../context/AuthContext';
 import { PillButton } from '../../../components/common/PillButton';
 
 interface AcademicsTabProps {
   academics: AcademicRecord[];
+  readOnly?: boolean;
   onRefresh: () => void;
 }
 
-export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, onRefresh }) => {
+export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly = false, onRefresh }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingSemester, setEditingSemester] = useState<AcademicRecord | null>(null);
   const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
+  const activeRollNo = user?.rollNumber || '23091A3251';
 
   // Sort academics by semester number ascending
   const sortedAcademics = [...academics].sort((a, b) => a.semester - b.semester);
@@ -59,7 +63,7 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, onRefresh
   const onSaveSemester = async (data: AcademicRecord) => {
     setSaving(true);
     try {
-      await api.saveAcademicRecord('23091A3251', {
+      await api.saveAcademicRecord(activeRollNo, {
         ...data,
         semester: Number(data.semester),
         semester_gpa: Number(data.semester_gpa),
@@ -106,27 +110,29 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, onRefresh
           </div>
 
           {/* Primary Action Button to enter semester GPA */}
-          <div>
-            <PillButton
-              variant="primary"
-              size="md"
-              onClick={() => {
-                setEditingSemester(null);
-                reset({
-                  semester: (sortedAcademics.length || 0) + 1,
-                  semester_gpa: 9.0,
-                  programming_grade: 'O',
-                  attendance_pct: 95.0,
-                  theory_grade: 'A+',
-                  remarks: 'Good progress',
-                });
-                setShowAddModal(true);
-              }}
-              icon={<Plus className="w-4 h-4" />}
-            >
-              + Enter Semester GPA
-            </PillButton>
-          </div>
+          {!readOnly && (
+            <div>
+              <PillButton
+                variant="primary"
+                size="md"
+                onClick={() => {
+                  setEditingSemester(null);
+                  reset({
+                    semester: (sortedAcademics.length || 0) + 1,
+                    semester_gpa: 9.0,
+                    programming_grade: 'O',
+                    attendance_pct: 95.0,
+                    theory_grade: 'A+',
+                    remarks: 'Good progress',
+                  });
+                  setShowAddModal(true);
+                }}
+                icon={<Plus className="w-4 h-4" />}
+              >
+                + Enter Semester GPA
+              </PillButton>
+            </div>
+          )}
         </div>
 
         {/* Improvement KPI Cards */}

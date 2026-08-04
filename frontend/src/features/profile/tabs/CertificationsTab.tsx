@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Plus, Award, UploadCloud, CheckCircle2, Sparkles, ExternalLink } from 'lucide-react';
 import { Certification } from '../../../types';
 import { api } from '../../../lib/api';
+import { useAuth } from '../../../context/AuthContext';
 import { PillButton } from '../../../components/common/PillButton';
 
 interface CertificationsTabProps {
   certifications: Certification[];
+  readOnly?: boolean;
   onRefresh: () => void;
 }
 
@@ -25,23 +27,25 @@ const PROVIDERS = [
   'Other',
 ];
 
-export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certifications, onRefresh }) => {
+export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certifications, readOnly = false, onRefresh }) => {
   const [showModal, setShowModal] = useState(false);
   const [provider, setProvider] = useState('AWS');
   const [title, setTitle] = useState('');
   const [dateCompleted, setDateCompleted] = useState('2024-03-15');
   const [uploading, setUploading] = useState(false);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const { user } = useAuth();
+  const activeRollNo = user?.rollNumber || '23091A3251';
 
   const completedCerts = certifications.filter((c) => !c.suggested);
   const suggestedCerts = certifications.filter((c) => c.suggested);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || readOnly) return;
     setUploading(true);
     try {
-      const presigned = await api.getUploadUrl('23091A3251', file.name, 'certs');
+      const presigned = await api.getUploadUrl(activeRollNo, file.name, 'certs');
       setFileUrl(presigned.uploadUrl);
     } catch (e: any) {
       alert('Upload failed: ' + e.message);
@@ -51,9 +55,9 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
   };
 
   const handleSaveCert = async () => {
-    if (!title.trim()) return;
+    if (!title.trim() || readOnly) return;
     try {
-      await api.saveCertification('23091A3251', {
+      await api.saveCertification(activeRollNo, {
         provider,
         title: title.trim(),
         date_completed: dateCompleted,
@@ -76,9 +80,11 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
           <h3 className="text-base font-bold text-textPrimary">Industry Certifications</h3>
           <p className="text-xs text-textSecondary">Upload verified technical certifications & cloud credentials</p>
         </div>
-        <PillButton variant="primary" size="sm" onClick={() => setShowModal(true)} icon={<Plus className="w-3.5 h-3.5" />}>
-          Add Certification
-        </PillButton>
+        {!readOnly && (
+          <PillButton variant="primary" size="sm" onClick={() => setShowModal(true)} icon={<Plus className="w-3.5 h-3.5" />}>
+            Add Certification
+          </PillButton>
+        )}
       </div>
 
       {/* Completed Certifications Grid */}

@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Zap, Plus, Award } from 'lucide-react';
 import { SoftSkill, Extracurricular } from '../../../types';
 import { api } from '../../../lib/api';
+import { useAuth } from '../../../context/AuthContext';
 import { PillButton } from '../../../components/common/PillButton';
 
 interface SoftSkillsTabProps {
   softSkills: SoftSkill[];
+  readOnly?: boolean;
   onRefresh: () => void;
 }
 
@@ -19,13 +21,16 @@ const CORE_SOFT_SKILLS = [
   'Professionalism',
 ] as const;
 
-export const SoftSkillsTab: React.FC<SoftSkillsTabProps> = ({ softSkills, onRefresh }) => {
+export const SoftSkillsTab: React.FC<SoftSkillsTabProps> = ({ softSkills, readOnly = false, onRefresh }) => {
   const [savingSkill, setSavingSkill] = useState<string | null>(null);
+  const { user } = useAuth();
+  const activeRollNo = user?.rollNumber || '23091A3251';
 
   const handleRatingChange = async (skillName: any, ratingValue: number) => {
+    if (readOnly) return;
     setSavingSkill(skillName);
     try {
-      await api.saveSoftSkill('23091A3251', {
+      await api.saveSoftSkill(activeRollNo, {
         skill: skillName,
         rating: ratingValue,
         rated_by: 'self',

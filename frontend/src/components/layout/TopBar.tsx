@@ -8,9 +8,13 @@ interface TopBarProps {
 
 export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
   const { user } = useAuth();
-  const initials = user?.name
-    ? user.name.split(' ').map((n) => n[0]).join('')
-    : 'JK';
+  const displayName = user?.name || (user?.email ? user.email.split('@')[0] : 'User');
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase() || 'U';
 
   return (
     <header className="h-16 bg-surface border-b border-borderLine px-4 md:px-8 flex items-center justify-between sticky top-0 z-30">
@@ -48,7 +52,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
             {initials}
           </div>
           <div className="hidden sm:block text-left">
-            <p className="text-xs font-semibold text-textPrimary leading-tight">{user?.name || 'Jayanth'}</p>
+            <p className="text-xs font-semibold text-textPrimary leading-tight">{displayName}</p>
             <p className="text-[10px] text-brand-primary font-medium">{user?.role?.toUpperCase() || 'STUDENT'}</p>
           </div>
         </div>

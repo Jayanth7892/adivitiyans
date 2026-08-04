@@ -79,7 +79,7 @@ export const AuthPage: React.FC = () => {
 
   const onSignUp = async (data: StudentSignUpInput) => {
     try {
-      login(data.email, 'student', data.registrationNumber);
+      login(data.email, 'student', data.registrationNumber, data.fullName);
       navigate('/dashboard');
     } catch (err: any) {
       alert(err.message || 'Sign up failed');
@@ -88,11 +88,36 @@ export const AuthPage: React.FC = () => {
 
   const onLogin = async (data: LoginInput) => {
     try {
-      login(data.email, activeTab, activeTab === 'student' ? '23091A3251' : undefined);
+      let displayName: string | undefined;
+      let rollNo: string | undefined;
+
+      if (activeTab === 'student') {
+        rollNo = '23091A3251';
+        if (data.email.toLowerCase().includes('ananya')) {
+          displayName = 'Ananya Sharma';
+          rollNo = '23091A3252';
+        } else if (data.email.toLowerCase().includes('vikram')) {
+          displayName = 'Vikram Reddy';
+          rollNo = '20091A0588';
+        } else if (data.email.toLowerCase().includes('sneha')) {
+          displayName = 'Sneha Patel';
+          rollNo = '24091A0512';
+        }
+      } else if (activeTab === 'hod') {
+        displayName = 'Dr. A. Srinivas (HOD CSE)';
+      } else if (activeTab === 'faculty') {
+        displayName = 'Dr. M. V. Ramana (Faculty)';
+      } else if (activeTab === 'admin') {
+        displayName = 'System Administrator';
+      }
+
+      login(data.email, activeTab, rollNo, displayName);
       if (activeTab === 'admin') {
         navigate('/admin/dashboard');
       } else if (activeTab === 'faculty') {
         navigate('/faculty/dashboard');
+      } else if (activeTab === 'hod') {
+        navigate('/hod/dashboard');
       } else {
         navigate('/dashboard');
       }
@@ -110,6 +135,9 @@ export const AuthPage: React.FC = () => {
     } else if (role === 'faculty') {
       setLoginValue('email', 'mramesh@rgmcet.edu.in');
       setLoginValue('password', 'FacultyPassword123');
+    } else if (role === 'hod') {
+      setLoginValue('email', 'hod.cse@rgmcet.edu.in');
+      setLoginValue('password', 'HodPassword123');
     } else {
       setLoginValue('email', 'admin@rgmcet.edu.in');
       setLoginValue('password', 'AdminPassword123');
@@ -151,6 +179,13 @@ export const AuthPage: React.FC = () => {
               </button>
               <button
                 type="button"
+                onClick={() => handleDemoPreset('hod')}
+                className="flex-1 py-1.5 px-2 text-xs font-semibold rounded-lg bg-surface text-textPrimary border border-borderLine hover:border-brand-primary"
+              >
+                HOD Demo
+              </button>
+              <button
+                type="button"
                 onClick={() => handleDemoPreset('admin')}
                 className="flex-1 py-1.5 px-2 text-xs font-semibold rounded-lg bg-surface text-textPrimary border border-borderLine hover:border-brand-primary"
               >
@@ -160,7 +195,7 @@ export const AuthPage: React.FC = () => {
           </div>
 
           {/* Role Switcher Pill Tabs */}
-          <div className="grid grid-cols-3 gap-1 bg-background p-1 rounded-xl border border-borderLine mb-8">
+          <div className="grid grid-cols-4 gap-1 bg-background p-1 rounded-xl border border-borderLine mb-8">
             <button
               onClick={() => { setActiveTab('student'); setIsSignUp(false); }}
               className={`py-2 text-xs font-bold rounded-lg transition-all ${
@@ -180,6 +215,16 @@ export const AuthPage: React.FC = () => {
               }`}
             >
               Faculty
+            </button>
+            <button
+              onClick={() => { setActiveTab('hod'); setIsSignUp(false); }}
+              className={`py-2 text-xs font-bold rounded-lg transition-all ${
+                activeTab === 'hod'
+                  ? 'bg-surface text-brand-primary shadow-sm border border-borderLine'
+                  : 'text-textSecondary hover:text-textPrimary'
+              }`}
+            >
+              HOD
             </button>
             <button
               onClick={() => { setActiveTab('admin'); setIsSignUp(false); }}
@@ -402,6 +447,8 @@ export const AuthPage: React.FC = () => {
                   <p className="mt-0.5 text-[11px] text-textSecondary">
                     {activeTab === 'faculty'
                       ? 'Access assigned mentees, view student 360° analytics, and update mentor remarks.'
+                      : activeTab === 'hod'
+                      ? 'Read-only department analytics. View all student records, CGPA rankings, and coding platform history.'
                       : 'Full administrative authority to manage student directory CRUD, placement analytics & CSV export.'}
                   </p>
                 </div>
@@ -410,12 +457,12 @@ export const AuthPage: React.FC = () => {
               <form onSubmit={handleLoginSubmit(onLogin)} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-textPrimary mb-1">
-                    {activeTab === 'faculty' ? 'Faculty Email' : 'Admin Email'}
+                    {activeTab === 'faculty' ? 'Faculty Email' : activeTab === 'hod' ? 'HOD Email' : 'Admin Email'}
                   </label>
                   <input
                     {...registerLogin('email')}
                     type="email"
-                    defaultValue={activeTab === 'faculty' ? 'mramesh@rgmcet.edu.in' : 'admin@rgmcet.edu.in'}
+                    defaultValue={activeTab === 'faculty' ? 'mramesh@rgmcet.edu.in' : activeTab === 'hod' ? 'hod.cse@rgmcet.edu.in' : 'admin@rgmcet.edu.in'}
                     placeholder={`${activeTab}@rgmcet.edu.in`}
                     className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
                   />
@@ -443,7 +490,7 @@ export const AuthPage: React.FC = () => {
                     disabled={isLoginSubmitting}
                     className="w-full"
                   >
-                    Log In as {activeTab === 'faculty' ? 'Faculty' : 'Admin'}
+                    Log In as {activeTab === 'faculty' ? 'Faculty' : activeTab === 'hod' ? 'HOD' : 'Admin'}
                   </PillButton>
                 </div>
               </form>

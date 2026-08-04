@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Plus, CheckCircle2, ShieldCheck, X } from 'lucide-react';
 import { TechSkill } from '../../../types';
 import { api } from '../../../lib/api';
+import { useAuth } from '../../../context/AuthContext';
 import { PillButton } from '../../../components/common/PillButton';
 
 interface TechSkillsTabProps {
   skills: TechSkill[];
+  readOnly?: boolean;
   onRefresh: () => void;
 }
 
@@ -23,20 +25,22 @@ const SKILL_CATEGORIES = [
   'Product Mgmt',
 ] as const;
 
-export const TechSkillsTab: React.FC<TechSkillsTabProps> = ({ skills, onRefresh }) => {
+export const TechSkillsTab: React.FC<TechSkillsTabProps> = ({ skills, readOnly = false, onRefresh }) => {
   const [activeCategory, setActiveCategory] = useState<string>('AI/Agentic');
   const [showAddModal, setShowAddModal] = useState(false);
   const [toolInput, setToolInput] = useState('');
   const [ratingInput, setRatingInput] = useState<number>(4);
   const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
+  const activeRollNo = user?.rollNumber || '23091A3251';
 
   const filteredSkills = skills.filter((s) => s.skill_category === activeCategory);
 
   const handleAddSkill = async () => {
-    if (!toolInput.trim()) return;
+    if (!toolInput.trim() || readOnly) return;
     setSaving(true);
     try {
-      await api.saveTechSkill('23091A3251', {
+      await api.saveTechSkill(activeRollNo, {
         skill_category: activeCategory,
         specific_tool: toolInput.trim(),
         self_rating: ratingInput,
@@ -58,14 +62,16 @@ export const TechSkillsTab: React.FC<TechSkillsTabProps> = ({ skills, onRefresh 
       <div className="bg-surface border border-borderLine rounded-xl p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-bold text-textPrimary">Technical Skills & Tool Matrix</h3>
-          <PillButton
-            variant="primary"
-            size="sm"
-            onClick={() => setShowAddModal(true)}
-            icon={<Plus className="w-3.5 h-3.5" />}
-          >
-            Add Technical Tool
-          </PillButton>
+          {!readOnly && (
+            <PillButton
+              variant="primary"
+              size="sm"
+              onClick={() => setShowAddModal(true)}
+              icon={<Plus className="w-3.5 h-3.5" />}
+            >
+              Add Technical Tool
+            </PillButton>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2 pt-2 border-t border-borderLine">

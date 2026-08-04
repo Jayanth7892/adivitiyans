@@ -27,22 +27,25 @@ import { calculateProfileCompletion } from '../../lib/profileCompletion';
 import { GreetingHero } from '../../components/common/GreetingHero';
 import { StatCard } from '../../components/common/StatCard';
 import { NudgeCard } from '../../components/common/NudgeCard';
+import { useAuth } from '../../context/AuthContext';
 import { EmptyState } from '../../components/common/EmptyState';
 import { ProgressRing } from '../../components/common/ProgressRing';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const activeRollNo = user?.rollNumber || '23091A3251';
 
   // Queries for real data
-  const { data: student } = useQuery({ queryKey: ['studentProfile'], queryFn: () => api.getStudentProfile() });
-  const { data: academics = [] } = useQuery({ queryKey: ['academics'], queryFn: () => api.getAcademics() });
-  const { data: codingProfiles = [] } = useQuery({ queryKey: ['codingProfiles'], queryFn: () => api.getCodingProfiles() });
-  const { data: techSkills = [] } = useQuery({ queryKey: ['techSkills'], queryFn: () => api.getTechSkills() });
-  const { data: certifications = [] } = useQuery({ queryKey: ['certifications'], queryFn: () => api.getCertifications() });
-  const { data: softSkills = [] } = useQuery({ queryKey: ['softSkills'], queryFn: () => api.getSoftSkills() });
-  const { data: achievements = [] } = useQuery({ queryKey: ['achievements'], queryFn: () => api.getAchievements() });
-  const { data: placement } = useQuery({ queryKey: ['placementProfile'], queryFn: () => api.getPlacementProfile() });
-  const { data: scoreData } = useQuery({ queryKey: ['academicScore'], queryFn: () => api.getEmployabilityScore() });
+  const { data: student } = useQuery({ queryKey: ['studentProfile', activeRollNo], queryFn: () => api.getStudentProfile(activeRollNo) });
+  const { data: academics = [] } = useQuery({ queryKey: ['academics', activeRollNo], queryFn: () => api.getAcademics(activeRollNo) });
+  const { data: codingProfiles = [] } = useQuery({ queryKey: ['codingProfiles', activeRollNo], queryFn: () => api.getCodingProfiles(activeRollNo) });
+  const { data: techSkills = [] } = useQuery({ queryKey: ['techSkills', activeRollNo], queryFn: () => api.getTechSkills(activeRollNo) });
+  const { data: certifications = [] } = useQuery({ queryKey: ['certifications', activeRollNo], queryFn: () => api.getCertifications(activeRollNo) });
+  const { data: softSkills = [] } = useQuery({ queryKey: ['softSkills', activeRollNo], queryFn: () => api.getSoftSkills(activeRollNo) });
+  const { data: achievements = [] } = useQuery({ queryKey: ['achievements', activeRollNo], queryFn: () => api.getAchievements(activeRollNo) });
+  const { data: placement } = useQuery({ queryKey: ['placementProfile', activeRollNo], queryFn: () => api.getPlacementProfile(activeRollNo) });
+  const { data: scoreData } = useQuery({ queryKey: ['academicScore', activeRollNo], queryFn: () => api.getEmployabilityScore(activeRollNo) });
 
   // Calculate live completion % & signature nudge cards using shared util
   const completionStatus = calculateProfileCompletion(
@@ -67,11 +70,13 @@ export const DashboardPage: React.FC = () => {
     navigate(`/profile?tab=${tabSlug}`);
   };
 
+  const displayName = user?.name || student?.name || 'Student';
+
   return (
     <div className="space-y-6">
       {/* 1. Greeting Hero */}
       <GreetingHero
-        name={student?.name || 'Jayanth'}
+        name={displayName}
         completionPercentage={completionStatus.totalPercentage}
         onEditProfile={() => navigate('/profile')}
       />

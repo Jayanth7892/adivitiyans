@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   BarChart2,
   PieChart,
+  Building2,
   LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -96,10 +97,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     {
       title: 'ADMINISTRATION',
       items: [
-        { label: 'Admin Dashboard', path: '/admin/dashboard?tab=students', icon: LayoutDashboard },
+        { label: 'Admin Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
         { label: 'Student Directory (CRUD)', path: '/admin/dashboard?tab=students', icon: Users },
         { label: 'CGPA & Top Performers', path: '/admin/dashboard?tab=performance', icon: Award },
         { label: 'Faculty & Mentors', path: '/admin/dashboard?tab=faculty', icon: ShieldCheck },
+        { label: 'Coding Leaderboard', path: '/coding-analytics', icon: BarChart2 },
+      ],
+    },
+  ];
+
+  const hodNavGroups: NavGroup[] = [
+    {
+      title: 'HOD PORTAL',
+      items: [
+        { label: 'Department Overview', path: '/hod/dashboard?tab=overview', icon: Building2 },
+        { label: 'Student Directory', path: '/hod/dashboard?tab=students', icon: Users },
+        { label: 'CGPA & Rankings', path: '/hod/dashboard?tab=rankings', icon: Award },
         { label: 'Coding Leaderboard', path: '/coding-analytics', icon: BarChart2 },
       ],
     },
@@ -110,7 +123,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       ? adminNavGroups
       : role === 'faculty'
       ? facultyNavGroups
+      : role === 'hod'
+      ? hodNavGroups
       : studentNavGroups;
+
+  const footerDisplayName = user?.name || (user?.email ? user.email.split('@')[0] : 'User');
+  const footerInitials = footerDisplayName
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase() || 'U';
 
   return (
     <>
@@ -189,13 +212,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         <div className="p-4 border-t border-borderLine bg-surface shrink-0">
           <div className="flex items-center gap-3 mb-3 p-2 rounded-lg bg-background">
             <div className="w-9 h-9 rounded-full bg-brand-primary text-white font-bold flex items-center justify-center text-xs shrink-0">
-              {user?.name
-                ?.split(' ')
-                .map((n) => n[0])
-                .join('') || 'JK'}
+              {footerInitials}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-textPrimary truncate">{user?.name || 'User'}</p>
+              <p className="text-xs font-semibold text-textPrimary truncate">{footerDisplayName}</p>
               <p className="text-[11px] text-brand-primary font-bold uppercase truncate">{role}</p>
             </div>
           </div>

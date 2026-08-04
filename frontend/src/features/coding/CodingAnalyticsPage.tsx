@@ -50,15 +50,14 @@ function DifficultyPill({ count, color }: { count: number; color: string }) {
 
 export const CodingAnalyticsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'leetcode' | 'github' | 'cgpa'>('leetcode');
-  const [deptFilter, setDeptFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
+  const [sectionFilter, setSectionFilter] = useState('');
   const [search, setSearch] = useState('');
 
   const lcFiltered = MOCK_LEETCODE_LEADERBOARD.filter((s) => {
     const q = search.toLowerCase();
     return (
       (!q || s.name.toLowerCase().includes(q) || s.handle.toLowerCase().includes(q) || s.regNo.toLowerCase().includes(q)) &&
-      (!deptFilter || s.dept === deptFilter) &&
       (!yearFilter || s.year === yearFilter)
     );
   });
@@ -67,7 +66,6 @@ export const CodingAnalyticsPage: React.FC = () => {
     const q = search.toLowerCase();
     return (
       (!q || s.name.toLowerCase().includes(q) || s.handle.toLowerCase().includes(q) || s.regNo.toLowerCase().includes(q)) &&
-      (!deptFilter || s.dept === deptFilter) &&
       (!yearFilter || s.year === yearFilter)
     );
   });
@@ -76,7 +74,6 @@ export const CodingAnalyticsPage: React.FC = () => {
     const q = search.toLowerCase();
     return (
       (!q || s.name.toLowerCase().includes(q) || s.regNo.toLowerCase().includes(q)) &&
-      (!deptFilter || s.dept === deptFilter) &&
       (!yearFilter || s.year === yearFilter)
     );
   });
@@ -137,15 +134,17 @@ export const CodingAnalyticsPage: React.FC = () => {
             placeholder="Search student or handle..."
             className="w-full bg-transparent focus:outline-none text-textPrimary" />
         </div>
-        <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
-          className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-surface text-textPrimary font-medium">
-          <option value="">All Departments</option>
-          {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
         <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}
           className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-surface text-textPrimary font-medium">
-          <option value="">All Years</option>
+          <option value="">All Academic Years</option>
           {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <select value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)}
+          className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-surface text-textPrimary font-medium">
+          <option value="">All Sections</option>
+          <option value="A">Section A</option>
+          <option value="B">Section B</option>
+          <option value="C">Section C</option>
         </select>
       </div>
 

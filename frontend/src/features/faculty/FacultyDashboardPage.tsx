@@ -39,7 +39,6 @@ export const FacultyDashboardPage: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
-  const [deptFilter, setDeptFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [selectedMentee, setSelectedMentee] = useState<StudentProfile | null>(null);
   const [inspectMentee, setInspectMentee] = useState<StudentProfile | null>(null);
@@ -100,9 +99,8 @@ export const FacultyDashboardPage: React.FC = () => {
     const q = searchQuery.toLowerCase();
     const matchesSearch = !q || m.name.toLowerCase().includes(q) || m.roll_number.toLowerCase().includes(q);
     const matchesSection = !sectionFilter || m.section === sectionFilter;
-    const matchesDept = !deptFilter || m.department === deptFilter;
     const matchesYear = !yearFilter || m.year === yearFilter;
-    return matchesSearch && matchesSection && matchesDept && matchesYear;
+    return matchesSearch && matchesSection && matchesYear;
   });
 
   const handleSaveRemark = async () => {
@@ -212,24 +210,18 @@ export const FacultyDashboardPage: React.FC = () => {
                 />
               </div>
 
-              <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
-                className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-medium">
-                <option value="">All Departments</option>
-                {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-
               <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}
                 className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-medium">
-                <option value="">All Years</option>
+                <option value="">All Academic Years</option>
                 {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
 
               <select value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)}
                 className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-medium">
                 <option value="">All Sections</option>
-                <option value="A">Sec A</option>
-                <option value="B">Sec B</option>
-                <option value="C">Sec C</option>
+                <option value="A">Section A</option>
+                <option value="B">Section B</option>
+                <option value="C">Section C</option>
               </select>
             </div>
           </div>
@@ -391,14 +383,22 @@ export const FacultyDashboardPage: React.FC = () => {
 
             {/* Inspect Tab Body */}
             <div>
-              {inspectTab === 'personal-info' && <PersonalInfoTab student={inspectMentee} onRefresh={refetch} />}
-              {inspectTab === 'academics' && <AcademicsTab academics={inspectAcademics} onRefresh={refetch} />}
-              {inspectTab === 'coding-profiles' && <CodingProfilesTab profiles={inspectCoding} onRefresh={refetch} />}
-              {inspectTab === 'tech-skills' && <TechSkillsTab skills={inspectSkills} onRefresh={refetch} />}
-              {inspectTab === 'certifications' && <CertificationsTab certifications={inspectCerts} onRefresh={refetch} />}
-              {inspectTab === 'soft-skills' && <SoftSkillsTab softSkills={inspectSoft} onRefresh={refetch} />}
-              {inspectTab === 'achievements' && <AchievementsTab achievements={inspectAchievements} onRefresh={refetch} />}
-              {inspectTab === 'placement-preferences' && <PlacementPreferencesTab placement={null} scoreData={null} onRefresh={refetch} />}
+              {inspectTab === 'personal-info' && <PersonalInfoTab readOnly={true} student={inspectMentee} onRefresh={refetch} />}
+              {inspectTab === 'academics' && <AcademicsTab readOnly={true} academics={inspectAcademics} onRefresh={refetch} />}
+              {inspectTab === 'coding-profiles' && (
+                <CodingProfilesTab
+                  studentName={inspectMentee.name}
+                  studentRollNumber={inspectMentee.roll_number}
+                  readOnly={true}
+                  profiles={inspectCoding}
+                  onRefresh={refetch}
+                />
+              )}
+              {inspectTab === 'tech-skills' && <TechSkillsTab readOnly={true} skills={inspectSkills} onRefresh={refetch} />}
+              {inspectTab === 'certifications' && <CertificationsTab readOnly={true} certifications={inspectCerts} onRefresh={refetch} />}
+              {inspectTab === 'soft-skills' && <SoftSkillsTab readOnly={true} softSkills={inspectSoft} onRefresh={refetch} />}
+              {inspectTab === 'achievements' && <AchievementsTab readOnly={true} achievements={inspectAchievements} onRefresh={refetch} />}
+              {inspectTab === 'placement-preferences' && <PlacementPreferencesTab readOnly={true} placement={null} scoreData={null} onRefresh={refetch} />}
             </div>
           </div>
         </div>

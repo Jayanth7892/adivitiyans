@@ -3,10 +3,12 @@ import { useForm } from 'react-hook-form';
 import { Edit2, Save, X, ExternalLink, GraduationCap } from 'lucide-react';
 import { StudentProfile } from '../../../types';
 import { api } from '../../../lib/api';
+import { useAuth } from '../../../context/AuthContext';
 import { PillButton } from '../../../components/common/PillButton';
 
 interface PersonalInfoTabProps {
   student?: StudentProfile | null;
+  readOnly?: boolean;
   onRefresh: () => void;
 }
 
@@ -35,16 +37,20 @@ const FINANCIAL_BACKGROUNDS = [
   'Upper Class',
 ];
 
-export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, onRefresh }) => {
+export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readOnly = false, onRefresh }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { user } = useAuth();
+  const activeRoll = student?.roll_number || user?.rollNumber || '23091A3251';
+  const activeName = student?.name || user?.name || 'Student';
+  const activeEmail = student?.email || user?.email || 'student@rgmcet.edu.in';
 
   const { register, handleSubmit } = useForm<StudentProfile & { cgpa?: number }>({
     defaultValues: {
       ...student,
-      name: student?.name || 'Jayanth Kumar',
-      roll_number: student?.roll_number || '23091A3251',
-      email: student?.email || 'jayanth@rgmcet.edu.in',
+      name: activeName,
+      roll_number: activeRoll,
+      email: activeEmail,
       year: student?.year || '3rd Year',
       phone: student?.phone || '9876543210',
       address: student?.address || 'Nandyal, Andhra Pradesh',
@@ -58,7 +64,7 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, onRef
       relocation_willingness: student?.relocation_willingness ?? true,
       family_business: student?.family_business || 'Agriculture',
       financial_background: student?.financial_background || 'Middle Class',
-      linkedin_url: student?.linkedin_url || 'https://linkedin.com/in/jayanth-kumar',
+      linkedin_url: student?.linkedin_url || `https://linkedin.com/in/${activeName.toLowerCase().replace(/\s+/g, '-')}`,
       cgpa: 9.16,
     },
   });
@@ -66,7 +72,7 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, onRef
   const onSubmit = async (data: any) => {
     setSaving(true);
     try {
-      await api.updateStudentProfile(data.roll_number || '23091A3251', data);
+      await api.updateStudentProfile(data.roll_number || activeRoll, data);
       setIsEditing(false);
       onRefresh();
     } catch (e: any) {
@@ -85,14 +91,16 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, onRef
           <h3 className="text-base font-bold text-textPrimary">Personal & Academic Information</h3>
           <p className="text-xs text-textSecondary">Manage your demographic details, CGPA, contact info, and academic standings</p>
         </div>
-        {!isEditing ? (
-          <PillButton variant="outline" size="sm" onClick={() => setIsEditing(true)} icon={<Edit2 className="w-3.5 h-3.5" />}>
-            Edit Section
-          </PillButton>
-        ) : (
-          <PillButton variant="outline" size="sm" onClick={() => setIsEditing(false)} icon={<X className="w-3.5 h-3.5" />}>
-            Cancel
-          </PillButton>
+        {!readOnly && (
+          !isEditing ? (
+            <PillButton variant="outline" size="sm" onClick={() => setIsEditing(true)} icon={<Edit2 className="w-3.5 h-3.5" />}>
+              Edit Section
+            </PillButton>
+          ) : (
+            <PillButton variant="outline" size="sm" onClick={() => setIsEditing(false)} icon={<X className="w-3.5 h-3.5" />}>
+              Cancel
+            </PillButton>
+          )
         )}
       </div>
 
@@ -104,14 +112,14 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, onRef
             {isEditing ? (
               <input {...register('name')} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
             ) : (
-              <p className="text-sm font-semibold text-textPrimary">{s?.name || 'Jayanth Kumar'}</p>
+              <p className="text-sm font-semibold text-textPrimary">{s?.name || activeName}</p>
             )}
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Registration Number (Locked)</label>
             <p className="text-sm font-bold text-brand-primary bg-brand-soft px-3 py-1.5 rounded-lg inline-block">
-              {s?.roll_number || '23091A3251'}
+              {s?.roll_number || activeRoll}
             </p>
           </div>
 

@@ -8,6 +8,7 @@ interface PlatformSwitcherProps {
   activePlatform: PlatformId;
   studentName: string;
   studentInitials: string;
+  readOnly?: boolean;
   onSelectPlatform: (id: PlatformId) => void;
   onLinkPlatform: (id: PlatformId) => void;
 }
@@ -16,8 +17,9 @@ export const PlatformSwitcher: React.FC<PlatformSwitcherProps> = ({
   platforms,
   linkedSnapshots,
   activePlatform,
-  studentName = 'Dasamneni Jayanth Kumar Naidu',
-  studentInitials = 'DJ',
+  studentName = 'Student',
+  studentInitials = 'S',
+  readOnly = false,
   onSelectPlatform,
   onLinkPlatform,
 }) => {
@@ -50,7 +52,7 @@ export const PlatformSwitcher: React.FC<PlatformSwitcherProps> = ({
             const snapshot = linkedSnapshots[platform.id];
 
             const handleClick = () => {
-              if (!isLinked && platform.id !== 'coding-stats') {
+              if (!isLinked && platform.id !== 'coding-stats' && !readOnly) {
                 onLinkPlatform(platform.id);
                 return;
               }
@@ -97,7 +99,7 @@ export const PlatformSwitcher: React.FC<PlatformSwitcherProps> = ({
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   )}
-                  {!isLinked && platform.id !== 'coding-stats' && (
+                  {!isLinked && platform.id !== 'coding-stats' && !readOnly && (
                     <PlusCircle className="w-3.5 h-3.5 text-textSecondary/40 group-hover:text-textSecondary transition-colors" />
                   )}
                 </div>

@@ -50,7 +50,7 @@ export const AdminDashboardPage: React.FC = () => {
 
   // Student Directory state
   const [searchQuery, setSearchQuery] = useState('');
-  const [deptFilter, setDeptFilter] = useState('');
+  const [sectionFilter, setSectionFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentProfile | null>(null);
@@ -129,15 +129,14 @@ export const AdminDashboardPage: React.FC = () => {
   const filteredStudents = students.filter((s) => {
     const q = searchQuery.toLowerCase();
     const matchesSearch = !q || s.name.toLowerCase().includes(q) || s.roll_number.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
-    const matchesDept = !deptFilter || s.department === deptFilter;
+    const matchesSection = !sectionFilter || s.section === sectionFilter;
     const matchesYear = !yearFilter || s.year === yearFilter;
-    return matchesSearch && matchesDept && matchesYear;
+    return matchesSearch && matchesSection && matchesYear;
   });
 
   const filteredPerformers = performersData.filter((p) => {
-    const matchesDept = !deptFilter || p.dept === deptFilter;
     const matchesYear = !yearFilter || p.year === yearFilter;
-    return matchesDept && matchesYear;
+    return matchesYear;
   });
 
   // Student CRUD handlers
@@ -310,15 +309,17 @@ export const AdminDashboardPage: React.FC = () => {
                   className="w-full bg-transparent focus:outline-none text-textPrimary"
                 />
               </div>
-              <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
-                className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-medium">
-                <option value="">All Departments</option>
-                {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
               <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}
                 className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-medium">
-                <option value="">All Years</option>
+                <option value="">All Academic Years</option>
                 {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <select value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)}
+                className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-medium">
+                <option value="">All Sections</option>
+                <option value="A">Section A</option>
+                <option value="B">Section B</option>
+                <option value="C">Section C</option>
               </select>
             </div>
           </div>
@@ -402,16 +403,10 @@ export const AdminDashboardPage: React.FC = () => {
             ))}
           </div>
 
-          {/* Department & Year Filters for Rankings */}
           <div className="flex flex-wrap gap-3">
-            <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-surface text-textPrimary font-medium">
-              <option value="">All Departments</option>
-              {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
             <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}
               className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-surface text-textPrimary font-medium">
-              <option value="">All Years</option>
+              <option value="">All Academic Years</option>
               {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
@@ -702,14 +697,22 @@ export const AdminDashboardPage: React.FC = () => {
 
             {/* Real data injected per tab */}
             <div>
-              {inspectTab === 'personal-info' && <PersonalInfoTab student={inspectStudent} onRefresh={refetch} />}
-              {inspectTab === 'academics' && <AcademicsTab academics={inspectAcademics} onRefresh={refetch} />}
-              {inspectTab === 'coding-profiles' && <CodingProfilesTab profiles={inspectCoding} onRefresh={refetch} />}
-              {inspectTab === 'tech-skills' && <TechSkillsTab skills={inspectSkills} onRefresh={refetch} />}
-              {inspectTab === 'certifications' && <CertificationsTab certifications={inspectCerts} onRefresh={refetch} />}
-              {inspectTab === 'soft-skills' && <SoftSkillsTab softSkills={inspectSoft} onRefresh={refetch} />}
-              {inspectTab === 'achievements' && <AchievementsTab achievements={inspectAchievements} onRefresh={refetch} />}
-              {inspectTab === 'academic-goals' && <PlacementPreferencesTab placement={null} scoreData={null} onRefresh={refetch} />}
+              {inspectTab === 'personal-info' && <PersonalInfoTab readOnly={true} student={inspectStudent} onRefresh={refetch} />}
+              {inspectTab === 'academics' && <AcademicsTab readOnly={true} academics={inspectAcademics} onRefresh={refetch} />}
+              {inspectTab === 'coding-profiles' && (
+                <CodingProfilesTab
+                  studentName={inspectStudent.name}
+                  studentRollNumber={inspectStudent.roll_number}
+                  readOnly={true}
+                  profiles={inspectCoding}
+                  onRefresh={refetch}
+                />
+              )}
+              {inspectTab === 'tech-skills' && <TechSkillsTab readOnly={true} skills={inspectSkills} onRefresh={refetch} />}
+              {inspectTab === 'certifications' && <CertificationsTab readOnly={true} certifications={inspectCerts} onRefresh={refetch} />}
+              {inspectTab === 'soft-skills' && <SoftSkillsTab readOnly={true} softSkills={inspectSoft} onRefresh={refetch} />}
+              {inspectTab === 'achievements' && <AchievementsTab readOnly={true} achievements={inspectAchievements} onRefresh={refetch} />}
+              {inspectTab === 'academic-goals' && <PlacementPreferencesTab readOnly={true} placement={null} scoreData={null} onRefresh={refetch} />}
             </div>
           </div>
         </div>
