@@ -98,7 +98,7 @@ if (USE_MOCK) {
       linkedin_url: 'https://linkedin.com/in/jayanth-kumar',
     },
     {
-      roll_number: '23091A3252', name: 'Ananya Sharma', email: 'ananya@rgmcet.edu.in',
+      roll_number: '23091A3252', name: 'dasamneni', email: 'dasamneni@rgmcet.edu.in',
       year: '3rd Year', phone: '9876543211', address: 'Kurnool, Andhra Pradesh',
       native_place: 'Kurnool', department: 'CSE', batch: '2023-2027', section: 'B',
       hostel_day_scholar: 'Hostel', driving_license: false, passport: true,

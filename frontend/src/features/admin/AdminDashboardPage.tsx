@@ -117,14 +117,26 @@ export const AdminDashboardPage: React.FC = () => {
     enabled: Boolean(inspectId),
   });
 
-  // Top performers data mapped from students with CGPA & Coding platforms
-  const performersData = [
-    { rank: 1, name: 'Jayanth Kumar', regNo: '23091A3251', dept: 'CSE', year: '3rd Year', cgpa: 9.45, leetcode: 'neal_wu', leetcodePts: 412, github: 'torvalds', status: 'Distinction' },
-    { rank: 2, name: 'Ananya Sharma', regNo: '23091A3252', dept: 'CSE', year: '3rd Year', cgpa: 9.30, leetcode: 'ananya_lc', leetcodePts: 378, github: 'ananya-dev', status: 'Distinction' },
-    { rank: 3, name: 'Vikram Reddy', regNo: '23091A3253', dept: 'ECE', year: '4th Year', cgpa: 9.10, leetcode: 'vikramr', leetcodePts: 340, github: 'vikram-dev', status: 'Distinction' },
-    { rank: 4, name: 'Sneha Patel', regNo: '23091A3254', dept: 'CSE', year: '2nd Year', cgpa: 8.90, leetcode: 'sneha_p', leetcodePts: 295, github: 'sneha-dev', status: 'First Class' },
-    { rank: 5, name: 'Rahul Verma', regNo: '23091A3255', dept: 'EEE', year: '4th Year', cgpa: 8.70, leetcode: 'rahulv', leetcodePts: 260, github: 'rahul-dev', status: 'First Class' },
-  ];
+  // Top performers data dynamically mapped from real API students
+  const performersData = [...students]
+    .map((s, idx) => {
+      const cgpa = (s as any).cgpa !== undefined ? Number((s as any).cgpa) : 9.0;
+      const leetcodePts = (s as any).leetcode_solved !== undefined ? Number((s as any).leetcode_solved) : 0;
+      const status = (s as any).standing || (cgpa >= 9.0 ? 'Distinction' : 'First Class');
+      return {
+        rank: idx + 1,
+        name: s.name,
+        regNo: s.roll_number,
+        dept: s.department || 'CSE',
+        year: s.year,
+        cgpa,
+        leetcode: (s as any).leetcode_handle || 'Not Linked',
+        leetcodePts,
+        github: (s as any).github_handle || 'Not Linked',
+        status,
+      };
+    })
+    .sort((a, b) => b.cgpa - a.cgpa);
 
   const filteredStudents = students.filter((s) => {
     const q = searchQuery.toLowerCase();

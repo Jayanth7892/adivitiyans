@@ -151,13 +151,46 @@ app.get('/students', async (req: Request, res: Response) => {
         const secFormatted = String(section).replace('Section ', '').replace('Sec ', '');
         students = students.filter((s) => s.section === secFormatted || s.section === `Sec ${secFormatted}`);
       }
-      if (standing && String(standing) !== 'All') students = students.filter((s) => (s as any).standing === standing);
       if (mentor_id) students = students.filter((s) => s.faculty_mentor_id === mentor_id);
       if (search) {
         const q = String(search).toLowerCase();
         students = students.filter((s) => s.name.toLowerCase().includes(q) || s.roll_number.toLowerCase().includes(q) || s.email.toLowerCase().includes(q));
       }
-      return res.json(students);
+
+      // Dynamically attach computed CGPA and coding profiles to each student
+      const enriched = students.map((student) => {
+        const rollNo = student.roll_number;
+        const academics = db.mockStore.academics.get(rollNo) || [];
+        const codingProfiles = db.mockStore.codingProfiles.get(rollNo) || [];
+
+        let cgpa = student.cgpa ? Number(student.cgpa) : 9.0;
+        if (academics.length > 0) {
+          const sumGpa = academics.reduce((acc: number, a: any) => acc + Number(a.semester_gpa || 0), 0);
+          cgpa = Number((sumGpa / academics.length).toFixed(2));
+        }
+
+        const lcProfile = codingProfiles.find((p: any) => String(p.platform).toLowerCase() === 'leetcode');
+        const ghProfile = codingProfiles.find((p: any) => String(p.platform).toLowerCase() === 'github');
+
+        const computedStanding = cgpa >= 9.0 ? 'First Class with Distinction' : 'First Class';
+
+        return {
+          ...student,
+          cgpa,
+          standing: computedStanding,
+          coding_profiles: codingProfiles,
+          leetcode_handle: lcProfile?.handle || null,
+          leetcode_solved: lcProfile ? (lcProfile.score_rating || lcProfile.streak || 0) : 0,
+          github_handle: ghProfile?.handle || null,
+          github_repos: ghProfile ? (ghProfile.repositories_count || 0) : 0,
+        };
+      });
+
+      if (standing && String(standing) !== 'All') {
+        return res.json(enriched.filter((s) => s.standing === standing));
+      }
+
+      return res.json(enriched);
     }
 
     // Build dynamic SQL query
