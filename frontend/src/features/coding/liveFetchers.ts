@@ -106,10 +106,10 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
   }
 
   // Default structure if profileData is still empty
-  const easySolved = profileData?.easySolved ?? 27;
-  const mediumSolved = profileData?.mediumSolved ?? 5;
+  const easySolved = profileData?.easySolved ?? 0;
+  const mediumSolved = profileData?.mediumSolved ?? 0;
   const hardSolved = profileData?.hardSolved ?? 0;
-  const totalSolved = profileData?.totalSolved ?? easySolved + mediumSolved + hardSolved;
+  const totalSolved = profileData?.totalSolved ?? (profileData ? easySolved + mediumSolved + hardSolved : 0);
 
   return {
     platform: 'leetcode',
