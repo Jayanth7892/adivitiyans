@@ -19,49 +19,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [role, setRole] = useState<UserRole>('student');
 
-  // Restore session on mount — check Cognito session first, then fallback to localStorage
+  // Restore session on mount — localStorage first (instant), Cognito validation second
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        // Try to restore Cognito session
-        const cognitoSession = await getCurrentSession();
-        if (cognitoSession) {
-          // We have a valid Cognito session — restore user from localStorage
-          const saved = localStorage.getItem('advitiyans_auth_user');
-          if (saved) {
-            const savedUser = JSON.parse(saved);
-            setUser(savedUser);
-            setRole(savedUser.role);
-            // Update the JWT token from the fresh Cognito session
-            localStorage.setItem('advitiyans_jwt_token', cognitoSession.idToken);
-          }
-        } else {
-          // No Cognito session — check for non-student saved sessions (faculty/HOD/admin)
-          const saved = localStorage.getItem('advitiyans_auth_user');
-          if (saved) {
-            const savedUser = JSON.parse(saved);
-            // Only restore non-student sessions without Cognito (they use demo auth)
-            if (savedUser.role !== 'student') {
-              setUser(savedUser);
-              setRole(savedUser.role);
-            } else {
-              // Student session expired — clear it
-              localStorage.removeItem('advitiyans_auth_user');
-              localStorage.removeItem('advitiyans_jwt_token');
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[Auth] Session restore failed:', e);
-        // Fallback: try localStorage directly
+        // Step 1: Always try localStorage first for instant session restore
         const saved = localStorage.getItem('advitiyans_auth_user');
         if (saved) {
           try {
             const savedUser = JSON.parse(saved);
             setUser(savedUser);
             setRole(savedUser.role);
-          } catch { /* ignore */ }
+          } catch { /* corrupted data, ignore */ }
         }
+
+        // Step 2: Try to refresh the Cognito JWT token in background
+        try {
+          const cognitoSession = await getCurrentSession();
+          if (cognitoSession) {
+            localStorage.setItem('advitiyans_jwt_token', cognitoSession.idToken);
+          }
+          // If no Cognito session but we have a non-student saved user, that's fine (demo auth)
+          // If no Cognito session and saved user is student, the API calls will fail
+          // but we keep them logged in to avoid jarring UX on mobile
+        } catch {
+          // Cognito check failed (network error, mobile offline, etc.)
+          // Keep the localStorage session — the user stays logged in
+          console.warn('[Auth] Cognito session check failed, using cached session');
+        }
+      } catch (e) {
+        console.warn('[Auth] Session restore failed:', e);
       } finally {
         setIsLoading(false);
       }
