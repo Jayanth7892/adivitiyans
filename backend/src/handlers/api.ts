@@ -92,11 +92,9 @@ app.get('/db-init', async (_req: Request, res: Response) => {
 function sendIndexHtml(res: Response) {
   const indexPath = path.join(publicDir, 'index.html');
   if (fs.existsSync(indexPath)) {
-    let html = fs.readFileSync(indexPath, 'utf8');
-    if (!html.includes('<base')) {
-      html = html.replace('<head>', '<head><base href="/prod/">');
-    }
+    const html = fs.readFileSync(indexPath, 'utf8');
     res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+    res.setHeader('Cache-Control', 'no-cache');
     return res.send(html);
   }
   return res.json({
