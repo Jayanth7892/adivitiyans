@@ -46,7 +46,18 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
     setUploading(true);
     try {
       const presigned = await api.getUploadUrl(activeRollNo, file.name, 'certs');
-      setFileUrl(presigned.uploadUrl);
+
+      // Upload the file to S3 using the PUT pre-signed URL
+      if (presigned.uploadUrl && !presigned.warning) {
+        await fetch(presigned.uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        });
+      }
+
+      // Store the viewUrl (GET pre-signed URL) for later viewing
+      setFileUrl(presigned.viewUrl || presigned.uploadUrl);
     } catch (e: any) {
       alert('Upload failed: ' + e.message);
     } finally {

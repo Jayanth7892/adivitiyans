@@ -9,11 +9,20 @@ import {
   PlacementProfile,
   ScoreBreakdown,
 } from '../types';
+import { getIdToken } from './cognitoAuth';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://w8tlnuswea.execute-api.ap-south-1.amazonaws.com/prod';
 
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
-  const token = localStorage.getItem('advitiyans_jwt_token');
+  // Prefer Cognito JWT, fallback to localStorage token
+  let token: string | null = null;
+  try {
+    token = await getIdToken();
+  } catch { /* ignore */ }
+  if (!token) {
+    token = localStorage.getItem('advitiyans_jwt_token');
+  }
+
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -59,6 +68,14 @@ export const api = {
     return fetchWithAuth(`/students/${id}`, {
       method: 'DELETE',
     });
+  },
+
+  getStudentByEmail: async (email: string): Promise<StudentProfile | null> => {
+    try {
+      return await fetchWithAuth(`/students/by-email/${encodeURIComponent(email)}`);
+    } catch {
+      return null;
+    }
   },
 
   // Student Profile
@@ -161,6 +178,11 @@ export const api = {
     return fetchWithAuth(`/students/${id}/upload-url?fileName=${encodeURIComponent(fileName)}&uploadType=${uploadType}`);
   },
 
+  // Get View URL for existing files
+  getViewUrl: async (id: string, fileKey: string) => {
+    return fetchWithAuth(`/students/${id}/view-url?fileKey=${encodeURIComponent(fileKey)}`);
+  },
+
   // Faculty Mentees
   getFacultyMentees: async (facultyId: string = 'FAC001'): Promise<StudentProfile[]> => {
     return fetchWithAuth(`/faculty/${facultyId}/mentees`);
@@ -169,6 +191,10 @@ export const api = {
   // Reports & Analytics
   getDepartmentReport: async (dept: string = 'CSE') => {
     return fetchWithAuth(`/reports/department/${dept}`);
+  },
+
+  getHodAnalytics: async () => {
+    return fetchWithAuth(`/reports/hod-analytics`);
   },
 
   getPlacementSummary: async () => {

@@ -78,13 +78,7 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
     let isMounted = true;
 
     async function loadLiveSnapshots() {
-      const activeList =
-        linkedProfiles && linkedProfiles.length > 0
-          ? linkedProfiles
-          : [
-              { platform: 'LeetCode', handle: 'jayanth_k' },
-              { platform: 'GitHub', handle: 'jayanth-kumar' },
-            ];
+      const activeList = linkedProfiles && linkedProfiles.length > 0 ? linkedProfiles : [];
 
       setLoadingPlatform(true);
       const newSnapshots: Partial<Record<PlatformId, PlatformStatsSnapshot>> = {};
@@ -209,11 +203,25 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
     if (!linkingPlatformId || !handleInput.trim() || readOnly) return;
     setSaving(true);
     try {
-      const platformConfig = PLATFORM_CONFIGS.find((p) => p.id === linkingPlatformId);
+      const targetId = linkingPlatformId === 'coding-stats' ? 'leetcode' : linkingPlatformId;
+      const platformConfig = PLATFORM_CONFIGS.find((p) => p.id === targetId);
+
+      const validPlatformEnumMap: Record<string, string> = {
+        'github': 'GitHub',
+        'leetcode': 'LeetCode',
+        'geeksforgeeks': 'GeeksforGeeks',
+        'hackerrank': 'HackerRank',
+        'codeforces': 'Codeforces',
+        'codechef': 'CodeChef',
+        'kaggle': 'Kaggle',
+      };
+
+      const platformName = platformConfig?.name || 'LeetCode';
+      const finalPlatformEnum = validPlatformEnumMap[targetId.toLowerCase()] || (platformName === 'Coding Stats' ? 'LeetCode' : platformName);
 
       // Persist to backend API
       await api.saveCodingProfile(activeRollNo, {
-        platform: (platformConfig?.name || linkingPlatformId) as any,
+        platform: finalPlatformEnum as any,
         handle: handleInput.trim(),
         streak: 0,
         repositories_count: 0,
@@ -224,11 +232,11 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
 
       // Refetch profiles to update UI dynamically
       await refetchCodingProfiles();
-      handleSelectPlatform(linkingPlatformId);
+      handleSelectPlatform(targetId);
       setLinkingPlatformId(null);
       setHandleInput('');
     } catch (e: any) {
-      alert('Failed to save platform handle: ' + e.message);
+      alert('Failed to save platform handle: ' + (e.message || e));
     } finally {
       setSaving(false);
     }
@@ -250,7 +258,7 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
         onSelectPlatform={handleSelectPlatform}
         onLinkPlatform={(id) => {
           if (!readOnly) {
-            setLinkingPlatformId(id);
+            setLinkingPlatformId(id === 'coding-stats' ? 'leetcode' : id);
             setHandleInput('');
           }
         }}
@@ -299,7 +307,7 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
                   variant="primary"
                   size="md"
                   onClick={() => {
-                    setLinkingPlatformId(currentConfig.id);
+                    setLinkingPlatformId(currentConfig.id === 'coding-stats' ? 'leetcode' : currentConfig.id);
                     setHandleInput('');
                   }}
                   icon={<Plus className="w-4 h-4" />}

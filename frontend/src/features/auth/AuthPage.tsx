@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, UserCheck, Lock, CheckCircle2, XCircle, Loader2, Sparkles } from 'lucide-react';
 import { studentSignUpSchema, loginSchema, StudentSignUpInput, LoginInput } from '../../lib/validation/auth';
 import { api } from '../../lib/api';
+import { cognitoSignUp, cognitoSignIn } from '../../lib/cognitoAuth';
 import { useAuth } from '../../context/AuthContext';
 import { PillButton } from '../../components/common/PillButton';
 import { UserRole } from '../../types';
@@ -79,7 +80,39 @@ export const AuthPage: React.FC = () => {
 
   const onSignUp = async (data: StudentSignUpInput) => {
     try {
-      login(data.email, 'student', data.registrationNumber, data.fullName);
+      let jwtToken: string | undefined;
+      // 1. Sign up with Cognito (creates user in User Pool)
+      try {
+        await cognitoSignUp({
+          email: data.email,
+          password: data.password,
+          regNo: data.registrationNumber.toUpperCase(),
+          year: data.year,
+          role: 'student',
+        });
+        const authResult = await cognitoSignIn(data.email, data.password);
+        jwtToken = authResult.idToken;
+      } catch (cErr: any) {
+        console.warn('[Cognito Auth Notice]:', cErr.message);
+      }
+
+      // 2. Create student record in database
+      try {
+        await api.createStudent({
+          roll_number: data.registrationNumber.toUpperCase(),
+          name: data.fullName,
+          email: data.email,
+          year: data.year,
+          department: 'CSE',
+          batch: '2023-2027',
+          section: 'A',
+        });
+      } catch (dbErr: any) {
+        console.warn('[DB Student Create Notice]:', dbErr.message);
+      }
+
+      // 3. Log in to app context
+      login(data.email, 'student', data.registrationNumber.toUpperCase(), data.fullName, jwtToken);
       navigate('/dashboard');
     } catch (err: any) {
       alert(err.message || 'Sign up failed');
@@ -90,18 +123,25 @@ export const AuthPage: React.FC = () => {
     try {
       let displayName: string | undefined;
       let rollNo: string | undefined;
+      let jwtToken: string | undefined;
 
       if (activeTab === 'student') {
-        rollNo = '23091A3251';
-        if (data.email.toLowerCase().includes('ananya')) {
-          displayName = 'Ananya Sharma';
-          rollNo = '23091A3252';
-        } else if (data.email.toLowerCase().includes('vikram')) {
-          displayName = 'Vikram Reddy';
-          rollNo = '20091A0588';
-        } else if (data.email.toLowerCase().includes('sneha')) {
-          displayName = 'Sneha Patel';
-          rollNo = '24091A0512';
+        // Attempt Cognito authentication first
+        try {
+          const authResult = await cognitoSignIn(data.email, data.password);
+          jwtToken = authResult.idToken;
+        } catch (cognitoErr: any) {
+          console.warn('[Cognito Login Notice]:', cognitoErr.message);
+          // Gracefully continue to DB lookup for pre-seeded or local student accounts
+        }
+
+        // Fetch student profile from DB
+        const student = await api.getStudentByEmail(data.email);
+        if (student) {
+          rollNo = student.roll_number;
+          displayName = student.name;
+        } else {
+          rollNo = data.email.includes('@') ? data.email.split('@')[0].toUpperCase() : data.email.toUpperCase();
         }
       } else if (activeTab === 'hod') {
         displayName = 'Dr. A. Srinivas (HOD CSE)';
@@ -111,7 +151,7 @@ export const AuthPage: React.FC = () => {
         displayName = 'System Administrator';
       }
 
-      login(data.email, activeTab, rollNo, displayName);
+      login(data.email, activeTab, rollNo, displayName, jwtToken);
       if (activeTab === 'admin') {
         navigate('/admin/dashboard');
       } else if (activeTab === 'faculty') {

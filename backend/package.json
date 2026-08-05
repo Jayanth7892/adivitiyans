@@ -4,12 +4,14 @@
   "description": "Advitiyans Student 360 & Placement Readiness Platform API",
   "main": "dist/handlers/api.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && esbuild src/handlers/api.ts --bundle --platform=node --target=node20 --outfile=dist/handlers/api.js --external:pg-native && esbuild src/handlers/cognito-pre-signup.ts --bundle --platform=node --target=node20 --outfile=dist/handlers/cognito-pre-signup.js",
     "test": "echo \"Error: no test specified\" && exit 0",
-    "start": "ts-node src/local.ts"
+    "start": "ts-node src/local.ts",
+    "db:init": "ts-node src/scripts/init-db.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.500.0",
+    "@aws-sdk/client-secrets-manager": "^3.1102.0",
     "@aws-sdk/s3-request-presigner": "^3.500.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -24,6 +26,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.24",
     "@types/pg": "^8.11.2",
+    "esbuild": "^0.28.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }

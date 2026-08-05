@@ -94,6 +94,43 @@ const SECTION_CGPA_SUMMARY = [
   { section: 'Section C', avgCgpa: 8.95, students: 155, distinction: 61, firstClass: 76 },
 ];
 
+// Type for HOD cross-filter entries (used by both real API data and fallback)
+interface HodStudentEntry {
+  rank: number;
+  name: string;
+  regNo: string;
+  email: string;
+  section: string;
+  year: string;
+  cgpa: number;
+  semGpas: number[];
+  leetcode: number;
+  github: number;
+  standing: string;
+  placementStatus: string;
+}
+
+// Helper: Convert API StudentProfile to HodStudentEntry
+function mapStudentToHodEntry(student: StudentProfile, index: number): HodStudentEntry {
+  const section = student.section
+    ? (student.section.startsWith('Sec ') ? student.section : `Sec ${student.section}`)
+    : 'Sec A';
+  return {
+    rank: index + 1,
+    name: student.name,
+    regNo: student.roll_number,
+    email: student.email,
+    section,
+    year: student.year || '1st Year',
+    cgpa: 0, // Will be enriched from academics if available
+    semGpas: [],
+    leetcode: 0,
+    github: 0,
+    standing: 'First Class', // Default, will be recalculated
+    placementStatus: 'Active',
+  };
+}
+
 export const HodDashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'students' | 'rankings'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,7 +141,7 @@ export const HodDashboardPage: React.FC = () => {
   const [slicerStanding, setSlicerStanding] = useState<string>('All');
   const [slicerCoding, setSlicerCoding] = useState<string>('All');
 
-  const [inspectStudent, setInspectStudent] = useState<typeof FULL_CSE_STUDENTS[0] | null>(null);
+  const [inspectStudent, setInspectStudent] = useState<HodStudentEntry | null>(null);
   const [inspectTab, setInspectTab] = useState('academics-graph');
   const [analyticsCategory, setAnalyticsCategory] = useState<'academics' | 'coding' | 'sections'>('academics');
 
@@ -125,9 +162,19 @@ export const HodDashboardPage: React.FC = () => {
     queryFn: () => api.getAllStudents(),
   });
 
+  // Merge API students with fallback: use API data when available, else hardcoded demo data
+  const mergedStudentDataset: HodStudentEntry[] = useMemo(() => {
+    if (students.length > 0) {
+      // Map API StudentProfile objects to HodStudentEntry shape
+      return students.map((s, idx) => mapStudentToHodEntry(s, idx));
+    }
+    // Fallback to hardcoded demo data when API returns empty
+    return FULL_CSE_STUDENTS;
+  }, [students]);
+
   // PowerBI-style Dynamic Cross-Filtered Dataset (Interactive Graph Clicks update this!)
   const crossFilteredDataset = useMemo(() => {
-    return FULL_CSE_STUDENTS.filter((s) => {
+    return mergedStudentDataset.filter((s) => {
       const matchesSearch = !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.regNo.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesYear = slicerYear === 'All' || s.year === slicerYear;
       const matchesSection = slicerSection === 'All' || s.section.includes(slicerSection.replace('Section ', 'Sec '));
@@ -139,7 +186,7 @@ export const HodDashboardPage: React.FC = () => {
 
       return matchesSearch && matchesYear && matchesSection && matchesStanding && matchesCoding;
     });
-  }, [searchQuery, slicerYear, slicerSection, slicerStanding, slicerCoding]);
+  }, [mergedStudentDataset, searchQuery, slicerYear, slicerSection, slicerStanding, slicerCoding]);
 
   // PowerBI Dynamic Calculated Measures (KPI Metrics)
   const powerBiMetrics = useMemo(() => {

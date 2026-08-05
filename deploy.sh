@@ -31,8 +31,14 @@ echo "   API Base URL: $API_URL"
 echo "   User Pool ID: $USER_POOL_ID"
 echo "   Client ID: $CLIENT_ID"
 
-# 3. Build Frontend SPA
-echo "📦 Step 3: Building Frontend web application..."
+# 3. Initialize Database Schema & Seed Data
+echo "🗄️ Step 3: Initializing AWS RDS PostgreSQL Schema & Seed Data..."
+cd backend
+npm run db:init || echo "⚠️ Database schema initialization skipped or will run via Lambda/SSM."
+cd ..
+
+# 4. Build Frontend SPA
+echo "📦 Step 4: Building Frontend web application..."
 cd frontend
 npm install
 VITE_API_BASE_URL="$API_URL" \

@@ -1,104 +1,248 @@
-# Enhanced Implementation Plan — Advitiyans Student 360°, Faculty & Admin Platform (AWS)
+# Integrate AWS RDS PostgreSQL (db.t4g.micro) + RDS Proxy into Advitiyans
 
-Build a full-stack, production-grade web application (**Advitiyans**) for Student Information, Placement Readiness, Faculty Mentoring, and Placement Cell Administration deployed on AWS serverless architecture.
+Replace the current in-memory mock data store with real PostgreSQL queries routed through **AWS RDS Proxy** for connection pooling, IAM auth, and failover resilience.
 
 ---
 
-## 1. Multi-Role Scope & Permissions Matrix
+## Architecture Overview
 
-| Role | Access & Dashboard Capabilities |
+```
+Frontend (S3/CloudFront)
+    │
+    ▼
+API Gateway → Lambda (in VPC)
+                  │
+                  ▼
+            RDS Proxy (connection pooling + IAM auth)
+                  │
+                  ▼
+            RDS PostgreSQL 15 (db.t4g.micro, PRIVATE_ISOLATED subnet)
+```
+
+**Why RDS Proxy?**
+- Lambda creates a new DB connection on every cold start → can exhaust RDS connection limits
+- RDS Proxy pools and reuses connections, reducing connection overhead by ~90%
+- Supports IAM-based authentication (no password in environment variables)
+- Automatic failover handling
+
+---
+
+## Current State
+
+- [db/index.ts](file:///d:/dept/new/adivitiyans/backend/src/db/index.ts): Uses 8 in-memory `Map` stores; `db.query()` tries PostgreSQL but falls back to `simulateMockQuery()` on failure
+- [api.ts](file:///d:/dept/new/adivitiyans/backend/src/handlers/api.ts): All 20+ routes read/write directly to `db.mockStore.*` Maps — **never touches the real database**
+- [CDK stack](file:///d:/dept/new/adivitiyans/infra/lib/advitiyans-stack.ts): Already provisions RDS PostgreSQL 15 (db.t4g.micro) + Secrets Manager + VPC, but **no RDS Proxy** and **Lambda is not in VPC**
+
+---
+
+## Proposed Changes
+
+### 1. CDK Stack — Add RDS Proxy + VPC Lambda Networking
+
+#### [MODIFY] [advitiyans-stack.ts](file:///d:/dept/new/adivitiyans/infra/lib/advitiyans-stack.ts)
+
+**New resources to add:**
+
+| Resource | Purpose |
 |---|---|
-| **Student** | Self-service signup/login (`/login`), Dashboard (`/dashboard`) with completion ring & nudge cards, Profile (`/profile`) with 8 read/write tabs, employability score breakdown. Cannot touch other students' data. |
-| **Faculty / Mentor** | Login (`/login`), Faculty Dashboard (`/faculty/dashboard`), assigned Mentee Directory with search/filters, department reports, full view/edit access to assigned mentees' academics, faculty remarks, and skill verifications. |
-| **Admin / Placement Cell** | Login (`/login`), Admin Dashboard (`/admin/dashboard`), full Student Directory CRUD (add, view, edit all fields, delete), status inspection across departments/batches, Placement Analytics & CSV export, Faculty & Mentor assignment. |
+| **RDS Proxy** | Connection pooling between Lambda and RDS. Uses Secrets Manager auth. |
+| **Lambda Security Group** | Allows Lambda outbound to RDS Proxy on port 5432 |
+| **RDS Proxy Security Group** | Allows inbound from Lambda SG on port 5432, outbound to RDS SG |
+| **VPC Interface Endpoint (Secrets Manager)** | Required for Lambda in isolated subnets to retrieve DB credentials (no NAT Gateway) |
+| **VPC Interface Endpoint (RDS Data)** | For RDS Proxy IAM authentication in private subnets |
 
----
+**Changes to existing resources:**
 
-## 2. Updated API Surface & Endpoint Mapping
+- **API Lambda**: Place inside VPC (`vpcSubnets: PRIVATE_ISOLATED`), attach Lambda Security Group, add env vars `DB_HOST` pointing to **RDS Proxy endpoint** (not direct RDS endpoint)
+- **Pre-SignUp Lambda**: Same VPC/SG treatment
+- **RDS Instance**: Add security group allowing inbound from RDS Proxy SG only
+- **New CDK Outputs**: `RdsProxyEndpoint`, `RdsEndpoint`
 
-```
-POST   /students                 (admin) create student
-GET    /students                 (admin/faculty) list/search/filter students by dept, batch, section, mentor
-GET    /students/{id}            (self, mentor, admin) get full profile
-PUT    /students/{id}            (self, mentor, admin) update student profile & remarks
-DELETE /students/{id}            (admin) delete student record
-
-GET    /students/{id}/academics
-POST   /students/{id}/academics
-GET    /students/{id}/coding-profiles
-POST   /students/{id}/coding-profiles
-GET    /students/{id}/tech-skills
-POST   /students/{id}/tech-skills
-GET    /students/{id}/certifications
-POST   /students/{id}/certifications
-GET    /students/{id}/soft-skills
-POST   /students/{id}/soft-skills
-GET    /students/{id}/achievements
-POST   /students/{id}/achievements
-GET    /students/{id}/placement-profile
-PUT    /students/{id}/placement-profile
-
-GET    /students/{id}/employability-score     compute + return score breakdown
-GET    /students/{id}/upload-url               returns S3 pre-signed URL for uploads
-
-GET    /faculty/{id}/mentees                     (faculty) list assigned mentees
-GET    /reports/department/{dept}                (admin/faculty) department GPA & skill analytics
-GET    /reports/placement-summary                 (admin) placement categories & CSV data
-
-GET    /auth/check-availability                  (public) registration number & email availability check
-GET    /health                                   (public) API health check
+```typescript
+// RDS Proxy configuration (key snippet)
+const rdsProxy = new rds.DatabaseProxy(this, 'AdvitiyansRdsProxy', {
+  proxyTarget: rds.ProxyTarget.fromInstance(dbInstance),
+  secrets: [dbSecret],
+  vpc,
+  vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+  securityGroups: [proxySecurityGroup],
+  requireTLS: true,
+  idleClientTimeout: cdk.Duration.minutes(30),
+  maxConnectionsPercent: 90,
+  maxIdleConnectionsPercent: 50,
+});
 ```
 
 ---
 
-## 3. Frontend Pages & Components Architecture
+### 2. Database Connection Layer — Connect via RDS Proxy
 
-### 3.1 Role-Based Navigation
-- **Student Navigation**: Dashboard, Personal & Academic, Coding Profiles, Tech Skills, Certifications, Soft Skills, Placement Readiness.
-- **Faculty Navigation**: Faculty Dashboard, Mentee Directory, Department Reports.
-- **Admin Navigation**: Admin Dashboard, Student Directory (CRUD), Placement Analytics, User & Mentor Management.
+#### [MODIFY] [index.ts](file:///d:/dept/new/adivitiyans/backend/src/db/index.ts)
 
-### 3.2 Key Dashboard Specifications
+Complete rewrite:
 
-#### 1. Student Dashboard (`/dashboard`)
-- 60/40 split layout. GreetingHero, StatCards (Employability Score, Certs, Coding Profiles, Skills Tracked), Skill Snapshot Radar chart, Recent Achievements timeline, Complete Your Profile prompt nudge cards.
+- **Remove** all 8 mock `Map` stores and `simulateMockQuery()`
+- **Add** AWS Secrets Manager password retrieval (fetches from `DB_SECRET_ARN` at Lambda cold start)
+- **Connect to RDS Proxy endpoint** (via `DB_HOST` env var) with SSL enabled (`ssl: { rejectUnauthorized: false }`)
+- **Connection pool settings** optimized for Lambda + RDS Proxy:
+  - `max: 1` (RDS Proxy handles pooling; Lambda should use minimal local connections)
+  - `idleTimeoutMillis: 120000`
+  - `connectionTimeoutMillis: 5000`
+- **Add** `db.healthCheck()` for the `/health` endpoint
+- **Keep** `USE_MOCK=true` env toggle for local development without a database
 
-#### 2. Faculty Dashboard (`/faculty/dashboard`)
-- StatCards: Assigned Mentee Count, Avg Mentee GPA, Avg Employability Score, Pending Reviews.
-- Mentee Directory Table: Search by roll number/name, filter by section/batch, status badges (Employability Score, Completion %), Quick View/Edit action.
-- Mentee Evaluation Drawer: Edit faculty remarks, verify tech skills, rate soft skills.
-
-#### 3. Admin / Placement Cell Dashboard (`/admin/dashboard`)
-- Institution StatCards: Total Registered Students, Dept Breakdown, Placement Eligible Students (Score ≥ 80%), Avg Institution Score.
-- Full Student Directory CRUD:
-  - Search bar + filters (Department, Batch, Section, Employability Status).
-  - Add New Student modal.
-  - Edit Student modal (Full administrative authority to modify any field).
-  - Delete Student confirmation.
-  - Quick status check modal (complete 360° summary card).
-- Placement Analytics: Top dream companies, skill gap breakdown, export to CSV.
+```typescript
+// New exports
+export const db = {
+  query(text: string, params?: any[]): Promise<QueryResult>,
+  healthCheck(): Promise<{ connected: boolean; via: 'rds-proxy' | 'direct' | 'mock' }>,
+};
+```
 
 ---
 
-## 4. Proposed File Modifications & Additions
+### 3. Backend API — Replace All Mock Store Access with SQL
 
-### Backend & API
-- **`backend/src/handlers/api.ts`**: Add `GET /students` (with query filtering for dept, batch, search), `DELETE /students/:id`, `GET /faculty/:id/mentees`, `GET /reports/department/:dept`, and `GET /reports/placement-summary`.
+#### [MODIFY] [api.ts](file:///d:/dept/new/adivitiyans/backend/src/handlers/api.ts)
 
-### Frontend Components
-- **`frontend/src/components/layout/Sidebar.tsx`**: Update sidebar navigation to be fully role-aware (Student vs Faculty vs Admin).
-- **`frontend/src/features/auth/AuthPage.tsx`**: Support seamless one-click demo login for Student (`jayanth@rgmcet.edu.in`), Faculty (`mramesh@rgmcet.edu.in`), and Admin (`admin@rgmcet.edu.in`).
-- **`frontend/src/features/faculty/FacultyDashboardPage.tsx`**: New Faculty Dashboard with Mentee Directory and evaluation controls.
-- **`frontend/src/features/admin/AdminDashboardPage.tsx`**: New Admin Dashboard with Student Directory CRUD, Add/Edit/Delete modals, and Placement Analytics CSV export.
-- **`frontend/src/App.tsx`**: Route handling for `/dashboard` (Student), `/faculty/dashboard` (Faculty), and `/admin/dashboard` (Admin).
+Every route handler rewritten to use parameterized SQL:
+
+| Route | Mock → SQL |
+|---|---|
+| `GET /students` | `SELECT * FROM students WHERE ($1::text IS NULL OR department = $1) AND ...` |
+| `POST /students` | `INSERT INTO students (...) VALUES (...) RETURNING *` |
+| `GET /students/:id` | `SELECT * FROM students WHERE roll_number = $1` |
+| `PUT /students/:id` | `UPDATE students SET ... WHERE roll_number = $1 RETURNING *` |
+| `DELETE /students/:id` | `DELETE FROM students WHERE roll_number = $1` |
+| `GET /:id/academics` | `SELECT * FROM academics WHERE student_id = $1 ORDER BY semester` |
+| `POST /:id/academics` | `INSERT INTO academics (...) ON CONFLICT (student_id, semester) DO UPDATE ... RETURNING *` |
+| `GET /:id/coding-profiles` | `SELECT * FROM coding_profiles WHERE student_id = $1` |
+| `POST /:id/coding-profiles` | `INSERT ... ON CONFLICT (student_id, platform) DO UPDATE ... RETURNING *` |
+| `GET /:id/tech-skills` | `SELECT * FROM tech_skills WHERE student_id = $1` |
+| `POST /:id/tech-skills` | `INSERT ... ON CONFLICT (student_id, specific_tool) DO UPDATE ... RETURNING *` |
+| `GET /:id/certifications` | `SELECT * FROM certifications WHERE student_id = $1 ORDER BY date_completed DESC` |
+| `POST /:id/certifications` | `INSERT INTO certifications (...) VALUES (...) RETURNING *` |
+| `GET /:id/soft-skills` | `SELECT * FROM soft_skills WHERE student_id = $1` |
+| `POST /:id/soft-skills` | `INSERT ... ON CONFLICT (student_id, skill, rated_by) DO UPDATE ... RETURNING *` |
+| `GET /:id/achievements` | `SELECT * FROM achievements WHERE student_id = $1 ORDER BY achievement_date DESC` |
+| `POST /:id/achievements` | `INSERT INTO achievements (...) VALUES (...) RETURNING *` |
+| `GET /:id/placement-profile` | `SELECT * FROM placement_profile WHERE student_id = $1` |
+| `PUT /:id/placement-profile` | `INSERT ... ON CONFLICT (student_id) DO UPDATE ... RETURNING *` |
+| `GET /:id/employability-score` | Multiple SELECTs → compute score |
+| `GET /faculty/:id/mentees` | `SELECT * FROM students WHERE faculty_mentor_id = $1` |
+| `GET /reports/department/:dept` | `SELECT COUNT(*), AVG(gpa) ... GROUP BY department` |
+| `GET /reports/placement-summary` | Aggregation joins across students + placement_profile |
+| `GET /reports/hod-analytics` | `GROUP BY year, section` with real computed stats |
+| `GET /auth/check-availability` | Direct `SELECT 1 FROM students WHERE ...` |
+
+Also:
+- **Remove** `getOrInitializeStudent()` — return `404` for missing students
+- Use `RETURNING *` on INSERT/UPDATE for cleaner responses
+- Wrap multi-step operations in transactions where needed
 
 ---
 
-## 5. Verification Plan
+### 4. Environment Configuration
 
-1. **Role Access Testing**:
-   - Log in as **Student**: Verifies `/dashboard` and `/profile`.
-   - Log in as **Faculty**: Redirects to `/faculty/dashboard`, displays assigned mentees, allows editing remarks and verifying skills.
-   - Log in as **Admin**: Redirects to `/admin/dashboard`, provides full CRUD table (Add student, Edit any student field, Delete student, Export CSV).
-2. **TypeScript Compilation**:
-   - Re-run `npm run build` in `/backend` and `/frontend` to ensure 0 compiler errors.
+#### [NEW] [.env.example](file:///d:/dept/new/adivitiyans/backend/.env.example)
+
+```env
+# === Local Development ===
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=advitiyans
+DB_SSL=false
+USE_MOCK=false
+
+# === AWS Deployment (set by CDK) ===
+# DB_HOST=<rds-proxy-endpoint>.rds.amazonaws.com
+# DB_SECRET_ARN=arn:aws:secretsmanager:...
+# DB_SSL=true
+```
+
+#### [MODIFY] [.gitignore](file:///d:/dept/new/adivitiyans/.gitignore)
+- Add `.env` entry
+
+---
+
+### 5. Database Init Script
+
+#### [MODIFY] [init-db.ts](file:///d:/dept/new/adivitiyans/backend/src/scripts/init-db.ts)
+
+- Add Secrets Manager password retrieval when `DB_SECRET_ARN` is set
+- Add connection retry logic (RDS can take time to accept connections after creation)
+- Print summary of tables created and rows seeded
+- Support `--seed-only` flag for re-seeding without dropping tables
+
+---
+
+## Security Group Flow Diagram
+
+```mermaid
+graph LR
+    A["Lambda<br/>(Lambda SG)"] -->|Port 5432| B["RDS Proxy<br/>(Proxy SG)"]
+    B -->|Port 5432| C["RDS PostgreSQL<br/>(DB SG)"]
+    A -->|Port 443| D["Secrets Manager<br/>VPC Endpoint"]
+    
+    style A fill:#f9a825,color:#000
+    style B fill:#1e88e5,color:#fff
+    style C fill:#43a047,color:#fff
+    style D fill:#8e24aa,color:#fff
+```
+
+| Security Group | Inbound | Outbound |
+|---|---|---|
+| **Lambda SG** | — | Port 5432 → Proxy SG, Port 443 → SM Endpoint |
+| **Proxy SG** | Port 5432 from Lambda SG | Port 5432 → DB SG |
+| **DB SG** | Port 5432 from Proxy SG | — |
+| **SM Endpoint SG** | Port 443 from Lambda SG | — |
+
+---
+
+## Files Changed Summary
+
+| File | Action | Description |
+|---|---|---|
+| `infra/lib/advitiyans-stack.ts` | MODIFY | Add RDS Proxy, VPC Endpoints, Security Groups, Lambda VPC placement |
+| `backend/src/db/index.ts` | MODIFY | Rewrite: remove mock stores, add Secrets Manager, connect via RDS Proxy |
+| `backend/src/handlers/api.ts` | MODIFY | Rewrite all 20+ routes from Map ops to parameterized SQL |
+| `backend/src/scripts/init-db.ts` | MODIFY | Add retry logic, Secrets Manager support |
+| `backend/.env.example` | NEW | Environment variable template |
+| `.gitignore` | MODIFY | Add `.env` |
+
+---
+
+## Verification Plan
+
+### Automated Tests
+```bash
+# 1. Set up local PostgreSQL and init schema
+cd backend
+cp .env.example .env   # Edit with your local DB credentials
+npm run db:init
+# → Should print "✅ 11 tables created, 5 students seeded"
+
+# 2. Start backend pointing to real DB
+npm run start
+# → Should print "Connected to PostgreSQL via RDS Proxy" or "via direct"
+
+# 3. Test API endpoints
+curl http://localhost:4000/health          # Should show {connected: true}
+curl http://localhost:4000/students        # Should return 5 seeded students
+curl http://localhost:4000/students/23091A3251/academics  # Real DB data
+
+# 4. Test data persistence — restart backend
+# Kill and restart npm run start → data should persist
+
+# 5. TypeScript compilation
+cd ../backend && npm run build   # 0 errors
+cd ../frontend && npm run build  # 0 errors
+```
+
+### Manual Verification
+- **Restart backend** → verify student data persists (proves no longer in-memory)
+- **Add a student via Admin dashboard** → verify it appears after page refresh
+- **Delete a student** → verify it's gone after backend restart
+- **Deploy to AWS** → verify Lambda connects through RDS Proxy endpoint
