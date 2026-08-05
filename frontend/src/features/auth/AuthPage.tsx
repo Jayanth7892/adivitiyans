@@ -130,13 +130,14 @@ export const AuthPage: React.FC = () => {
 
   const onFacultySignUp = async (data: FacultySignUpInput) => {
     try {
+      const generatedFacId = `FAC_${data.email.split('@')[0].toUpperCase()}`;
       let jwtToken: string | undefined;
       // 1. Sign up with Cognito
       try {
         await cognitoSignUp({
           email: data.email,
           password: data.password,
-          regNo: data.facultyId.toUpperCase(),
+          regNo: generatedFacId,
           year: 'Faculty',
           role: 'faculty',
         });
@@ -149,7 +150,7 @@ export const AuthPage: React.FC = () => {
       // 2. Create faculty record in database
       try {
         await api.createFaculty({
-          faculty_id: data.facultyId.toUpperCase(),
+          faculty_id: generatedFacId,
           name: data.fullName,
           email: data.email,
           department: data.department,
@@ -160,10 +161,47 @@ export const AuthPage: React.FC = () => {
       }
 
       // 3. Log in to app context
-      login(data.email, 'faculty', data.facultyId.toUpperCase(), data.fullName, jwtToken);
+      login(data.email, 'faculty', generatedFacId, data.fullName, jwtToken);
       navigate('/faculty/dashboard');
     } catch (err: any) {
       alert(err.message || 'Faculty sign up failed');
+    }
+  };
+
+  const onHodSignUp = async (data: FacultySignUpInput) => {
+    try {
+      const generatedHodId = `HOD_${data.email.split('@')[0].toUpperCase()}`;
+      let jwtToken: string | undefined;
+      try {
+        await cognitoSignUp({
+          email: data.email,
+          password: data.password,
+          regNo: generatedHodId,
+          year: 'HOD',
+          role: 'hod',
+        });
+        const authResult = await cognitoSignIn(data.email, data.password);
+        jwtToken = authResult.idToken;
+      } catch (cErr: any) {
+        console.warn('[Cognito HOD Auth Notice]:', cErr.message);
+      }
+
+      try {
+        await api.createFaculty({
+          faculty_id: generatedHodId,
+          name: data.fullName,
+          email: data.email,
+          department: data.department,
+          role: 'hod',
+        });
+      } catch (dbErr: any) {
+        console.warn('[DB HOD Create Notice]:', dbErr.message);
+      }
+
+      login(data.email, 'hod', generatedHodId, `${data.fullName} (HOD ${data.department})`, jwtToken);
+      navigate('/hod/dashboard');
+    } catch (err: any) {
+      alert(err.message || 'HOD sign up failed');
     }
   };
 
@@ -174,7 +212,6 @@ export const AuthPage: React.FC = () => {
       let jwtToken: string | undefined;
 
       if (activeTab === 'student') {
-        // Attempt Cognito authentication first
         try {
           const authResult = await cognitoSignIn(data.email, data.password);
           jwtToken = authResult.idToken;
@@ -182,7 +219,6 @@ export const AuthPage: React.FC = () => {
           console.warn('[Cognito Login Notice]:', cognitoErr.message);
         }
 
-        // Fetch student profile from DB
         const student = await api.getStudentByEmail(data.email);
         if (student) {
           rollNo = student.roll_number;
@@ -206,7 +242,20 @@ export const AuthPage: React.FC = () => {
           rollNo = 'FAC001';
         }
       } else if (activeTab === 'hod') {
-        displayName = 'Dr. A. Srinivas (HOD CSE)';
+        try {
+          const authResult = await cognitoSignIn(data.email, data.password);
+          jwtToken = authResult.idToken;
+        } catch (cErr: any) {
+          console.warn('[Cognito HOD Login Notice]:', cErr.message);
+        }
+        const hod = await api.getFacultyByEmail(data.email).catch(() => null);
+        if (hod) {
+          rollNo = hod.faculty_id;
+          displayName = `${hod.name} (HOD ${hod.department})`;
+        } else {
+          displayName = 'Dr. A. Srinivas (HOD CSE)';
+          rollNo = 'HOD_CSE';
+        }
       } else if (activeTab === 'admin') {
         displayName = 'System Administrator';
       }
@@ -480,32 +529,21 @@ export const AuthPage: React.FC = () => {
                 </div>
               </form>
             )
-          ) : activeTab === 'faculty' && isSignUp ? (
-            /* FACULTY SIGN UP FORM */
-            <form onSubmit={handleFacultySignUpSubmit(onFacultySignUp)} className="space-y-4">
+          ) : (activeTab === 'faculty' || activeTab === 'hod') && isSignUp ? (
+            /* FACULTY & HOD SIGN UP FORM */
+            <form onSubmit={handleFacultySignUpSubmit(activeTab === 'hod' ? onHodSignUp : onFacultySignUp)} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-textPrimary mb-1">Faculty Full Name *</label>
+                <label className="block text-xs font-semibold text-textPrimary mb-1">
+                  {activeTab === 'hod' ? 'HOD Full Name *' : 'Faculty Full Name *'}
+                </label>
                 <input
                   {...registerFacultySignUp('fullName')}
                   type="text"
-                  placeholder="e.g. Dr. M. V. Ramana"
+                  placeholder={activeTab === 'hod' ? 'e.g. Dr. A. Srinivas' : 'e.g. Dr. M. V. Ramana'}
                   className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
                 />
                 {facultySignUpErrors.fullName && (
                   <p className="text-xs text-alert mt-1">{facultySignUpErrors.fullName.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-textPrimary mb-1">Faculty / Employee ID *</label>
-                <input
-                  {...registerFacultySignUp('facultyId')}
-                  type="text"
-                  placeholder="e.g. FAC001"
-                  className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background uppercase focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                />
-                {facultySignUpErrors.facultyId && (
-                  <p className="text-xs text-alert mt-1">{facultySignUpErrors.facultyId.message}</p>
                 )}
               </div>
 
@@ -529,11 +567,13 @@ export const AuthPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-textPrimary mb-1">Faculty Email (@rgmcet.edu.in) *</label>
+                <label className="block text-xs font-semibold text-textPrimary mb-1">
+                  {activeTab === 'hod' ? 'HOD Email (@rgmcet.edu.in) *' : 'Faculty Email (@rgmcet.edu.in) *'}
+                </label>
                 <input
                   {...registerFacultySignUp('email')}
                   type="email"
-                  placeholder="username@rgmcet.edu.in"
+                  placeholder={activeTab === 'hod' ? 'hod.cse@rgmcet.edu.in' : 'faculty@rgmcet.edu.in'}
                   className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
                 />
                 {facultySignUpErrors.email && (
@@ -576,7 +616,11 @@ export const AuthPage: React.FC = () => {
                   disabled={isFacultySignUpSubmitting}
                   className="w-full"
                 >
-                  {isFacultySignUpSubmitting ? 'Registering Faculty...' : 'Create Faculty Account'}
+                  {isFacultySignUpSubmitting
+                    ? 'Creating Account...'
+                    : activeTab === 'hod'
+                    ? 'Create HOD Account'
+                    : 'Create Faculty Account'}
                 </PillButton>
               </div>
 
@@ -586,7 +630,7 @@ export const AuthPage: React.FC = () => {
                   onClick={() => setIsSignUp(false)}
                   className="text-xs font-semibold text-brand-primary hover:underline"
                 >
-                  Already registered? Log in as Faculty
+                  Already registered? Log in as {activeTab === 'hod' ? 'HOD' : 'Faculty'}
                 </button>
               </div>
             </form>
@@ -607,6 +651,14 @@ export const AuthPage: React.FC = () => {
                 </div>
               </div>
 
+              {activeTab === 'hod' && (
+                <div className="p-3 bg-surface rounded-xl border border-brand-primary/30 text-xs">
+                  <p className="font-bold text-brand-primary mb-1">🔑 HOD Login Credentials:</p>
+                  <p className="text-textSecondary"><span className="font-semibold text-textPrimary">Email:</span> hod.cse@rgmcet.edu.in</p>
+                  <p className="text-textSecondary"><span className="font-semibold text-textPrimary">Password:</span> HodPassword123</p>
+                </div>
+              )}
+
               <form onSubmit={handleLoginSubmit(onLogin)} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-textPrimary mb-1">
@@ -615,7 +667,7 @@ export const AuthPage: React.FC = () => {
                   <input
                     {...registerLogin('email')}
                     type="email"
-                    placeholder={`${activeTab}@rgmcet.edu.in`}
+                    placeholder={activeTab === 'hod' ? 'hod.cse@rgmcet.edu.in' : `${activeTab}@rgmcet.edu.in`}
                     className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
                   />
                   {loginErrors.email && (
@@ -648,14 +700,14 @@ export const AuthPage: React.FC = () => {
                   </PillButton>
                 </div>
 
-                {activeTab === 'faculty' && (
+                {(activeTab === 'faculty' || activeTab === 'hod') && (
                   <div className="text-center pt-2">
                     <button
                       type="button"
                       onClick={() => setIsSignUp(true)}
                       className="text-xs font-semibold text-brand-primary hover:underline"
                     >
-                      New Faculty Member? Register Account Here
+                      New {activeTab === 'hod' ? 'HOD' : 'Faculty Member'}? Register Account Here
                     </button>
                   </div>
                 )}

@@ -44,10 +44,6 @@ export const facultySignUpSchema = z.object({
   fullName: z.string()
     .min(2, "Full name must be at least 2 characters")
     .max(100, "Full name cannot exceed 100 characters"),
-  facultyId: z.string()
-    .trim()
-    .min(3, "Faculty ID must be at least 3 characters")
-    .transform((val) => val.toUpperCase()),
   department: z.string().min(1, "Please select department"),
   email: z.string()
     .trim()
@@ -65,6 +61,9 @@ export const facultySignUpSchema = z.object({
   path: ["confirmPassword"],
 });
 
+export const hodSignUpSchema = facultySignUpSchema;
+
 export type StudentSignUpInput = z.infer<typeof studentSignUpSchema>;
 export type FacultySignUpInput = z.infer<typeof facultySignUpSchema>;
+export type HodSignUpInput = z.infer<typeof hodSignUpSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
