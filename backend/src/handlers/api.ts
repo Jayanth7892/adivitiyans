@@ -52,36 +52,33 @@ app.get('/db-init', async (_req: Request, res: Response) => {
       const sqlContent = fs.readFileSync(schemaPath, 'utf8');
       await db.query(sqlContent);
 
-      // Clean up duplicate student records if any, keeping the latest record
+      // Delete dummy seed student records if present
       await db.query(`
+        DELETE FROM students 
+        WHERE email IN ('vikram@rgmcet.edu.in', 'sneha@rgmcet.edu.in', 'rahul@rgmcet.edu.in', 'ananya@rgmcet.edu.in', 'jayanth@rgmcet.edu.in')
+        OR roll_number IN ('23091A3253', '23091A3254', '23091A3255');
+
         DELETE FROM students a USING students b
         WHERE a.ctid < b.ctid AND LOWER(a.roll_number) = LOWER(b.roll_number);
-      `).catch(() => {/* ignore if table empty */});
 
-      // Auto-populate default academics & coding profiles for all real students
+        ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS easy_count INT DEFAULT 0;
+        ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS medium_count INT DEFAULT 0;
+        ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS hard_count INT DEFAULT 0;
+        ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS contest_rating INT DEFAULT 0;
+      `).catch(() => {/* ignore */});
+
+      // Ensure every real student has a coding profile record (default 0 solved unless set)
       await db.query(`
-        INSERT INTO academics (student_id, semester, semester_gpa)
-        SELECT roll_number, 1, 8.80 FROM students
-        ON CONFLICT (student_id, semester) DO NOTHING;
-
-        INSERT INTO academics (student_id, semester, semester_gpa)
-        SELECT roll_number, 2, 9.00 FROM students
-        ON CONFLICT (student_id, semester) DO NOTHING;
-
-        INSERT INTO academics (student_id, semester, semester_gpa)
-        SELECT roll_number, 3, 9.20 FROM students
-        ON CONFLICT (student_id, semester) DO NOTHING;
-
-        INSERT INTO coding_profiles (student_id, platform, handle, streak, score_rating)
-        SELECT roll_number, 'LeetCode', LOWER(SPLIT_PART(email, '@', 1)), 18, 280 FROM students
+        INSERT INTO coding_profiles (student_id, platform, handle, streak, score_rating, easy_count, medium_count, hard_count, contest_rating)
+        SELECT roll_number, 'LeetCode', LOWER(SPLIT_PART(email, '@', 1)), 0, 0, 0, 0, 0, 0 FROM students
         ON CONFLICT (student_id, platform) DO NOTHING;
 
         INSERT INTO coding_profiles (student_id, platform, handle, streak, repositories_count)
-        SELECT roll_number, 'GitHub', LOWER(SPLIT_PART(email, '@', 1)), 25, 14 FROM students
+        SELECT roll_number, 'GitHub', LOWER(SPLIT_PART(email, '@', 1)), 0, 0 FROM students
         ON CONFLICT (student_id, platform) DO NOTHING;
       `).catch(() => {/* ignore */});
 
-      return res.json({ status: 'ok', message: 'Database schema, seed data, and student deduplication completed successfully!' });
+      return res.json({ status: 'ok', message: 'Database cleaned: Dummy users removed and real student profiles synced.' });
     }
     res.status(404).json({ error: 'schema.sql file not found in asset' });
   } catch (err: any) {
@@ -262,9 +259,13 @@ app.get('/students', async (req: Request, res: Response) => {
     const result = await db.query(`
       SELECT DISTINCT ON (s.roll_number) 
         s.*,
-        COALESCE(ROUND(AVG(a.semester_gpa), 2), 9.00) AS cgpa,
+        COALESCE(ROUND(AVG(a.semester_gpa), 2), 0.00) AS cgpa,
         MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.handle END) AS leetcode_handle,
-        COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN GREATEST(c.score_rating, c.streak, 0) END), 0) AS leetcode_solved,
+        COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.score_rating END), 0) AS leetcode_solved,
+        COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.easy_count END), 0) AS leetcode_easy,
+        COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.medium_count END), 0) AS leetcode_medium,
+        COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.hard_count END), 0) AS leetcode_hard,
+        COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.contest_rating END), 0) AS leetcode_contest,
         MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.handle END) AS github_handle,
         COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.repositories_count END), 0) AS github_repos
       FROM students s
@@ -300,6 +301,11 @@ app.post('/students', async (req: Request, res: Response) => {
         hostel_day_scholar, driving_license, passport, relocation_willingness, family_business, financial_background,
         faculty_mentor_id, photo_url, resume_url, linkedin_url)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+       ON CONFLICT (roll_number) DO UPDATE SET
+         name = EXCLUDED.name,
+         email = EXCLUDED.email,
+         year = EXCLUDED.year,
+         updated_at = CURRENT_TIMESTAMP
        RETURNING *`,
       [
         regNo, validatedData.name, validatedData.email, validatedData.year,
@@ -311,11 +317,22 @@ app.post('/students', async (req: Request, res: Response) => {
         validatedData.photo_url || null, validatedData.resume_url || null, validatedData.linkedin_url || null,
       ]
     );
-    res.status(201).json({ message: 'Student created successfully', student: result.rows[0] });
+
+    const createdStudent = result.rows[0];
+
+    // Automatically initialize coding profiles & academics for new registration
+    await db.query(`
+      INSERT INTO coding_profiles (student_id, platform, handle, streak, score_rating, easy_count, medium_count, hard_count, contest_rating)
+      VALUES ($1, 'LeetCode', $2, 0, 0, 0, 0, 0, 0)
+      ON CONFLICT (student_id, platform) DO NOTHING;
+
+      INSERT INTO coding_profiles (student_id, platform, handle, streak, repositories_count)
+      VALUES ($1, 'GitHub', $2, 0, 0)
+      ON CONFLICT (student_id, platform) DO NOTHING;
+    `, [regNo, regNo.toLowerCase()]).catch(() => {/* ignore */});
+
+    res.status(201).json({ message: 'Student created successfully', student: createdStudent });
   } catch (err: any) {
-    if (err.code === '23505') {
-      return res.status(400).json({ error: 'Student with this registration number or email already exists' });
-    }
     res.status(400).json({ error: err.message || err });
   }
 });

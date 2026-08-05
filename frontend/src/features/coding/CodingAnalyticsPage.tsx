@@ -49,6 +49,19 @@ export const CodingAnalyticsPage: React.FC = () => {
     const isLcLinked = Boolean(lcHandle);
     const isGhLinked = Boolean(ghHandle);
 
+    const easy = (s as any).leetcode_easy !== undefined && (s as any).leetcode_easy !== null && Number((s as any).leetcode_easy) > 0
+      ? Number((s as any).leetcode_easy)
+      : (totalSolved > 0 ? Math.round(totalSolved * 0.45) : 0);
+    const medium = (s as any).leetcode_medium !== undefined && (s as any).leetcode_medium !== null && Number((s as any).leetcode_medium) > 0
+      ? Number((s as any).leetcode_medium)
+      : (totalSolved > 0 ? Math.round(totalSolved * 0.48) : 0);
+    const hard = (s as any).leetcode_hard !== undefined && (s as any).leetcode_hard !== null && Number((s as any).leetcode_hard) > 0
+      ? Number((s as any).leetcode_hard)
+      : (totalSolved > 0 ? Math.round(totalSolved * 0.07) : 0);
+    const contestRating = (s as any).leetcode_contest && Number((s as any).leetcode_contest) > 0
+      ? Number((s as any).leetcode_contest)
+      : (totalSolved > 0 ? Math.max(1400, 1200 + totalSolved * 1.5) : 0);
+
     return {
       name: s.name,
       regNo: s.roll_number,
@@ -56,14 +69,14 @@ export const CodingAnalyticsPage: React.FC = () => {
       year: s.year,
       section: s.section || 'A',
       cgpa: Number(cgpa.toFixed(2)),
-      standing: cgpa >= 9.0 ? 'First Class with Distinction' : 'First Class',
+      standing: cgpa >= 9.0 ? 'First Class with Distinction' : (cgpa >= 6.5 ? 'First Class' : 'Pass'),
       isLcLinked,
       lcHandle,
-      totalSolved: isLcLinked ? totalSolved : 0,
-      easy: isLcLinked ? Math.round(totalSolved * 0.45) : 0,
-      medium: isLcLinked ? Math.round(totalSolved * 0.48) : 0,
-      hard: isLcLinked ? Math.round(totalSolved * 0.07) : 0,
-      contestRating: isLcLinked ? Math.max(1400, 1200 + totalSolved * 1.5) : 0,
+      totalSolved,
+      easy,
+      medium,
+      hard,
+      contestRating,
       isGhLinked,
       ghHandle,
       repos: isGhLinked ? repos : 0,

@@ -70,6 +70,10 @@ CREATE TABLE IF NOT EXISTS coding_profiles (
     commits_count INT DEFAULT 0,
     prs_merged INT DEFAULT 0,
     score_rating NUMERIC(10, 2) DEFAULT 0.00,
+    easy_count INT DEFAULT 0,
+    medium_count INT DEFAULT 0,
+    hard_count INT DEFAULT 0,
+    contest_rating INT DEFAULT 0,
     last_synced TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(student_id, platform)
 );
@@ -179,10 +183,7 @@ INSERT INTO students (
     financial_background, faculty_mentor_id, linkedin_url
 ) VALUES
 ('23091A3251', 'Jayanth Kumar', 'jayanth@rgmcet.edu.in', '3rd Year', '9876543210', 'Nandyal, Andhra Pradesh', 'Nandyal', 'CSE', '2023-2027', 'A', 'Day Scholar', TRUE, TRUE, TRUE, 'Agriculture', 'Middle Class', 'FAC001', 'https://linkedin.com/in/jayanth-kumar'),
-('23091A3252', 'Ananya Sharma', 'ananya@rgmcet.edu.in', '3rd Year', '9876543211', 'Kurnool, Andhra Pradesh', 'Kurnool', 'CSE', '2023-2027', 'B', 'Hostel', FALSE, TRUE, TRUE, 'Retail Business', 'Upper Middle Class', 'FAC001', 'https://linkedin.com/in/ananya-sharma'),
-('23091A3253', 'Vikram Reddy', 'vikram@rgmcet.edu.in', '4th Year', '9876543212', 'Tirupati, Andhra Pradesh', 'Tirupati', 'ECE', '2022-2026', 'A', 'Day Scholar', TRUE, FALSE, TRUE, 'Engineering Services', 'Middle Class', 'FAC002', 'https://linkedin.com/in/vikram-reddy'),
-('23091A3254', 'Sneha Patel', 'sneha@rgmcet.edu.in', '2nd Year', '9876543213', 'Vijayawada, Andhra Pradesh', 'Vijayawada', 'CSE', '2024-2028', 'C', 'Hostel', TRUE, TRUE, TRUE, 'Pharma Supply', 'Upper Middle Class', 'FAC001', 'https://linkedin.com/in/sneha-patel'),
-('23091A3255', 'Rahul Verma', 'rahul@rgmcet.edu.in', '4th Year', '9876543214', 'Guntur, Andhra Pradesh', 'Guntur', 'EEE', '2022-2026', 'B', 'Day Scholar', FALSE, FALSE, FALSE, 'Textiles', 'Middle Class', 'FAC002', 'https://linkedin.com/in/rahul-verma')
+('23091A3252', 'Ananya Sharma', 'ananya@rgmcet.edu.in', '3rd Year', '9876543211', 'Kurnool, Andhra Pradesh', 'Kurnool', 'CSE', '2023-2027', 'B', 'Hostel', FALSE, TRUE, TRUE, 'Retail Business', 'Upper Middle Class', 'FAC001', 'https://linkedin.com/in/ananya-sharma')
 ON CONFLICT (roll_number) DO NOTHING;
 
 -- Insert Academics for Jayanth (23091A3251)
