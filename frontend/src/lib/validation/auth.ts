@@ -40,5 +40,31 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+export const facultySignUpSchema = z.object({
+  fullName: z.string()
+    .min(2, "Full name must be at least 2 characters")
+    .max(100, "Full name cannot exceed 100 characters"),
+  facultyId: z.string()
+    .trim()
+    .min(3, "Faculty ID must be at least 3 characters")
+    .transform((val) => val.toUpperCase()),
+  department: z.string().min(1, "Please select department"),
+  email: z.string()
+    .trim()
+    .regex(RGMCET_EMAIL_REGEX, {
+      message: "Email must be a valid @rgmcet.edu.in address",
+    })
+    .transform((val) => val.toLowerCase()),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Za-z]/, "Must contain at least one letter")
+    .regex(/\d/, "Must contain at least one number"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
 export type StudentSignUpInput = z.infer<typeof studentSignUpSchema>;
+export type FacultySignUpInput = z.infer<typeof facultySignUpSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

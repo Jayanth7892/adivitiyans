@@ -183,6 +183,18 @@ export const api = {
     return fetchWithAuth(`/students/${id}/view-url?fileKey=${encodeURIComponent(fileKey)}`);
   },
 
+  // Faculty Management
+  createFaculty: async (data: { faculty_id: string; name: string; email: string; department: string; role?: string }) => {
+    return fetchWithAuth('/faculty', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  getFacultyByEmail: async (email: string) => {
+    return fetchWithAuth(`/faculty/by-email/${encodeURIComponent(email)}`);
+  },
+
   // Faculty Mentees
   getFacultyMentees: async (facultyId: string = 'FAC001'): Promise<StudentProfile[]> => {
     return fetchWithAuth(`/faculty/${facultyId}/mentees`);

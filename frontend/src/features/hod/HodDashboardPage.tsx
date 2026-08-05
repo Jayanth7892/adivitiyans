@@ -167,13 +167,17 @@ export const HodDashboardPage: React.FC = () => {
     queryFn: () => api.getAllStudents(),
   });
 
-  // Merge API students with fallback: use API data when available, else hardcoded demo data
+  // Merge API students with fallback: use API data when available (deduplicated by roll_number)
   const mergedStudentDataset: HodStudentEntry[] = useMemo(() => {
     if (students.length > 0) {
+      // Deduplicate API students by roll_number
+      const uniqueStudents = Array.from(
+        new Map(students.map((s) => [s.roll_number.toUpperCase(), s])).values()
+      );
       // Map API StudentProfile objects to HodStudentEntry shape
-      return students.map((s, idx) => mapStudentToHodEntry(s, idx));
+      return uniqueStudents.map((s, idx) => mapStudentToHodEntry(s, idx));
     }
-    // Fallback to hardcoded demo data when API returns empty
+    // Fallback to demo data when API returns empty
     return FULL_CSE_STUDENTS;
   }, [students]);
 

@@ -253,8 +253,8 @@ export class AdvitiyansStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: userPool.userPoolId,
         UPLOADS_BUCKET_NAME: uploadsBucket.bucketName,
         USE_MOCK: 'false',
-        // Forced update timestamp: 2026-08-05T14:26:00
-        BUILD_TIMESTAMP: '2026-08-05T14:26:00',
+        // Forced update timestamp: 2026-08-05T14:48:00
+        BUILD_TIMESTAMP: '2026-08-05T14:48:00',
       },
     });
     dbSecret.grantRead(apiLambda);

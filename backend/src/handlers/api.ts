@@ -51,7 +51,14 @@ app.get('/db-init', async (_req: Request, res: Response) => {
     if (fs.existsSync(schemaPath)) {
       const sqlContent = fs.readFileSync(schemaPath, 'utf8');
       await db.query(sqlContent);
-      return res.json({ status: 'ok', message: 'Database schema and seed data initialized successfully in AWS RDS PostgreSQL via RDS Proxy!' });
+
+      // Clean up duplicate student records if any, keeping the latest record
+      await db.query(`
+        DELETE FROM students a USING students b
+        WHERE a.ctid < b.ctid AND LOWER(a.roll_number) = LOWER(b.roll_number);
+      `).catch(() => {/* ignore if table empty */});
+
+      return res.json({ status: 'ok', message: 'Database schema, seed data, and student deduplication completed successfully!' });
     }
     res.status(404).json({ error: 'schema.sql file not found in asset' });
   } catch (err: any) {
@@ -137,13 +144,16 @@ app.get('/auth/check-availability', async (req: Request, res: Response) => {
 // Students CRUD
 // ============================================================================
 
-// GET /students — List/Search/Filter
+// GET /students — List/Search/Filter (Guarantees DISTINCT ON roll_number)
 app.get('/students', async (req: Request, res: Response) => {
   try {
     const { department, batch, section, year, standing, mentor_id, search } = req.query;
 
     if (db.isMock) {
       let students = Array.from(db.mockStore.students.values());
+      // Deduplicate mock store entries by roll_number
+      students = Array.from(new Map(students.map((s) => [s.roll_number.toUpperCase(), s])).values());
+
       if (department && String(department) !== 'All') students = students.filter((s) => s.department === department);
       if (batch && String(batch) !== 'All') students = students.filter((s) => s.batch === batch);
       if (year && String(year) !== 'All') students = students.filter((s) => s.year === year);
@@ -193,7 +203,7 @@ app.get('/students', async (req: Request, res: Response) => {
       return res.json(enriched);
     }
 
-    // Build dynamic SQL query
+    // Build dynamic SQL query with DISTINCT ON to eliminate duplicates
     const conditions: string[] = [];
     const params: any[] = [];
     let paramIndex = 1;
@@ -228,7 +238,7 @@ app.get('/students', async (req: Request, res: Response) => {
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const result = await db.query(`SELECT * FROM students ${whereClause} ORDER BY roll_number`, params);
+    const result = await db.query(`SELECT DISTINCT ON (roll_number) * FROM students ${whereClause} ORDER BY roll_number, created_at DESC`, params);
     res.json(result.rows);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -889,8 +899,50 @@ app.get('/students/:id/view-url', async (req: Request, res: Response) => {
 });
 
 // ============================================================================
-// Faculty: Mentees
+// Faculty: Registration & Mentees
 // ============================================================================
+
+// POST /faculty — Register a new faculty profile
+app.post('/faculty', async (req: Request, res: Response) => {
+  try {
+    const { faculty_id, name, email, department, role } = req.body;
+    const facId = (faculty_id || `FAC${Date.now().toString().slice(-4)}`).toUpperCase();
+
+    if (db.isMock) {
+      const newFaculty = { faculty_id: facId, name, email, department: department || 'CSE', role: role || 'mentor' };
+      return res.status(201).json({ message: 'Faculty registered successfully', faculty: newFaculty });
+    }
+
+    const result = await db.query(
+      `INSERT INTO faculty (faculty_id, name, email, department, role)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (email) DO UPDATE SET name=$2, department=$4, role=$5
+       RETURNING *`,
+      [facId, name, email.toLowerCase(), department || 'CSE', role || 'mentor']
+    );
+    res.status(201).json({ message: 'Faculty registered successfully', faculty: result.rows[0] });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /faculty/by-email/:email — Fetch faculty profile by email
+app.get('/faculty/by-email/:email', async (req: Request, res: Response) => {
+  try {
+    const email = req.params.email.toLowerCase();
+    if (db.isMock) {
+      return res.json({ faculty_id: 'FAC001', name: 'Dr. M. V. Ramana', email, department: 'CSE', role: 'mentor' });
+    }
+    const result = await db.query('SELECT * FROM faculty WHERE LOWER(email) = $1', [email]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Faculty profile not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/faculty/:id/mentees', async (req: Request, res: Response) => {
   try {
     const facultyId = req.params.id.toUpperCase();

@@ -33,8 +33,13 @@ export const CodingAnalyticsPage: React.FC = () => {
     queryFn: () => api.getAllStudents(),
   });
 
-  // Map real database students to live analytics without any static hardcoded overrides
-  const enrichedStudents = students.map((s) => {
+  // Deduplicate students by roll_number so no duplicate profiles are displayed
+  const uniqueStudents = Array.from(
+    new Map(students.map((s) => [s.roll_number.toUpperCase(), s])).values()
+  );
+
+  // Map real database students to live analytics without any duplicate profiles
+  const enrichedStudents = uniqueStudents.map((s) => {
     const cgpa = (s as any).cgpa !== undefined && (s as any).cgpa !== null ? Number((s as any).cgpa) : 9.0;
     const lcHandle = (s as any).leetcode_handle || null;
     const ghHandle = (s as any).github_handle || null;

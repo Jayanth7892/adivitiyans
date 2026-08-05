@@ -138,7 +138,11 @@ export const AdminDashboardPage: React.FC = () => {
     })
     .sort((a, b) => b.cgpa - a.cgpa);
 
-  const filteredStudents = students.filter((s) => {
+  const uniqueStudents = Array.from(
+    new Map(students.map((s) => [s.roll_number.toUpperCase(), s])).values()
+  );
+
+  const filteredStudents = uniqueStudents.filter((s) => {
     const q = searchQuery.toLowerCase();
     const matchesSearch = !q || s.name.toLowerCase().includes(q) || s.roll_number.toLowerCase().includes(q) || s.email.toLowerCase().includes(q);
     const matchesSection = !sectionFilter || s.section === sectionFilter;

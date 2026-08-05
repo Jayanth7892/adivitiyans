@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, UserCheck, Lock, CheckCircle2, XCircle, Loader2, Sparkles } from 'lucide-react';
-import { studentSignUpSchema, loginSchema, StudentSignUpInput, LoginInput } from '../../lib/validation/auth';
+import { studentSignUpSchema, facultySignUpSchema, loginSchema, StudentSignUpInput, FacultySignUpInput, LoginInput } from '../../lib/validation/auth';
 import { api } from '../../lib/api';
 import { cognitoSignUp, cognitoSignIn } from '../../lib/cognitoAuth';
 import { useAuth } from '../../context/AuthContext';
@@ -19,7 +19,7 @@ export const AuthPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // Sign Up Form
+  // Student Sign Up Form
   const {
     register: registerSignUp,
     handleSubmit: handleSignUpSubmit,
@@ -30,11 +30,20 @@ export const AuthPage: React.FC = () => {
     mode: 'onChange',
   });
 
+  // Faculty Sign Up Form
+  const {
+    register: registerFacultySignUp,
+    handleSubmit: handleFacultySignUpSubmit,
+    formState: { errors: facultySignUpErrors, isSubmitting: isFacultySignUpSubmitting },
+  } = useForm<FacultySignUpInput>({
+    resolver: zodResolver(facultySignUpSchema),
+    mode: 'onChange',
+  });
+
   // Login Form
   const {
     register: registerLogin,
     handleSubmit: handleLoginSubmit,
-    setValue: setLoginValue,
     formState: { errors: loginErrors, isSubmitting: isLoginSubmitting },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -119,6 +128,45 @@ export const AuthPage: React.FC = () => {
     }
   };
 
+  const onFacultySignUp = async (data: FacultySignUpInput) => {
+    try {
+      let jwtToken: string | undefined;
+      // 1. Sign up with Cognito
+      try {
+        await cognitoSignUp({
+          email: data.email,
+          password: data.password,
+          regNo: data.facultyId.toUpperCase(),
+          year: 'Faculty',
+          role: 'faculty',
+        });
+        const authResult = await cognitoSignIn(data.email, data.password);
+        jwtToken = authResult.idToken;
+      } catch (cErr: any) {
+        console.warn('[Cognito Auth Notice]:', cErr.message);
+      }
+
+      // 2. Create faculty record in database
+      try {
+        await api.createFaculty({
+          faculty_id: data.facultyId.toUpperCase(),
+          name: data.fullName,
+          email: data.email,
+          department: data.department,
+          role: 'mentor',
+        });
+      } catch (dbErr: any) {
+        console.warn('[DB Faculty Create Notice]:', dbErr.message);
+      }
+
+      // 3. Log in to app context
+      login(data.email, 'faculty', data.facultyId.toUpperCase(), data.fullName, jwtToken);
+      navigate('/faculty/dashboard');
+    } catch (err: any) {
+      alert(err.message || 'Faculty sign up failed');
+    }
+  };
+
   const onLogin = async (data: LoginInput) => {
     try {
       let displayName: string | undefined;
@@ -132,7 +180,6 @@ export const AuthPage: React.FC = () => {
           jwtToken = authResult.idToken;
         } catch (cognitoErr: any) {
           console.warn('[Cognito Login Notice]:', cognitoErr.message);
-          // Gracefully continue to DB lookup for pre-seeded or local student accounts
         }
 
         // Fetch student profile from DB
@@ -143,10 +190,23 @@ export const AuthPage: React.FC = () => {
         } else {
           rollNo = data.email.includes('@') ? data.email.split('@')[0].toUpperCase() : data.email.toUpperCase();
         }
+      } else if (activeTab === 'faculty') {
+        try {
+          const authResult = await cognitoSignIn(data.email, data.password);
+          jwtToken = authResult.idToken;
+        } catch (cErr: any) {
+          console.warn('[Cognito Faculty Login Notice]:', cErr.message);
+        }
+        const faculty = await api.getFacultyByEmail(data.email).catch(() => null);
+        if (faculty) {
+          rollNo = faculty.faculty_id;
+          displayName = faculty.name;
+        } else {
+          displayName = data.email.split('@')[0].replace(/\./g, ' ');
+          rollNo = 'FAC001';
+        }
       } else if (activeTab === 'hod') {
         displayName = 'Dr. A. Srinivas (HOD CSE)';
-      } else if (activeTab === 'faculty') {
-        displayName = 'Dr. M. V. Ramana (Faculty)';
       } else if (activeTab === 'admin') {
         displayName = 'System Administrator';
       }
@@ -166,24 +226,6 @@ export const AuthPage: React.FC = () => {
     }
   };
 
-  const handleDemoPreset = (role: UserRole) => {
-    setActiveTab(role);
-    setIsSignUp(false);
-    if (role === 'student') {
-      setLoginValue('email', 'jayanth@rgmcet.edu.in');
-      setLoginValue('password', 'Password123');
-    } else if (role === 'faculty') {
-      setLoginValue('email', 'mramesh@rgmcet.edu.in');
-      setLoginValue('password', 'FacultyPassword123');
-    } else if (role === 'hod') {
-      setLoginValue('email', 'hod.cse@rgmcet.edu.in');
-      setLoginValue('password', 'HodPassword123');
-    } else {
-      setLoginValue('email', 'admin@rgmcet.edu.in');
-      setLoginValue('password', 'AdminPassword123');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
@@ -196,44 +238,6 @@ export const AuthPage: React.FC = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg">
         <div className="bg-surface py-8 px-6 shadow-sm border border-borderLine sm:rounded-2xl sm:px-10">
-          {/* Quick Demo Access Bar */}
-          <div className="mb-6 p-3 rounded-xl bg-brand-soft border border-brand-primary/20">
-            <p className="text-[11px] font-bold text-brand-primary uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>One-Click Role Demo Presets</span>
-            </p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoPreset('student')}
-                className="flex-1 py-1.5 px-2 text-xs font-semibold rounded-lg bg-surface text-textPrimary border border-borderLine hover:border-brand-primary"
-              >
-                Student Demo
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoPreset('faculty')}
-                className="flex-1 py-1.5 px-2 text-xs font-semibold rounded-lg bg-surface text-textPrimary border border-borderLine hover:border-brand-primary"
-              >
-                Faculty Demo
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoPreset('hod')}
-                className="flex-1 py-1.5 px-2 text-xs font-semibold rounded-lg bg-surface text-textPrimary border border-borderLine hover:border-brand-primary"
-              >
-                HOD Demo
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoPreset('admin')}
-                className="flex-1 py-1.5 px-2 text-xs font-semibold rounded-lg bg-surface text-textPrimary border border-borderLine hover:border-brand-primary"
-              >
-                Admin Demo
-              </button>
-            </div>
-          </div>
-
           {/* Role Switcher Pill Tabs */}
           <div className="grid grid-cols-4 gap-1 bg-background p-1 rounded-xl border border-borderLine mb-8">
             <button
@@ -428,11 +432,10 @@ export const AuthPage: React.FC = () => {
               /* STUDENT LOGIN FORM */
               <form onSubmit={handleLoginSubmit(onLogin)} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-textPrimary mb-1">Student Email</label>
+                  <label className="block text-xs font-semibold text-textPrimary mb-1">Student Email *</label>
                   <input
                     {...registerLogin('email')}
                     type="email"
-                    defaultValue="jayanth@rgmcet.edu.in"
                     placeholder="username@rgmcet.edu.in"
                     className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
                   />
@@ -442,11 +445,11 @@ export const AuthPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-textPrimary mb-1">Password</label>
+                  <label className="block text-xs font-semibold text-textPrimary mb-1">Password *</label>
                   <input
                     {...registerLogin('password')}
                     type="password"
-                    defaultValue="Password123"
+                    placeholder="Enter password"
                     className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
                   />
                   {loginErrors.password && (
@@ -477,8 +480,118 @@ export const AuthPage: React.FC = () => {
                 </div>
               </form>
             )
+          ) : activeTab === 'faculty' && isSignUp ? (
+            /* FACULTY SIGN UP FORM */
+            <form onSubmit={handleFacultySignUpSubmit(onFacultySignUp)} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1">Faculty Full Name *</label>
+                <input
+                  {...registerFacultySignUp('fullName')}
+                  type="text"
+                  placeholder="e.g. Dr. M. V. Ramana"
+                  className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                />
+                {facultySignUpErrors.fullName && (
+                  <p className="text-xs text-alert mt-1">{facultySignUpErrors.fullName.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1">Faculty / Employee ID *</label>
+                <input
+                  {...registerFacultySignUp('facultyId')}
+                  type="text"
+                  placeholder="e.g. FAC001"
+                  className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background uppercase focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                />
+                {facultySignUpErrors.facultyId && (
+                  <p className="text-xs text-alert mt-1">{facultySignUpErrors.facultyId.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1">Department *</label>
+                <select
+                  {...registerFacultySignUp('department')}
+                  className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                >
+                  <option value="">Select Department</option>
+                  <option value="CSE">Computer Science & Engineering (CSE)</option>
+                  <option value="ECE">Electronics & Communication (ECE)</option>
+                  <option value="EEE">Electrical & Electronics (EEE)</option>
+                  <option value="ME">Mechanical Engineering (ME)</option>
+                  <option value="CE">Civil Engineering (CE)</option>
+                  <option value="Data Science">Data Science</option>
+                </select>
+                {facultySignUpErrors.department && (
+                  <p className="text-xs text-alert mt-1">{facultySignUpErrors.department.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1">Faculty Email (@rgmcet.edu.in) *</label>
+                <input
+                  {...registerFacultySignUp('email')}
+                  type="email"
+                  placeholder="username@rgmcet.edu.in"
+                  className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                />
+                {facultySignUpErrors.email && (
+                  <p className="text-xs text-alert mt-1">{facultySignUpErrors.email.message}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-textPrimary mb-1">Password *</label>
+                  <input
+                    {...registerFacultySignUp('password')}
+                    type="password"
+                    placeholder="Min 8 chars"
+                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  />
+                  {facultySignUpErrors.password && (
+                    <p className="text-xs text-alert mt-1">{facultySignUpErrors.password.message}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-textPrimary mb-1">Confirm Password *</label>
+                  <input
+                    {...registerFacultySignUp('confirmPassword')}
+                    type="password"
+                    placeholder="Re-enter password"
+                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  />
+                  {facultySignUpErrors.confirmPassword && (
+                    <p className="text-xs text-alert mt-1">{facultySignUpErrors.confirmPassword.message}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <PillButton
+                  variant="primary"
+                  size="lg"
+                  type="submit"
+                  disabled={isFacultySignUpSubmitting}
+                  className="w-full"
+                >
+                  {isFacultySignUpSubmitting ? 'Registering Faculty...' : 'Create Faculty Account'}
+                </PillButton>
+              </div>
+
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(false)}
+                  className="text-xs font-semibold text-brand-primary hover:underline"
+                >
+                  Already registered? Log in as Faculty
+                </button>
+              </div>
+            </form>
           ) : (
-            /* FACULTY & ADMIN LOGIN FORMS */
+            /* FACULTY, HOD & ADMIN LOGIN FORMS */
             <div className="space-y-4">
               <div className="bg-brand-soft border border-brand-primary/20 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-brand-primary">
                 <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5" />
@@ -502,7 +615,6 @@ export const AuthPage: React.FC = () => {
                   <input
                     {...registerLogin('email')}
                     type="email"
-                    defaultValue={activeTab === 'faculty' ? 'mramesh@rgmcet.edu.in' : activeTab === 'hod' ? 'hod.cse@rgmcet.edu.in' : 'admin@rgmcet.edu.in'}
                     placeholder={`${activeTab}@rgmcet.edu.in`}
                     className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
                   />
@@ -516,10 +628,12 @@ export const AuthPage: React.FC = () => {
                   <input
                     {...registerLogin('password')}
                     type="password"
-                    defaultValue="Password123"
-                    placeholder="••••••••"
+                    placeholder="Enter password"
                     className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
                   />
+                  {loginErrors.password && (
+                    <p className="text-xs text-alert mt-1">{loginErrors.password.message}</p>
+                  )}
                 </div>
 
                 <div className="pt-2">
@@ -533,6 +647,18 @@ export const AuthPage: React.FC = () => {
                     Log In as {activeTab === 'faculty' ? 'Faculty' : activeTab === 'hod' ? 'HOD' : 'Admin'}
                   </PillButton>
                 </div>
+
+                {activeTab === 'faculty' && (
+                  <div className="text-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsSignUp(true)}
+                      className="text-xs font-semibold text-brand-primary hover:underline"
+                    >
+                      New Faculty Member? Register Account Here
+                    </button>
+                  </div>
+                )}
               </form>
             </div>
           )}
