@@ -27,8 +27,8 @@ const publicDir = path.join(__dirname, '../public');
 
 // Serve frontend static assets from public/ folder if bundled
 if (fs.existsSync(publicDir)) {
-  app.use(express.static(publicDir));
-  app.use('/assets', express.static(path.join(publicDir, 'assets')));
+  app.use('/assets', express.static(path.join(publicDir, 'assets'), { maxAge: '1y', immutable: true }));
+  app.use(express.static(publicDir, { maxAge: '1d' }));
 }
 
 // ============================================================================

@@ -253,8 +253,8 @@ export class AdvitiyansStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: userPool.userPoolId,
         UPLOADS_BUCKET_NAME: uploadsBucket.bucketName,
         USE_MOCK: 'false',
-        // Forced update timestamp: 2026-08-05T16:10:00
-        BUILD_TIMESTAMP: '2026-08-05T16:10:00',
+        // Forced update timestamp: 2026-08-05T16:17:00
+        BUILD_TIMESTAMP: '2026-08-05T16:17:00',
       },
     });
     dbSecret.grantRead(apiLambda);
@@ -323,6 +323,13 @@ export class AdvitiyansStack extends cdk.Stack {
       }),
       websiteIndexDocument: 'index.html',
       websiteErrorDocument: 'index.html',
+      cors: [
+        {
+          allowedOrigins: ['*'],
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD],
+          allowedHeaders: ['*'],
+        },
+      ],
     });
 
     // ========================================================================
