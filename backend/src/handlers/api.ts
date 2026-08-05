@@ -59,18 +59,27 @@ app.get('/db-init', async (_req: Request, res: Response) => {
   }
 });
 
-// Root & Web UI SPA Fallback Route (Serves frontend index.html over HTTPS)
-app.get('/', (_req: Request, res: Response) => {
+function sendIndexHtml(res: Response) {
   const indexPath = path.join(publicDir, 'index.html');
   if (fs.existsSync(indexPath)) {
-    return res.sendFile(indexPath);
+    let html = fs.readFileSync(indexPath, 'utf8');
+    if (!html.includes('<base')) {
+      html = html.replace('<head>', '<head><base href="/prod/">');
+    }
+    res.setHeader('Content-Type', 'text/html; charset=UTF-8');
+    return res.send(html);
   }
-  res.json({
+  return res.json({
     service: 'Advitiyans API Backend Server',
     status: 'running',
     healthCheck: '/health',
     message: 'Advitiyans Placement Readiness Platform',
   });
+}
+
+// Root & Web UI SPA Fallback Route (Serves frontend index.html over HTTPS)
+app.get('/', (_req: Request, res: Response) => {
+  return sendIndexHtml(res);
 });
 
 // ============================================================================
@@ -1070,12 +1079,8 @@ app.get('/reports/placement-summary', async (_req: Request, res: Response) => {
 });
 
 // Catch-all SPA route fallback for client-side React routes
-app.get('*', (req: Request, res: Response) => {
-  const indexPath = path.join(publicDir, 'index.html');
-  if (fs.existsSync(indexPath)) {
-    return res.sendFile(indexPath);
-  }
-  res.status(404).json({ error: 'Route not found' });
+app.get('*', (_req: Request, res: Response) => {
+  return sendIndexHtml(res);
 });
 
 export const handler = serverless(app);
