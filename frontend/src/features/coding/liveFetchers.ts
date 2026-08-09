@@ -1,9 +1,10 @@
 import { PlatformId, PlatformStatsSnapshot } from './platformData';
+import { api } from '../../lib/api';
 
 // ─── Real Live API Fetchers ───────────────────────────────────────────────────
 
 /**
- * Fetches real LeetCode stats with multiple public API fallbacks
+ * Fetches real LeetCode stats with backend GraphQL proxy & public API fallbacks
  */
 export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSnapshot> {
   const LC_PRIMARY = 'https://alfa-leetcode-api.onrender.com';
@@ -15,8 +16,30 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
   let topicAnalysis: { label: string; count: number }[] = [];
   let recentActivities: any[] = [];
 
-  // Try Primary (alfa-leetcode-api)
+  // Try Backend Proxy First (Server-side GraphQL fetch, bypassing browser CORS)
   try {
+    const proxyData = await api.getLeetCodeStats(handle);
+    if (proxyData && proxyData.totalSolved !== undefined) {
+      profileData = {
+        totalSolved: proxyData.totalSolved,
+        easySolved: proxyData.easySolved,
+        mediumSolved: proxyData.mediumSolved,
+        hardSolved: proxyData.hardSolved,
+        ranking: proxyData.ranking,
+        reputation: proxyData.reputation,
+      };
+      contestData = {
+        attendedContestsCount: proxyData.attendedContestsCount || 0,
+        rating: proxyData.contestRating || 0,
+      };
+    }
+  } catch (e) {
+    console.warn('Backend LeetCode proxy fallback triggered:', e);
+  }
+
+  // Try Primary (alfa-leetcode-api) if proxy did not supply full profile
+  if (!profileData) {
+    try {
     const [profileRes, calendarRes, contestRes, skillRes, recentRes] = await Promise.allSettled([
       fetch(`${LC_PRIMARY}/userProfile/${encodeURIComponent(handle)}`),
       fetch(`${LC_PRIMARY}/${encodeURIComponent(handle)}/calendar`),
@@ -72,6 +95,7 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
     }
   } catch (e) {
     console.warn('Alfa LeetCode API fallback triggered:', e);
+  }
   }
 
   // If primary endpoint didn't return profile, try Secondary fallback

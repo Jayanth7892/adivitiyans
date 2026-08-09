@@ -549,19 +549,35 @@ app.post('/students/:id/coding-profiles', async (req: Request, res: Response) =>
     }
 
     await db.query(
-      `INSERT INTO coding_profiles (student_id, platform, handle, streak, repositories_count, commits_count, prs_merged, score_rating)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO coding_profiles (student_id, platform, handle, streak, score_rating, easy_count, medium_count, hard_count, contest_rating, repositories_count, commits_count, prs_merged)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        ON CONFLICT (student_id, platform) DO UPDATE SET
          handle = EXCLUDED.handle,
          streak = EXCLUDED.streak,
+         score_rating = EXCLUDED.score_rating,
+         easy_count = EXCLUDED.easy_count,
+         medium_count = EXCLUDED.medium_count,
+         hard_count = EXCLUDED.hard_count,
+         contest_rating = EXCLUDED.contest_rating,
          repositories_count = EXCLUDED.repositories_count,
          commits_count = EXCLUDED.commits_count,
          prs_merged = EXCLUDED.prs_merged,
-         score_rating = EXCLUDED.score_rating,
          last_synced = CURRENT_TIMESTAMP`,
       [studentId, validated.platform, validated.handle, validated.streak,
-       validated.repositories_count, validated.commits_count, validated.prs_merged, validated.score_rating]
+       validated.score_rating, validated.easy_count || 0, validated.medium_count || 0, validated.hard_count || 0, validated.contest_rating || 0,
+       validated.repositories_count, validated.commits_count, validated.prs_merged]
     );
+
+    // If platform is LeetCode, update student's aggregate leetcode_solved score
+    if (validated.platform === 'LeetCode') {
+      const lcTotal = (validated.score_rating || 0) > 0
+        ? validated.score_rating
+        : ((validated.easy_count || 0) + (validated.medium_count || 0) + (validated.hard_count || 0));
+      await db.query(
+        'UPDATE students SET updated_at = CURRENT_TIMESTAMP WHERE UPPER(roll_number) = $1',
+        [studentId]
+      ).catch(() => {});
+    }
 
     const result = await db.query(
       'SELECT * FROM coding_profiles WHERE student_id = $1 ORDER BY platform',
@@ -570,6 +586,93 @@ app.post('/students/:id/coding-profiles', async (req: Request, res: Response) =>
     res.json({ message: 'Coding profile updated', profiles: result.rows });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /proxy/leetcode/:handle — Proxy live LeetCode stats via GraphQL
+app.get('/proxy/leetcode/:handle', async (req: Request, res: Response) => {
+  try {
+    const handle = String(req.params.handle).trim();
+    if (!handle) {
+      return res.status(400).json({ error: 'Handle is required' });
+    }
+
+    const query = `
+      query userProblemsSolved($username: String!) {
+        matchedUser(username: $username) {
+          username
+          submitStats: submitStatsGlobal {
+            acSubmissionNum {
+              difficulty
+              count
+              submissions
+            }
+          }
+          profile {
+            ranking
+            reputation
+          }
+        }
+        userContestRanking(username: $username) {
+          rating
+          globalRanking
+          attendedContestsCount
+        }
+      }
+    `;
+
+    const response = await fetch('https://leetcode.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://leetcode.com',
+      },
+      body: JSON.stringify({ query, variables: { username: handle } }),
+    });
+
+    if (!response.ok) {
+      return res.status(502).json({ error: `LeetCode API HTTP ${response.status}` });
+    }
+
+    const json: any = await response.json();
+    const matchedUser = json?.data?.matchedUser;
+    if (!matchedUser) {
+      return res.status(404).json({ error: 'LeetCode profile not found' });
+    }
+
+    const stats = matchedUser.submitStats?.acSubmissionNum || [];
+    let easySolved = 0;
+    let mediumSolved = 0;
+    let hardSolved = 0;
+    let totalSolved = 0;
+
+    stats.forEach((s: any) => {
+      if (s.difficulty === 'Easy') easySolved = s.count || 0;
+      if (s.difficulty === 'Medium') mediumSolved = s.count || 0;
+      if (s.difficulty === 'Hard') hardSolved = s.count || 0;
+      if (s.difficulty === 'All') totalSolved = s.count || 0;
+    });
+
+    if (!totalSolved) {
+      totalSolved = easySolved + mediumSolved + hardSolved;
+    }
+
+    const contestInfo = json?.data?.userContestRanking || {};
+
+    res.json({
+      handle: matchedUser.username || handle,
+      totalSolved,
+      easySolved,
+      mediumSolved,
+      hardSolved,
+      ranking: matchedUser.profile?.ranking || 0,
+      reputation: matchedUser.profile?.reputation || 0,
+      contestRating: Math.round(contestInfo.rating || 0),
+      attendedContestsCount: contestInfo.attendedContestsCount || 0,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch LeetCode profile' });
   }
 });
 

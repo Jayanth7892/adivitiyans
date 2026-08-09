@@ -83,6 +83,10 @@ export const codingProfileSchema = z.object({
   commits_count: z.number().int().nonnegative().default(0),
   prs_merged: z.number().int().nonnegative().default(0),
   score_rating: z.number().nonnegative().default(0),
+  easy_count: z.number().int().nonnegative().optional().default(0),
+  medium_count: z.number().int().nonnegative().optional().default(0),
+  hard_count: z.number().int().nonnegative().optional().default(0),
+  contest_rating: z.number().optional().default(0),
 });
 
 export const techSkillSchema = z.object({

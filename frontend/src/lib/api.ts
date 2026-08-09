@@ -113,6 +113,10 @@ export const api = {
     });
   },
 
+  getLeetCodeStats: async (handle: string): Promise<any> => {
+    return fetchWithAuth(`/proxy/leetcode/${encodeURIComponent(handle)}`);
+  },
+
   getTechSkills: async (id: string = '23091A3251'): Promise<TechSkill[]> => {
     return fetchWithAuth(`/students/${id}/tech-skills`);
   },
