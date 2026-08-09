@@ -141,7 +141,7 @@ app.get('/auth/check-availability', async (req: Request, res: Response) => {
     if (type === 'regNo') {
       const regStr = String(value).trim().toUpperCase();
       if (!REGISTRATION_NUMBER_REGEX.test(regStr)) {
-        return res.json({ available: false, message: "Must match 10-char format (e.g. 23091A3251). Positions 7-8 must be '32'" });
+        return res.json({ available: false, message: "Must match format: YY09(1A|5A)32XX (e.g. 23091A32A5)" });
       }
 
       if (db.isMock) {

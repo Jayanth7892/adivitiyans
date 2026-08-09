@@ -1,6 +1,14 @@
 import { z } from 'zod';
 
-export const REGISTRATION_NUMBER_REGEX = /^\d{5}[A-Za-z]32\d{2}$/;
+/**
+ * Registration Number format (10 chars):
+ *   Pos 1-2: Year (any 2 digits, e.g. 23 = 2023)
+ *   Pos 3-4: College code — must be '09'
+ *   Pos 5-6: Education type — must be '1A' (inter) or '5A' (polytechnic/FDH/diploma)
+ *   Pos 7-8: Department ID — must be '32' (Data Science)
+ *   Pos 9-10: Student ID — alphanumeric (e.g. 01, A5, KK, P4, ZZ)
+ */
+export const REGISTRATION_NUMBER_REGEX = /^\d{2}09[15][Aa]32[A-Za-z0-9]{2}$/;
 export const RGMCET_EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@rgmcet\.edu\.in$/i;
 
 export const studentSignUpSchema = z.object({
@@ -10,12 +18,9 @@ export const studentSignUpSchema = z.object({
   registrationNumber: z.string()
     .trim()
     .regex(REGISTRATION_NUMBER_REGEX, {
-      message: "10 characters required (e.g. 23091A3251). Positions 7-8 must be '32'.",
+      message: "Invalid format. Must be: YY09(1A|5A)32XX (e.g. 23091A32A5)",
     })
     .transform((val) => val.toUpperCase()),
-  year: z.enum(['1st Year', '2nd Year', '3rd Year', '4th Year'], {
-    required_error: "Please select your academic year",
-  }),
   email: z.string()
     .trim()
     .regex(RGMCET_EMAIL_REGEX, {
@@ -27,6 +32,13 @@ export const studentSignUpSchema = z.object({
     .regex(/[A-Za-z]/, "Must contain at least one letter")
     .regex(/\d/, "Must contain at least one number"),
   confirmPassword: z.string(),
+}).refine((data) => {
+  // Email prefix must match registration number (case-insensitive)
+  const emailPrefix = data.email.split('@')[0].toLowerCase();
+  return emailPrefix === data.registrationNumber.toLowerCase();
+}, {
+  message: "Email must match your registration number (e.g. 23091a32a5@rgmcet.edu.in)",
+  path: ["email"],
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],

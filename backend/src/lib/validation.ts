@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
-// Registration Number Regex: 5 digits, 1 letter (case-insensitive), fixed '32', 2 digits
-export const REGISTRATION_NUMBER_REGEX = /^\d{5}[A-Za-z]32\d{2}$/;
+// Registration Number Regex: YY (2 digits) + 09 (college) + 1A/5A (edu) + 32 (dept) + XX (2 alphanumeric)
+export const REGISTRATION_NUMBER_REGEX = /^\d{2}09(1[Aa]|5[Aa])32[A-Za-z0-9]{2}$/;
 export const RGMCET_EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@rgmcet\.edu\.in$/i;
 
 export const registrationNumberSchema = z.string()
   .trim()
   .regex(REGISTRATION_NUMBER_REGEX, {
-    message: "Registration number must be 10 characters (e.g. 23091A3251). Positions 7-8 must be '32'.",
+    message: "Must match format: YY09(1A|5A)32XX (e.g. 23091A32A5).",
   })
   .transform((val) => val.toUpperCase());
 
