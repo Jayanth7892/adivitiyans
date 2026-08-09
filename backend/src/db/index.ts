@@ -221,6 +221,7 @@ async function ensureSchema(p: Pool) {
       photo_url TEXT,
       resume_url TEXT,
       linkedin_url TEXT,
+      linkedin_updated TIMESTAMP WITH TIME ZONE,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`,
@@ -314,6 +315,9 @@ async function ensureSchema(p: Pool) {
       need_from_department TEXT,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`,
+
+    // Migrations: add columns that may be missing from earlier schema versions
+    `ALTER TABLE students ADD COLUMN IF NOT EXISTS linkedin_updated TIMESTAMP WITH TIME ZONE;`,
   ];
 
   try {
