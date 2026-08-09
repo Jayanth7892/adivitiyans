@@ -183,6 +183,151 @@ if (USE_MOCK) {
   });
 }
 
+let schemaInitialized = false;
+
+async function ensureSchema(p: Pool) {
+  if (schemaInitialized) return;
+  schemaInitialized = true;
+  try {
+    const client = await p.connect();
+    try {
+      await client.query(`
+        CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+        CREATE TABLE IF NOT EXISTS faculty (
+          faculty_id VARCHAR(50) PRIMARY KEY,
+          name VARCHAR(100) NOT NULL,
+          email VARCHAR(100) UNIQUE NOT NULL,
+          department VARCHAR(50) NOT NULL,
+          role VARCHAR(50) DEFAULT 'mentor',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS students (
+          roll_number VARCHAR(10) PRIMARY KEY,
+          name VARCHAR(100) NOT NULL,
+          email VARCHAR(100) UNIQUE NOT NULL,
+          year VARCHAR(20) NOT NULL,
+          phone VARCHAR(20),
+          address TEXT,
+          native_place VARCHAR(100),
+          department VARCHAR(50) NOT NULL DEFAULT 'CSE',
+          batch VARCHAR(20) NOT NULL DEFAULT '2023-2027',
+          section VARCHAR(10) DEFAULT 'A',
+          hostel_day_scholar VARCHAR(20) DEFAULT 'Day Scholar',
+          driving_license BOOLEAN DEFAULT FALSE,
+          passport BOOLEAN DEFAULT FALSE,
+          relocation_willingness BOOLEAN DEFAULT TRUE,
+          family_business TEXT,
+          financial_background VARCHAR(50),
+          faculty_mentor_id VARCHAR(50) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
+          photo_url TEXT,
+          resume_url TEXT,
+          linkedin_url TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS academics (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          student_id VARCHAR(10) NOT NULL REFERENCES students(roll_number) ON DELETE CASCADE,
+          semester INT NOT NULL,
+          semester_gpa NUMERIC(4, 2),
+          programming_grade VARCHAR(5),
+          attendance_pct NUMERIC(5, 2),
+          theory_grade VARCHAR(5),
+          remarks TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(student_id, semester)
+        );
+
+        CREATE TABLE IF NOT EXISTS coding_profiles (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          student_id VARCHAR(10) NOT NULL REFERENCES students(roll_number) ON DELETE CASCADE,
+          platform VARCHAR(50) NOT NULL,
+          handle VARCHAR(100) NOT NULL,
+          streak INT DEFAULT 0,
+          repositories_count INT DEFAULT 0,
+          commits_count INT DEFAULT 0,
+          prs_merged INT DEFAULT 0,
+          score_rating NUMERIC(10, 2) DEFAULT 0.00,
+          easy_count INT DEFAULT 0,
+          medium_count INT DEFAULT 0,
+          hard_count INT DEFAULT 0,
+          contest_rating NUMERIC(10, 2) DEFAULT 0.00,
+          last_synced TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(student_id, platform)
+        );
+
+        CREATE TABLE IF NOT EXISTS tech_skills (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          student_id VARCHAR(10) NOT NULL REFERENCES students(roll_number) ON DELETE CASCADE,
+          skill_category VARCHAR(100) NOT NULL,
+          specific_tool VARCHAR(100) NOT NULL,
+          self_rating INT NOT NULL,
+          verified BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(student_id, specific_tool)
+        );
+
+        CREATE TABLE IF NOT EXISTS certifications (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          student_id VARCHAR(10) NOT NULL REFERENCES students(roll_number) ON DELETE CASCADE,
+          provider VARCHAR(100) NOT NULL,
+          title VARCHAR(200) NOT NULL,
+          date_completed DATE,
+          certificate_file_url TEXT,
+          suggested BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS soft_skills (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          student_id VARCHAR(10) NOT NULL REFERENCES students(roll_number) ON DELETE CASCADE,
+          skill VARCHAR(100) NOT NULL,
+          rating INT NOT NULL,
+          rated_by VARCHAR(20) DEFAULT 'self',
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(student_id, skill, rated_by)
+        );
+
+        CREATE TABLE IF NOT EXISTS achievements (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          student_id VARCHAR(10) NOT NULL REFERENCES students(roll_number) ON DELETE CASCADE,
+          type VARCHAR(50) NOT NULL,
+          title VARCHAR(200) NOT NULL,
+          description TEXT NOT NULL,
+          achievement_date DATE,
+          organization VARCHAR(150),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS placement_profile (
+          student_id VARCHAR(10) PRIMARY KEY REFERENCES students(roll_number) ON DELETE CASCADE,
+          placement_category VARCHAR(100) DEFAULT 'Product Companies',
+          preferred_career VARCHAR(100) DEFAULT 'AI & Full Stack Engineer',
+          dream_company TEXT[] DEFAULT ARRAY['Google', 'Microsoft', 'Amazon'],
+          employability_score NUMERIC(5, 2) DEFAULT 85.50,
+          skill_gap JSONB DEFAULT '[]'::jsonb,
+          suggested_certifications JSONB DEFAULT '[]'::jsonb,
+          higher_studies_interest BOOLEAN DEFAULT FALSE,
+          overall_potential NUMERIC(3, 1) DEFAULT 4.5,
+          research_potential NUMERIC(3, 1) DEFAULT 4.0,
+          need_from_department TEXT,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      console.log('[DB] Automatic database schema check/creation complete.');
+    } finally {
+      client.release();
+    }
+  } catch (err: any) {
+    console.warn('[DB] Automatic schema initialization warning:', err.message);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Exported db object
 // ---------------------------------------------------------------------------
@@ -197,7 +342,19 @@ export const db = {
       return { rows: [], rowCount: 0, command: '', oid: 0, fields: [] } as any;
     }
     const p = await getPool();
-    return p.query(text, params);
+    await ensureSchema(p);
+    try {
+      return await p.query(text, params);
+    } catch (err: any) {
+      const msg = String(err.message || err);
+      if (msg.includes('does not exist') || err.code === '42P01') {
+        console.warn('[DB] Missing table error caught. Retrying schema initialization...');
+        schemaInitialized = false;
+        await ensureSchema(p);
+        return await p.query(text, params);
+      }
+      throw err;
+    }
   },
 
   /**
