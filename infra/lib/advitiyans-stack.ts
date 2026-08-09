@@ -91,7 +91,7 @@ export class AdvitiyansStack extends cdk.Stack {
     vpceSecurityGroup.addIngressRule(proxySg, ec2.Port.tcp(443), 'Allow RDS Proxy to Secrets Manager');
 
     // ========================================================================
-    // 3. VPC Interface Endpoints (required: no NAT Gateway)
+    // 3. VPC Interface Endpoints (Temporarily removed to stop hourly VPC charges)
     // ========================================================================
 
     // Secrets Manager endpoint — needed by Lambda and RDS Proxy

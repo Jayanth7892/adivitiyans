@@ -89,39 +89,34 @@ export const AuthPage: React.FC = () => {
 
   const onSignUp = async (data: StudentSignUpInput) => {
     try {
-      let jwtToken: string | undefined;
+      const regNo = data.registrationNumber.toUpperCase();
       // 1. Sign up with Cognito (creates user in User Pool)
-      try {
-        await cognitoSignUp({
-          email: data.email,
-          password: data.password,
-          regNo: data.registrationNumber.toUpperCase(),
-          year: data.year,
-          role: 'student',
-        });
-        const authResult = await cognitoSignIn(data.email, data.password);
-        jwtToken = authResult.idToken;
-      } catch (cErr: any) {
-        console.warn('[Cognito Auth Notice]:', cErr.message);
-      }
+      let jwtToken: string | undefined;
+      await cognitoSignUp({
+        email: data.email,
+        password: data.password,
+        regNo,
+        year: data.year,
+        role: 'student',
+      });
+      const authResult = await cognitoSignIn(data.email, data.password);
+      jwtToken = authResult.idToken;
 
       // 2. Create student record in database
-      try {
-        await api.createStudent({
-          roll_number: data.registrationNumber.toUpperCase(),
-          name: data.fullName,
-          email: data.email,
-          year: data.year,
-          department: 'CSE',
-          batch: '2023-2027',
-          section: 'A',
-        });
-      } catch (dbErr: any) {
+      await api.createStudent({
+        roll_number: regNo,
+        name: data.fullName,
+        email: data.email,
+        year: data.year,
+        department: 'CSE',
+        batch: '2023-2027',
+        section: 'A',
+      }).catch((dbErr: any) => {
         console.warn('[DB Student Create Notice]:', dbErr.message);
-      }
+      });
 
       // 3. Log in to app context
-      login(data.email, 'student', data.registrationNumber.toUpperCase(), data.fullName, jwtToken);
+      login(data.email, 'student', regNo, data.fullName, jwtToken);
       navigate('/dashboard');
     } catch (err: any) {
       alert(err.message || 'Sign up failed');
@@ -132,35 +127,26 @@ export const AuthPage: React.FC = () => {
     try {
       const generatedFacId = `FAC_${data.email.split('@')[0].toUpperCase()}`;
       let jwtToken: string | undefined;
-      // 1. Sign up with Cognito
-      try {
-        await cognitoSignUp({
-          email: data.email,
-          password: data.password,
-          regNo: generatedFacId,
-          year: 'Faculty',
-          role: 'faculty',
-        });
-        const authResult = await cognitoSignIn(data.email, data.password);
-        jwtToken = authResult.idToken;
-      } catch (cErr: any) {
-        console.warn('[Cognito Auth Notice]:', cErr.message);
-      }
+      await cognitoSignUp({
+        email: data.email,
+        password: data.password,
+        regNo: generatedFacId,
+        year: 'Faculty',
+        role: 'faculty',
+      });
+      const authResult = await cognitoSignIn(data.email, data.password);
+      jwtToken = authResult.idToken;
 
-      // 2. Create faculty record in database
-      try {
-        await api.createFaculty({
-          faculty_id: generatedFacId,
-          name: data.fullName,
-          email: data.email,
-          department: data.department,
-          role: 'mentor',
-        });
-      } catch (dbErr: any) {
+      await api.createFaculty({
+        faculty_id: generatedFacId,
+        name: data.fullName,
+        email: data.email,
+        department: data.department,
+        role: 'mentor',
+      }).catch((dbErr: any) => {
         console.warn('[DB Faculty Create Notice]:', dbErr.message);
-      }
+      });
 
-      // 3. Log in to app context
       login(data.email, 'faculty', generatedFacId, data.fullName, jwtToken);
       navigate('/faculty/dashboard');
     } catch (err: any) {
@@ -172,36 +158,42 @@ export const AuthPage: React.FC = () => {
     try {
       const generatedHodId = `HOD_${data.email.split('@')[0].toUpperCase()}`;
       let jwtToken: string | undefined;
-      try {
-        await cognitoSignUp({
-          email: data.email,
-          password: data.password,
-          regNo: generatedHodId,
-          year: 'HOD',
-          role: 'hod',
-        });
-        const authResult = await cognitoSignIn(data.email, data.password);
-        jwtToken = authResult.idToken;
-      } catch (cErr: any) {
-        console.warn('[Cognito HOD Auth Notice]:', cErr.message);
-      }
+      await cognitoSignUp({
+        email: data.email,
+        password: data.password,
+        regNo: generatedHodId,
+        year: 'HOD',
+        role: 'hod',
+      });
+      const authResult = await cognitoSignIn(data.email, data.password);
+      jwtToken = authResult.idToken;
 
-      try {
-        await api.createFaculty({
-          faculty_id: generatedHodId,
-          name: data.fullName,
-          email: data.email,
-          department: data.department,
-          role: 'hod',
-        });
-      } catch (dbErr: any) {
+      await api.createFaculty({
+        faculty_id: generatedHodId,
+        name: data.fullName,
+        email: data.email,
+        department: data.department,
+        role: 'hod',
+      }).catch((dbErr: any) => {
         console.warn('[DB HOD Create Notice]:', dbErr.message);
-      }
+      });
 
       login(data.email, 'hod', generatedHodId, `${data.fullName} (HOD ${data.department})`, jwtToken);
       navigate('/hod/dashboard');
     } catch (err: any) {
       alert(err.message || 'HOD sign up failed');
+    }
+  };
+
+  // Helper to decode JWT payload (base64url) for role validation
+  const decodeJwtPayload = (token: string): Record<string, any> => {
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return {};
+      const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(payload));
+    } catch {
+      return {};
     }
   };
 
@@ -211,50 +203,103 @@ export const AuthPage: React.FC = () => {
       let rollNo: string | undefined;
       let jwtToken: string | undefined;
 
-      if (activeTab === 'student') {
-        try {
-          const authResult = await cognitoSignIn(data.email, data.password);
-          jwtToken = authResult.idToken;
-        } catch (cognitoErr: any) {
-          console.warn('[Cognito Login Notice]:', cognitoErr.message);
+      // Step 1: Attempt authentication via Cognito
+      try {
+        const authResult = await cognitoSignIn(data.email, data.password);
+        jwtToken = authResult.idToken;
+      } catch (cognitoErr: any) {
+        const msg = cognitoErr.message || '';
+
+        if (msg.includes('Incorrect username or password') || msg.includes('NotAuthorizedException')) {
+          // Wrong password for an existing Cognito account -> REJECT IMMEDIATELY!
+          throw new Error('Incorrect password. Please check your credentials and try again.');
         }
 
+        if (msg.includes('User does not exist') || msg.includes('UserNotFoundException')) {
+          // User is not in Cognito yet. Check if they exist in DB.
+          let dbUser: any = null;
+
+          if (activeTab === 'student') {
+            dbUser = await api.getStudentByEmail(data.email);
+          } else if (activeTab === 'faculty' || activeTab === 'hod') {
+            dbUser = await api.getFacultyByEmail(data.email).catch(() => null);
+          }
+
+          if (!dbUser) {
+            throw new Error(`No ${activeTab} account found for this email. Please check your email or sign up.`);
+          }
+
+          // User DOES exist in DB. Register them in Cognito with this password so future logins require exact password!
+          try {
+            const regNo = dbUser.roll_number || dbUser.faculty_id || data.email.split('@')[0].toUpperCase();
+            await cognitoSignUp({
+              email: data.email,
+              password: data.password,
+              regNo,
+              year: dbUser.year || (activeTab === 'hod' ? 'HOD' : activeTab === 'faculty' ? 'Faculty' : 'student'),
+              role: activeTab,
+            });
+            const authResult = await cognitoSignIn(data.email, data.password);
+            jwtToken = authResult.idToken;
+          } catch (autoSignUpErr: any) {
+            const signMsg = autoSignUpErr.message || '';
+            if (signMsg.includes('UsernameExistsException') || signMsg.includes('already exists') || signMsg.includes('User already exists')) {
+              // User IS in Cognito, but cognitoSignIn above failed -> wrong password!
+              throw new Error('Incorrect password. Please check your credentials and try again.');
+            }
+            if (signMsg.includes('Password') || signMsg.includes('policy')) {
+              throw new Error(`Password requirement: ${signMsg}`);
+            }
+            throw new Error(signMsg || 'Invalid email or password. Please check your credentials and try again.');
+          }
+        } else {
+          throw new Error(msg || 'Authentication failed');
+        }
+      }
+
+      // Step 2: Validate role from JWT token
+      if (jwtToken) {
+        const payload = decodeJwtPayload(jwtToken);
+        const tokenRole = (payload['custom:role'] || '').toLowerCase();
+
+        if (activeTab === 'student' && tokenRole && tokenRole !== 'student') {
+          throw new Error(`This account is registered as "${tokenRole}". Please use the ${tokenRole.charAt(0).toUpperCase() + tokenRole.slice(1)} tab to log in.`);
+        }
+        if (activeTab === 'faculty' && tokenRole && tokenRole !== 'faculty' && tokenRole !== 'mentor') {
+          throw new Error(`This account is registered as "${tokenRole}". Please use the correct tab to log in.`);
+        }
+        if (activeTab === 'hod' && tokenRole && tokenRole !== 'hod') {
+          throw new Error(`This account is registered as "${tokenRole}". Please use the correct tab to log in.`);
+        }
+        if (activeTab === 'admin' && tokenRole && tokenRole !== 'admin') {
+          throw new Error(`This account is not authorized for admin access.`);
+        }
+      }
+
+      // Step 3: Fetch DB profile to get displayName and rollNo
+      if (activeTab === 'student') {
         const student = await api.getStudentByEmail(data.email);
         if (student) {
           rollNo = student.roll_number;
           displayName = student.name;
         } else {
-          rollNo = data.email.includes('@') ? data.email.split('@')[0].toUpperCase() : data.email.toUpperCase();
+          throw new Error('No student account found for this email. Please sign up first.');
         }
       } else if (activeTab === 'faculty') {
-        try {
-          const authResult = await cognitoSignIn(data.email, data.password);
-          jwtToken = authResult.idToken;
-        } catch (cErr: any) {
-          console.warn('[Cognito Faculty Login Notice]:', cErr.message);
-        }
         const faculty = await api.getFacultyByEmail(data.email).catch(() => null);
-        if (faculty) {
+        if (faculty && faculty.role !== 'hod') {
           rollNo = faculty.faculty_id;
           displayName = faculty.name;
         } else {
-          displayName = data.email.split('@')[0].replace(/\./g, ' ');
-          rollNo = 'FAC001';
+          throw new Error('No faculty account found for this email. Please sign up as faculty first.');
         }
       } else if (activeTab === 'hod') {
-        try {
-          const authResult = await cognitoSignIn(data.email, data.password);
-          jwtToken = authResult.idToken;
-        } catch (cErr: any) {
-          console.warn('[Cognito HOD Login Notice]:', cErr.message);
-        }
         const hod = await api.getFacultyByEmail(data.email).catch(() => null);
-        if (hod) {
+        if (hod && hod.role === 'hod') {
           rollNo = hod.faculty_id;
           displayName = `${hod.name} (HOD ${hod.department})`;
         } else {
-          displayName = 'Dr. A. Srinivas (HOD CSE)';
-          rollNo = 'HOD_CSE';
+          throw new Error('No HOD account found for this email. Please register as HOD first.');
         }
       } else if (activeTab === 'admin') {
         displayName = 'System Administrator';
@@ -651,13 +696,6 @@ export const AuthPage: React.FC = () => {
                 </div>
               </div>
 
-              {activeTab === 'hod' && (
-                <div className="p-3 bg-surface rounded-xl border border-brand-primary/30 text-xs">
-                  <p className="font-bold text-brand-primary mb-1">🔑 HOD Login Credentials:</p>
-                  <p className="text-textSecondary"><span className="font-semibold text-textPrimary">Email:</span> hod.cse@rgmcet.edu.in</p>
-                  <p className="text-textSecondary"><span className="font-semibold text-textPrimary">Password:</span> HodPassword123</p>
-                </div>
-              )}
 
               <form onSubmit={handleLoginSubmit(onLogin)} className="space-y-4">
                 <div>

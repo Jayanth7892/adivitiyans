@@ -40,6 +40,28 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
   const completedCerts = certifications.filter((c) => !c.suggested);
   const suggestedCerts = certifications.filter((c) => c.suggested);
 
+  // Format ISO dates to human-readable format (e.g. "Mar 15, 2024")
+  const formatDate = (dateStr: string | undefined): string => {
+    if (!dateStr) return '2024';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Check if a certificate URL is actually reachable (not a placeholder/broken S3 bucket)
+  const isCertUrlValid = (url: string | undefined): boolean => {
+    if (!url) return false;
+    // Reject placeholder URLs from local dev without S3
+    if (url.includes('placeholder-no-bucket')) return false;
+    // Reject known non-existent bucket URLs
+    if (url.includes('advitiyans-uploads.s3')) return false;
+    return true;
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || readOnly) return;
@@ -110,19 +132,26 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-primary text-white">
                   {cert.provider}
                 </span>
-                <span className="text-xs text-textSecondary">{cert.date_completed || '2024'}</span>
+                <span className="text-xs text-textSecondary">{formatDate(cert.date_completed)}</span>
               </div>
               <h4 className="text-sm font-bold text-textPrimary mt-1.5">{cert.title}</h4>
               {cert.certificate_file_url && (
-                <a
-                  href={cert.certificate_file_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-2 text-xs font-semibold text-brand-primary hover:underline inline-flex items-center gap-1"
-                >
-                  <span>View Certificate PDF</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+                isCertUrlValid(cert.certificate_file_url) ? (
+                  <a
+                    href={cert.certificate_file_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 text-xs font-semibold text-brand-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>View Certificate PDF</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                ) : (
+                  <span className="mt-2 text-xs font-medium text-textSecondary inline-flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-success" />
+                    Certificate uploaded (file preview unavailable)
+                  </span>
+                )
               )}
             </div>
           </div>
