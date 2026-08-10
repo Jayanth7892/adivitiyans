@@ -1311,14 +1311,30 @@ app.get('/faculty/:id/mentees', async (req: Request, res: Response) => {
     }
 
     const result = await db.query(
-      'SELECT * FROM students WHERE faculty_mentor_id = $1 ORDER BY roll_number',
+      `SELECT s.*,
+              COALESCE(ROUND(AVG(a.semester_gpa), 2), 0.00) AS cgpa,
+              MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.handle END) AS leetcode_handle,
+              COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.score_rating END), 0) AS leetcode_solved,
+              MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.handle END) AS github_handle,
+              COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.repositories_count END), 0) AS github_repos
+       FROM students s
+       LEFT JOIN academics a ON a.student_id = s.roll_number
+       LEFT JOIN coding_profiles c ON c.student_id = s.roll_number
+       WHERE s.faculty_mentor_id = $1
+       GROUP BY s.roll_number, s.name, s.email, s.year, s.phone, s.address, s.native_place, s.department, s.batch, s.section, s.hostel_day_scholar, s.driving_license, s.passport, s.relocation_willingness, s.family_business, s.financial_background, s.faculty_mentor_id, s.photo_url, s.resume_url, s.linkedin_url, s.linkedin_updated, s.created_at, s.updated_at
+       ORDER BY s.roll_number`,
       [facultyId]
     );
-    res.json(result.rows);
+    const formattedRows = result.rows.map((r: any) => ({
+      ...r,
+      department: (!r.department || r.department === 'CSE' || r.department === 'Data Science' || r.department === 'CSE (Data Science)') ? 'CSE(Data Science)' : r.department,
+    }));
+    res.json(formattedRows);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // ============================================================================
 // Reports: HOD Analytics

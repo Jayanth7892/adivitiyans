@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -35,10 +36,24 @@ import { PlacementPreferencesTab } from '../profile/tabs/PlacementPreferencesTab
 import { BulkImportModal } from '../admin/components/BulkImportModal';
 import { PlacementEligibilitySection } from '../hod/components/PlacementEligibilitySection';
 
+// Helper: compute academic standing from CGPA
+const getStanding = (cgpa: number | string | undefined | null) => {
+  const val = Number(cgpa) || 0;
+  if (val >= 9.0) return { label: `Distinction (${val.toFixed(2)})`, color: 'bg-success-soft text-success border-green-200' };
+  if (val >= 7.5) return { label: `First Class (${val.toFixed(2)})`, color: 'bg-blue-50 text-blue-700 border-blue-200' };
+  if (val >= 6.0) return { label: `Second Class (${val.toFixed(2)})`, color: 'bg-amber-50 text-amber-700 border-amber-200' };
+  if (val > 0)   return { label: `Pass (${val.toFixed(2)})`, color: 'bg-orange-50 text-orange-700 border-orange-200' };
+  return { label: 'No Data', color: 'bg-gray-50 text-gray-500 border-gray-200' };
+};
+
 export const FacultyDashboardPage: React.FC = () => {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const activeTab = searchParams.get('tab') || 'mentees';
+
+  // Use the logged-in faculty's ID from auth context
+  const facultyId = user?.rollNumber || 'FAC001';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
@@ -50,16 +65,27 @@ export const FacultyDashboardPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
 
-  // Fetch all students / mentees for faculty view
+  // Fetch mentees for the logged-in faculty
   const { data: mentees = [], refetch } = useQuery({
-    queryKey: ['facultyMentees'],
-    queryFn: () => api.getFacultyMentees('FAC001'),
+    queryKey: ['facultyMentees', facultyId],
+    queryFn: () => api.getFacultyMentees(facultyId),
   });
 
   const { data: deptReport } = useQuery({
     queryKey: ['deptReport'],
-    queryFn: () => api.getDepartmentReport('CSE'),
+    queryFn: () => api.getDepartmentReport('CSE(Data Science)'),
   });
+
+  // Compute real stat card values
+  const topStandingCount = useMemo(
+    () => mentees.filter((m: any) => Number(m.cgpa) >= 9.0).length,
+    [mentees]
+  );
+  const realAvgGpa = useMemo(() => {
+    const withCgpa = mentees.filter((m: any) => Number(m.cgpa) > 0);
+    if (withCgpa.length === 0) return 0;
+    return (withCgpa.reduce((s: number, m: any) => s + Number(m.cgpa), 0) / withCgpa.length).toFixed(2);
+  }, [mentees]);
 
   // Queries for inspected mentee sub-resources
   const menteeId = inspectMentee?.roll_number || '23091A3251';
@@ -182,8 +208,8 @@ export const FacultyDashboardPage: React.FC = () => {
           icon={<BookOpen className="w-5 h-5" />}
           iconBgColor="bg-indigo-50 text-indigo-600"
           label="Department Avg GPA"
-          value={deptReport?.avgGpa || 9.15}
-          subtext="Out of 10.0 scale"
+          value={realAvgGpa || deptReport?.avgGpa || '—'}
+          subtext="Computed from mentee records"
         />
         <StatCard
           icon={<TrendingUp className="w-5 h-5" />}
@@ -195,9 +221,9 @@ export const FacultyDashboardPage: React.FC = () => {
         <StatCard
           icon={<Award className="w-5 h-5" />}
           iconBgColor="bg-amber-50 text-amber-600"
-          label="Top Standing Mentees"
-          value={mentees.length}
-          subtext="High academic performance"
+          label="Top Standing (9.0+)"
+          value={topStandingCount}
+          subtext={`Out of ${mentees.length} mentees`}
         />
       </div>
 
@@ -246,7 +272,7 @@ export const FacultyDashboardPage: React.FC = () => {
                   <th className="py-3 px-4">Registration No</th>
                   <th className="py-3 px-4">Dept / Batch / Sec</th>
                   <th className="py-3 px-4">Academic Year</th>
-                  <th className="py-3 px-4">Hostel / Day</th>
+                  <th className="py-3 px-4">CGPA</th>
                   <th className="py-3 px-4">Academic Standing</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -268,11 +294,16 @@ export const FacultyDashboardPage: React.FC = () => {
                     <td className="py-3.5 px-4 font-bold text-brand-primary text-xs">{mentee.roll_number}</td>
                     <td className="py-3.5 px-4 text-xs">{mentee.department} • {mentee.batch} • Sec {mentee.section}</td>
                     <td className="py-3.5 px-4 text-xs font-medium text-textPrimary">{mentee.year}</td>
-                    <td className="py-3.5 px-4 text-xs text-textSecondary">{mentee.hostel_day_scholar}</td>
+                    <td className="py-3.5 px-4 text-sm font-bold text-textPrimary">{Number((mentee as any).cgpa) > 0 ? Number((mentee as any).cgpa).toFixed(2) : '—'}</td>
                     <td className="py-3.5 px-4">
-                      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-success-soft text-success border border-green-200">
-                        High Standing (GPA 9.0+)
-                      </span>
+                      {(() => {
+                        const standing = getStanding((mentee as any).cgpa);
+                        return (
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${standing.color}`}>
+                            {standing.label}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
