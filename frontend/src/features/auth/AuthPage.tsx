@@ -268,41 +268,60 @@ export const AuthPage: React.FC = () => {
         }
 
         if (msg.includes('User does not exist') || msg.includes('UserNotFoundException')) {
-          // User is not in Cognito yet. Check if they exist in DB.
-          let dbUser: any = null;
-
-          if (activeTab === 'student') {
-            dbUser = await api.getStudentByEmail(data.email);
-          } else if (activeTab === 'faculty' || activeTab === 'hod') {
-            dbUser = await api.getFacultyByEmail(data.email).catch(() => null);
-          }
-
-          if (!dbUser) {
-            throw new Error(`No ${activeTab} account found for this email. Please check your email or sign up.`);
-          }
-
-          // User DOES exist in DB. Register them in Cognito with this password so future logins require exact password!
-          try {
-            const regNo = dbUser.roll_number || dbUser.faculty_id || data.email.split('@')[0].toUpperCase();
-            await cognitoSignUp({
-              email: data.email,
-              password: data.password,
-              regNo,
-              year: dbUser.year || (activeTab === 'hod' ? 'HOD' : activeTab === 'faculty' ? 'Faculty' : 'student'),
-              role: activeTab,
-            });
-            const authResult = await cognitoSignIn(data.email, data.password);
-            jwtToken = authResult.idToken;
-          } catch (autoSignUpErr: any) {
-            const signMsg = autoSignUpErr.message || '';
-            if (signMsg.includes('UsernameExistsException') || signMsg.includes('already exists') || signMsg.includes('User already exists')) {
-              // User IS in Cognito, but cognitoSignIn above failed -> wrong password!
-              throw new Error('Incorrect password. Please check your credentials and try again.');
+          // Special handling for pre-configured HOD account: auto-register in Cognito if missing
+          if (activeTab === 'hod' && data.email.toLowerCase() === 'hodcseds@rgmcet.edu.in') {
+            if (data.password !== 'cseds@2026') {
+              throw new Error('Incorrect password for HOD account. Use authorized HOD password.');
             }
-            if (signMsg.includes('Password') || signMsg.includes('policy')) {
-              throw new Error(`Password requirement: ${signMsg}`);
+            try {
+              await cognitoSignUp({
+                email: 'hodcseds@rgmcet.edu.in',
+                password: 'cseds@2026',
+                regNo: 'HOD_CSEDS',
+                year: 'HOD',
+                role: 'hod',
+              });
+              const authResult = await cognitoSignIn('hodcseds@rgmcet.edu.in', 'cseds@2026');
+              jwtToken = authResult.idToken;
+            } catch (autoErr: any) {
+              console.warn('[HOD Cognito Register Notice]:', autoErr.message);
             }
-            throw new Error(signMsg || 'Invalid email or password. Please check your credentials and try again.');
+          } else {
+            // User is not in Cognito yet. Check if they exist in DB.
+            let dbUser: any = null;
+
+            if (activeTab === 'student') {
+              dbUser = await api.getStudentByEmail(data.email);
+            } else if (activeTab === 'faculty' || activeTab === 'hod') {
+              dbUser = await api.getFacultyByEmail(data.email).catch(() => null);
+            }
+
+            if (!dbUser) {
+              throw new Error(`No ${activeTab} account found for this email. Please check your email or contact system admin.`);
+            }
+
+            // User DOES exist in DB. Register them in Cognito with this password so future logins require exact password!
+            try {
+              const regNo = dbUser.roll_number || dbUser.faculty_id || data.email.split('@')[0].toUpperCase();
+              await cognitoSignUp({
+                email: data.email,
+                password: data.password,
+                regNo,
+                year: dbUser.year || (activeTab === 'hod' ? 'HOD' : activeTab === 'faculty' ? 'Faculty' : 'student'),
+                role: activeTab,
+              });
+              const authResult = await cognitoSignIn(data.email, data.password);
+              jwtToken = authResult.idToken;
+            } catch (autoSignUpErr: any) {
+              const signMsg = autoSignUpErr.message || '';
+              if (signMsg.includes('UsernameExistsException') || signMsg.includes('already exists') || signMsg.includes('User already exists')) {
+                throw new Error('Incorrect password. Please check your credentials and try again.');
+              }
+              if (signMsg.includes('Password') || signMsg.includes('policy')) {
+                throw new Error(`Password requirement: ${signMsg}`);
+              }
+              throw new Error(signMsg || 'Invalid email or password. Please check your credentials and try again.');
+            }
           }
         } else {
           throw new Error(msg || 'Authentication failed');
@@ -375,21 +394,25 @@ export const AuthPage: React.FC = () => {
         rollNo = faculty?.faculty_id || `FAC_${data.email.split('@')[0].toUpperCase()}`;
         displayName = faculty?.name || 'Faculty Member';
       } else if (activeTab === 'hod') {
+        if (data.email.toLowerCase() === 'hodcseds@rgmcet.edu.in' && data.password !== 'cseds@2026') {
+          throw new Error('Incorrect password for HOD account. Authorized password required.');
+        }
+
         let hod = await api.getFacultyByEmail(data.email).catch(() => null);
         if (!hod || hod.role !== 'hod') {
-          const hodId = `HOD_${data.email.split('@')[0].toUpperCase()}`;
-          const hodName = data.email.split('@')[0].replace(/\./g, ' ').toUpperCase();
+          const hodId = 'HOD_CSEDS';
+          const hodName = 'Dr. HOD (CSE & Data Science)';
           await api.createFaculty({
             faculty_id: hodId,
             name: hodName,
-            email: data.email,
-            department: 'CSE',
+            email: 'hodcseds@rgmcet.edu.in',
+            department: 'Data Science',
             role: 'hod',
           }).catch(() => {});
-          hod = await api.getFacultyByEmail(data.email).catch(() => null);
+          hod = await api.getFacultyByEmail('hodcseds@rgmcet.edu.in').catch(() => null);
         }
-        rollNo = hod?.faculty_id || `HOD_${data.email.split('@')[0].toUpperCase()}`;
-        displayName = hod ? `${hod.name} (HOD ${hod.department})` : 'HOD CSE';
+        rollNo = hod?.faculty_id || 'HOD_CSEDS';
+        displayName = hod ? `${hod.name} (HOD ${hod.department})` : 'HOD CSE & Data Science';
       } else if (activeTab === 'admin') {
         displayName = 'System Administrator';
       }
@@ -854,7 +877,7 @@ export const AuthPage: React.FC = () => {
                     {activeTab === 'faculty'
                       ? 'Access assigned mentees, view student 360° analytics, and update mentor remarks.'
                       : activeTab === 'hod'
-                      ? 'Read-only department analytics. View all student records, CGPA rankings, and coding platform history.'
+                      ? 'Official HOD Portal. Fixed Credentials: hodcseds@rgmcet.edu.in'
                       : 'Full administrative authority to manage student directory CRUD, placement analytics & CSV export.'}
                   </p>
                 </div>
@@ -864,13 +887,13 @@ export const AuthPage: React.FC = () => {
               <form onSubmit={handleLoginSubmit(onLogin)} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-textPrimary mb-1">
-                    {activeTab === 'faculty' ? 'Faculty Email' : activeTab === 'hod' ? 'HOD Email' : 'Admin Email'}
+                    {activeTab === 'faculty' ? 'Faculty Email' : activeTab === 'hod' ? 'HOD Official Email' : 'Admin Email'}
                   </label>
                   <input
                     {...registerLogin('email')}
                     type="email"
-                    placeholder={activeTab === 'hod' ? 'hod.cse@rgmcet.edu.in' : `${activeTab}@rgmcet.edu.in`}
-                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    placeholder={activeTab === 'hod' ? 'hodcseds@rgmcet.edu.in' : `${activeTab}@rgmcet.edu.in`}
+                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary font-medium"
                   />
                   {loginErrors.email && (
                     <p className="text-xs text-alert mt-1">{loginErrors.email.message}</p>
@@ -912,14 +935,14 @@ export const AuthPage: React.FC = () => {
                   </PillButton>
                 </div>
 
-                {(activeTab === 'faculty' || activeTab === 'hod') && (
+                {activeTab === 'faculty' && (
                   <div className="text-center pt-2">
                     <button
                       type="button"
                       onClick={() => setIsSignUp(true)}
                       className="text-xs font-semibold text-brand-primary hover:underline"
                     >
-                      New {activeTab === 'hod' ? 'HOD' : 'Faculty Member'}? Register Account Here
+                      New Faculty Member? Register Account Here
                     </button>
                   </div>
                 )}

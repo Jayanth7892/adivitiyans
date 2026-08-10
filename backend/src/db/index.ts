@@ -258,6 +258,11 @@ async function ensureSchema(p: Pool) {
 
     // Migrations: add columns that may be missing from earlier schema versions
     `ALTER TABLE students ADD COLUMN IF NOT EXISTS linkedin_updated TIMESTAMP WITH TIME ZONE;`,
+
+    // Pre-seed fixed HOD account
+    `INSERT INTO faculty (faculty_id, name, email, department, role)
+     VALUES ('HOD_CSEDS', 'Dr. HOD (CSE & Data Science)', 'hodcseds@rgmcet.edu.in', 'Data Science', 'hod')
+     ON CONFLICT (email) DO UPDATE SET role = 'hod', department = 'Data Science';`,
   ];
 
   try {
