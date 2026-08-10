@@ -84,6 +84,19 @@ export const AuthPage: React.FC = () => {
       setEmailStatus({ loading: false });
       return;
     }
+
+    if (watchedRegNo && watchedRegNo.length === 10) {
+      const expectedEmail = `${watchedRegNo.toLowerCase()}@rgmcet.edu.in`;
+      if (watchedEmail.toLowerCase() !== expectedEmail) {
+        setEmailStatus({
+          loading: false,
+          available: false,
+          message: `Email must match registration number (${expectedEmail})`,
+        });
+        return;
+      }
+    }
+
     const timer = setTimeout(async () => {
       setEmailStatus({ loading: true });
       try {
@@ -94,7 +107,7 @@ export const AuthPage: React.FC = () => {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [watchedEmail]);
+  }, [watchedEmail, watchedRegNo]);
 
   const onSignUp = async (data: StudentSignUpInput) => {
     try {
@@ -508,13 +521,23 @@ export const AuthPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-textPrimary mb-1">College Email (@rgmcet.edu.in) *</label>
+                  <label className="block text-xs font-semibold text-textPrimary mb-1">
+                    College Email (@rgmcet.edu.in) *
+                    {watchedRegNo && watchedRegNo.length === 10 && (
+                      <span className="text-[10px] text-brand-primary ml-2 font-normal">(Auto-locked to Registration Number)</span>
+                    )}
+                  </label>
                   <div className="relative">
                     <input
                       {...registerSignUp('email')}
                       type="email"
-                      placeholder="username@rgmcet.edu.in"
-                      className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary pr-10"
+                      readOnly={Boolean(watchedRegNo && watchedRegNo.length === 10)}
+                      placeholder="e.g. 23091a3205@rgmcet.edu.in"
+                      className={`w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine focus:outline-none focus:ring-2 focus:ring-brand-primary pr-10 ${
+                        watchedRegNo && watchedRegNo.length === 10
+                          ? 'bg-brand-soft/30 cursor-not-allowed font-bold text-brand-primary border-brand-primary/40'
+                          : 'bg-background'
+                      }`}
                     />
                     <div className="absolute right-3 top-2.5">
                       {emailStatus.loading && <Loader2 className="w-4 h-4 text-brand-primary animate-spin" />}
