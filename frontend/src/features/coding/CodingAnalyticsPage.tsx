@@ -74,7 +74,7 @@ export const CodingAnalyticsPage: React.FC = () => {
       await Promise.all(
         uniqueStudents.map(async (s) => {
           const lcHandle = (s as any).leetcode_handle;
-          const isValidHandle = lcHandle && !lcHandle.startsWith('@23091') && !lcHandle.startsWith('23091');
+          const isValidHandle = Boolean(lcHandle) && lcHandle !== 'Not Linked' && String(lcHandle).trim() !== '';
 
           if (isValidHandle) {
             try {
@@ -111,9 +111,9 @@ export const CodingAnalyticsPage: React.FC = () => {
     const rawLcHandle = (s as any).leetcode_handle || null;
     const rawGhHandle = (s as any).github_handle || null;
 
-    // Check if handle is genuine (not auto-filled roll number string)
-    const isLcLinked = Boolean(rawLcHandle) && !rawLcHandle.startsWith('@23091') && !rawLcHandle.startsWith('23091');
-    const isGhLinked = Boolean(rawGhHandle) && !rawGhHandle.startsWith('@23091') && !rawGhHandle.startsWith('23091');
+    // Check if handle is linked
+    const isLcLinked = Boolean(rawLcHandle) && rawLcHandle !== 'Not Linked' && String(rawLcHandle).trim() !== '';
+    const isGhLinked = Boolean(rawGhHandle) && rawGhHandle !== 'Not Linked' && String(rawGhHandle).trim() !== '';
 
     const liveData = liveSnapshots[s.roll_number];
     const totalSolved = liveData ? liveData.total : (isLcLinked ? Number((s as any).leetcode_solved || 0) : 0);
@@ -578,15 +578,19 @@ export const CodingAnalyticsPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-xs">
-                        {s.isLcLinked && s.totalSolved > 0 ? (
-                          <span className="font-bold text-green-600">{s.totalSolved} solved</span>
+                        {s.isLcLinked ? (
+                          <span className="font-bold text-green-600">
+                            {s.totalSolved > 0 ? `${s.totalSolved} solved` : `Linked (${s.lcHandle})`}
+                          </span>
                         ) : (
                           <span className="text-textSecondary font-normal">Not Linked</span>
                         )}
                       </td>
                       <td className="py-3.5 px-4 text-xs">
-                        {s.isGhLinked && s.repos > 0 ? (
-                          <span className="font-bold text-textPrimary">{s.repos} repos</span>
+                        {s.isGhLinked ? (
+                          <span className="font-bold text-textPrimary">
+                            {s.repos > 0 ? `${s.repos} repos` : `Linked (${s.ghHandle})`}
+                          </span>
                         ) : (
                           <span className="text-textSecondary font-normal">Not Linked</span>
                         )}

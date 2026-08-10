@@ -115,13 +115,13 @@ function mapStudentToHodEntry(student: any, index: number, liveSolved?: number):
 
   // Real LeetCode profile linking check
   const rawLcHandle = (student.leetcode_handle || student.leetcode || '').toString().trim();
-  const isLcLinked = Boolean(rawLcHandle) && rawLcHandle !== 'Not Linked' && !rawLcHandle.startsWith('@23091') && !rawLcHandle.startsWith('23091');
+  const isLcLinked = Boolean(rawLcHandle) && rawLcHandle !== 'Not Linked' && rawLcHandle !== '';
   const dbLeetcode = student.leetcode_solved !== undefined && student.leetcode_solved !== null ? Number(student.leetcode_solved) : 0;
   const leetcode = liveSolved !== undefined ? liveSolved : (isLcLinked ? dbLeetcode : 0);
 
   // Real GitHub profile linking check
   const rawGhHandle = (student.github_handle || student.github || '').toString().trim();
-  const isGhLinked = Boolean(rawGhHandle) && rawGhHandle !== 'Not Linked' && !rawGhHandle.startsWith('@23091') && !rawGhHandle.startsWith('23091');
+  const isGhLinked = Boolean(rawGhHandle) && rawGhHandle !== 'Not Linked' && rawGhHandle !== '';
   const github = isGhLinked ? Number(student.github_repos || 0) : 0;
 
   const standing = student.standing || (cgpa >= 9.0 ? 'Distinction' : (cgpa >= 6.5 ? 'First Class' : (cgpa > 0 ? 'Pass' : 'N/A')));
@@ -185,7 +185,7 @@ export const HodDashboardPage: React.FC = () => {
       await Promise.all(
         students.map(async (s: any) => {
           const lcHandle = s.leetcode_handle;
-          const isValidHandle = lcHandle && lcHandle !== 'Not Linked' && !lcHandle.startsWith('@23091') && !lcHandle.startsWith('23091');
+          const isValidHandle = Boolean(lcHandle) && lcHandle !== 'Not Linked' && String(lcHandle).trim() !== '';
           if (isValidHandle) {
             try {
               const cleanHandle = lcHandle.replace(/^@/, '').trim();
@@ -602,15 +602,15 @@ export const HodDashboardPage: React.FC = () => {
                       <td className="py-3 px-4 text-xs text-textSecondary">{s.year} • {s.section}</td>
                       <td className="py-3 px-4 font-black text-brand-primary">{s.cgpa > 0 ? `${s.cgpa} CGPA` : <span className="text-textSecondary italic text-xs font-normal">N/A</span>}</td>
                       <td className="py-3 px-4 text-xs font-bold text-[#FFA116]">
-                        {s.isLcLinked && s.leetcode > 0 ? (
-                          `${s.leetcode} Solved`
+                        {s.isLcLinked ? (
+                          s.leetcode > 0 ? `${s.leetcode} Solved` : `Linked`
                         ) : (
                           <span className="text-textSecondary font-semibold px-2 py-0.5 rounded-md bg-background border border-borderLine">Not Linked</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-xs text-textSecondary">
-                        {s.isGhLinked && s.github > 0 ? (
-                          `${s.github} Repos`
+                      <td className="py-3 px-4 text-xs text-textSecondary font-medium">
+                        {s.isGhLinked ? (
+                          s.github > 0 ? `${s.github} Repos` : `Linked`
                         ) : (
                           <span className="text-textSecondary font-semibold px-2 py-0.5 rounded-md bg-background border border-borderLine">Not Linked</span>
                         )}
