@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Target, Download, CheckCircle2, Filter, Award, Sparkles } from 'lucide-react';
+import { Target, Download, CheckCircle2, Search, Sparkles, SlidersHorizontal, RefreshCw } from 'lucide-react';
 
 interface StudentCandidate {
   rank: number;
@@ -20,64 +20,129 @@ interface PlacementEligibilityProps {
 }
 
 export const PlacementEligibilitySection: React.FC<PlacementEligibilityProps> = ({ students }) => {
+  // Filter States
   const [minCgpa, setMinCgpa] = useState<number>(7.5);
-  const [minLeetCode, setMinLeetCode] = useState<number>(200);
+  const [enableCgpa, setEnableCgpa] = useState<boolean>(true);
+
+  const [minLeetCode, setMinLeetCode] = useState<number>(50);
+  const [enableLeetCode, setEnableLeetCode] = useState<boolean>(false);
+
   const [minGitHub, setMinGitHub] = useState<number>(5);
+  const [enableGitHub, setEnableGitHub] = useState<boolean>(false);
+
   const [targetYear, setTargetYear] = useState<string>('All');
-  const [preset, setPreset] = useState<string>('custom');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [activePreset, setActivePreset] = useState<string>('custom');
 
   const applyPreset = (presetName: string) => {
-    setPreset(presetName);
-    if (presetName === 'tier1') {
-      setMinCgpa(8.5);
-      setMinLeetCode(350);
-      setMinGitHub(15);
-    } else if (presetName === 'tier2') {
+    setActivePreset(presetName);
+    if (presetName === 'all') {
+      setMinCgpa(0);
+      setEnableCgpa(true);
+      setMinLeetCode(0);
+      setEnableLeetCode(false);
+      setMinGitHub(0);
+      setEnableGitHub(false);
+      setTargetYear('All');
+    } else if (presetName === 'academic') {
       setMinCgpa(7.5);
+      setEnableCgpa(true);
+      setEnableLeetCode(false);
+      setEnableGitHub(false);
+    } else if (presetName === 'tier1') {
+      setMinCgpa(8.0);
+      setEnableCgpa(true);
       setMinLeetCode(200);
-      setMinGitHub(10);
-    } else if (presetName === 'mass') {
-      setMinCgpa(6.5);
-      setMinLeetCode(100);
+      setEnableLeetCode(true);
       setMinGitHub(5);
+      setEnableGitHub(true);
+    } else if (presetName === 'mass') {
+      setMinCgpa(6.0);
+      setEnableCgpa(true);
+      setMinLeetCode(50);
+      setEnableLeetCode(true);
+      setEnableGitHub(false);
     }
   };
 
+  // Robustly normalize candidate dataset
   const candidateDataset: StudentCandidate[] = useMemo(() => {
+    if (!Array.isArray(students) || students.length === 0) return [];
+
     return students.map((s, idx) => {
-      const cgpa = (s as any).cgpa !== undefined && (s as any).cgpa !== null ? Number((s as any).cgpa) : 0;
-      const lcHandle = (s as any).leetcode_handle || (s as any).leetcode;
-      const isLcLinked = Boolean(lcHandle) && lcHandle !== 'Not Linked';
-      const leetcode = isLcLinked ? Number((s as any).leetcode_solved || (s as any).leetcode || 0) : 0;
-      const ghHandle = (s as any).github_handle || (s as any).github;
-      const isGhLinked = Boolean(ghHandle) && ghHandle !== 'Not Linked';
-      const github = isGhLinked ? Number((s as any).github_repos || (s as any).github || 0) : 0;
+      // 1. CGPA Extraction
+      let cgpa = 0;
+      if (typeof s.cgpa === 'number') cgpa = s.cgpa;
+      else if (s.cgpa !== undefined && s.cgpa !== null && s.cgpa !== '') cgpa = Number(s.cgpa) || 0;
+      else if (typeof s.avg_gpa === 'number') cgpa = s.avg_gpa;
+      else if (typeof s.semester_gpa === 'number') cgpa = s.semester_gpa;
+
+      // 2. LeetCode Solved Extraction
+      let leetcode = 0;
+      if (typeof s.leetcode === 'number') leetcode = s.leetcode;
+      else if (typeof s.leetcode_solved === 'number') leetcode = s.leetcode_solved;
+      else if (s.leetcode_solved) leetcode = Number(s.leetcode_solved) || 0;
+      else if (s.leetcode) leetcode = Number(s.leetcode) || 0;
+
+      // 3. GitHub Repos Extraction
+      let github = 0;
+      if (typeof s.github === 'number') github = s.github;
+      else if (typeof s.github_repos === 'number') github = s.github_repos;
+      else if (s.github_repos) github = Number(s.github_repos) || 0;
+      else if (s.github) github = Number(s.github) || 0;
+
+      const regNo = (s.roll_number || s.regNo || s.registrationNumber || `STUDENT_${idx + 1}`).toString().toUpperCase();
+      const name = s.name || `Student ${regNo}`;
+      const email = s.email || `${regNo.toLowerCase()}@rgmcet.edu.in`;
+      const phone = s.phone || 'N/A';
+      const year = s.year || '3rd Year';
+      const section = s.section ? (s.section.startsWith('Sec ') ? s.section : `Sec ${s.section}`) : 'Sec A';
+      const standing = s.standing || (cgpa >= 9.0 ? 'Distinction' : cgpa >= 6.5 ? 'First Class' : (cgpa > 0 ? 'Pass' : 'Enrolled'));
 
       return {
         rank: idx + 1,
-        name: s.name,
-        regNo: s.roll_number || s.regNo,
-        email: s.email || `${(s.roll_number || s.regNo || '').toLowerCase()}@rgmcet.edu.in`,
-        phone: s.phone || 'N/A',
-        year: s.year || '3rd Year',
-        section: s.section ? (s.section.startsWith('Sec ') ? s.section : `Sec ${s.section}`) : 'Sec A',
+        name,
+        regNo,
+        email,
+        phone,
+        year,
+        section,
         cgpa,
         leetcode,
         github,
-        standing: cgpa >= 9.0 ? 'Distinction' : cgpa >= 6.5 ? 'First Class' : 'Pass',
+        standing,
       };
     });
   }, [students]);
 
+  // Apply filters
   const eligibleStudents = useMemo(() => {
     return candidateDataset.filter((s) => {
-      const matchesCgpa = s.cgpa >= minCgpa;
-      const matchesLc = s.leetcode >= minLeetCode;
-      const matchesGh = s.github >= minGitHub;
-      const matchesYear = targetYear === 'All' || s.year === targetYear;
-      return matchesCgpa && matchesLc && matchesGh && matchesYear;
+      // 1. Search Query Filter
+      const matchesSearch =
+        !searchQuery ||
+        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.regNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.email.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // 2. Academic Year Filter
+      const normalizedTarget = targetYear.toLowerCase().trim();
+      const normalizedStudentYear = s.year.toLowerCase().trim();
+      const matchesYear =
+        normalizedTarget === 'all' ||
+        normalizedTarget === 'all years' ||
+        normalizedTarget === '' ||
+        normalizedStudentYear.includes(normalizedTarget) ||
+        normalizedTarget.includes(normalizedStudentYear);
+
+      // 3. Cutoff Filters
+      const matchesCgpa = !enableCgpa || s.cgpa >= minCgpa;
+      const matchesLc = !enableLeetCode || s.leetcode >= minLeetCode;
+      const matchesGh = !enableGitHub || s.github >= minGitHub;
+
+      return matchesSearch && matchesYear && matchesCgpa && matchesLc && matchesGh;
     });
-  }, [candidateDataset, minCgpa, minLeetCode, minGitHub, targetYear]);
+  }, [candidateDataset, searchQuery, targetYear, enableCgpa, minCgpa, enableLeetCode, minLeetCode, enableGitHub, minGitHub]);
 
   const exportPlacementEligibleCSV = () => {
     const headers = ['Rank', 'Name', 'Reg Number', 'Email', 'Phone', 'Year', 'Section', 'CGPA', 'LeetCode Solved', 'GitHub Repos', 'Standing', 'Eligibility Status'];
@@ -89,7 +154,7 @@ export const PlacementEligibilitySection: React.FC<PlacementEligibilityProps> = 
       s.phone,
       s.year,
       s.section,
-      s.cgpa,
+      s.cgpa > 0 ? s.cgpa.toFixed(2) : 'N/A',
       s.leetcode,
       s.github,
       s.standing,
@@ -100,7 +165,7 @@ export const PlacementEligibilitySection: React.FC<PlacementEligibilityProps> = 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Placement_Eligible_Students_MinCGPA_${minCgpa}_${Date.now()}.csv`);
+    link.setAttribute('download', `Placement_Eligible_Candidates_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -129,116 +194,214 @@ export const PlacementEligibilitySection: React.FC<PlacementEligibilityProps> = 
         <button
           onClick={exportPlacementEligibleCSV}
           disabled={eligibleStudents.length === 0}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-all shrink-0 self-start md:self-auto"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-all shrink-0 self-start md:self-auto"
         >
           <Download className="w-4 h-4" />
           <span>Export Eligible Candidates CSV ({eligibleStudents.length})</span>
         </button>
       </div>
 
-      {/* Preset Buttons */}
+      {/* Recruitment Drive Presets */}
       <div className="space-y-2">
-        <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider">Recruitment Drive Presets</label>
+        <div className="flex items-center justify-between">
+          <label className="block text-xs font-bold text-textSecondary uppercase tracking-wider">Recruitment Drive Presets</label>
+          <button
+            onClick={() => applyPreset('all')}
+            className="text-xs text-brand-primary font-semibold hover:underline flex items-center gap-1"
+          >
+            <RefreshCw className="w-3 h-3" /> Show All Students ({candidateDataset.length})
+          </button>
+        </div>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => applyPreset('tier1')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-              preset === 'tier1' ? 'bg-brand-primary text-white border-brand-primary' : 'bg-background text-textSecondary border-borderLine hover:text-textPrimary'
+            onClick={() => applyPreset('academic')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
+              activePreset === 'academic' ? 'bg-brand-primary text-white border-brand-primary shadow-sm' : 'bg-background text-textPrimary border-borderLine hover:border-brand-primary'
             }`}
           >
-            🏆 Tier-1 Product Drive (CGPA ≥ 8.5, LC ≥ 350, GH ≥ 15)
+            🎓 Core Academic Drive (CGPA ≥ 7.5)
           </button>
           <button
-            onClick={() => applyPreset('tier2')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-              preset === 'tier2' ? 'bg-brand-primary text-white border-brand-primary' : 'bg-background text-textSecondary border-borderLine hover:text-textPrimary'
+            onClick={() => applyPreset('tier1')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
+              activePreset === 'tier1' ? 'bg-brand-primary text-white border-brand-primary shadow-sm' : 'bg-background text-textPrimary border-borderLine hover:border-brand-primary'
             }`}
           >
-            ⚡ High-Growth Core Drive (CGPA ≥ 7.5, LC ≥ 200, GH ≥ 10)
+            🏆 Tier-1 Product Drive (CGPA ≥ 8.0, LC ≥ 200, GH ≥ 5)
           </button>
           <button
             onClick={() => applyPreset('mass')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-              preset === 'mass' ? 'bg-brand-primary text-white border-brand-primary' : 'bg-background text-textSecondary border-borderLine hover:text-textPrimary'
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
+              activePreset === 'mass' ? 'bg-brand-primary text-white border-brand-primary shadow-sm' : 'bg-background text-textPrimary border-borderLine hover:border-brand-primary'
             }`}
           >
-            🏢 IT Major Mass Drive (CGPA ≥ 6.5, LC ≥ 100, GH ≥ 5)
+            🏢 IT Major Mass Drive (CGPA ≥ 6.0, LC ≥ 50)
+          </button>
+          <button
+            onClick={() => applyPreset('all')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
+              activePreset === 'all' ? 'bg-brand-primary text-white border-brand-primary shadow-sm' : 'bg-background text-textPrimary border-borderLine hover:border-brand-primary'
+            }`}
+          >
+            👥 All Students (No Cutoffs)
           </button>
         </div>
       </div>
 
       {/* Threshold Controls */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-background/50 p-4 rounded-xl border border-borderLine">
-        <div>
-          <label className="block text-xs font-semibold text-textSecondary mb-1">Min CGPA Cutoff</label>
-          <input
-            type="number"
-            step="0.1"
-            min={0}
-            max={10}
-            value={minCgpa}
-            onChange={(e) => {
-              setMinCgpa(parseFloat(e.target.value) || 0);
-              setPreset('custom');
-            }}
-            className="w-full px-3 py-2 text-xs font-bold text-brand-primary rounded-lg border border-borderLine bg-background"
-          />
+      <div className="bg-background/80 border border-borderLine p-4 rounded-xl space-y-4">
+        <div className="flex items-center gap-2 border-b border-borderLine pb-2">
+          <SlidersHorizontal className="w-4 h-4 text-brand-primary" />
+          <span className="text-xs font-bold text-textPrimary uppercase tracking-wider">Custom Eligibility Criteria Filters</span>
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-textSecondary mb-1">Min LeetCode Solved</label>
-          <input
-            type="number"
-            step="10"
-            min={0}
-            value={minLeetCode}
-            onChange={(e) => {
-              setMinLeetCode(parseInt(e.target.value) || 0);
-              setPreset('custom');
-            }}
-            className="w-full px-3 py-2 text-xs font-bold text-green-600 rounded-lg border border-borderLine bg-background"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* CGPA Filter */}
+          <div className="space-y-1.5 p-3 rounded-lg border border-borderLine bg-surface">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-textPrimary flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={enableCgpa}
+                  onChange={(e) => {
+                    setEnableCgpa(e.target.checked);
+                    setActivePreset('custom');
+                  }}
+                  className="rounded text-brand-primary focus:ring-brand-primary"
+                />
+                Min CGPA Cutoff
+              </label>
+              <span className={`text-[11px] font-bold ${enableCgpa ? 'text-brand-primary' : 'text-textSecondary'}`}>
+                {enableCgpa ? `≥ ${minCgpa}` : 'Disabled'}
+              </span>
+            </div>
+            <input
+              type="number"
+              step="0.1"
+              min={0}
+              max={10}
+              disabled={!enableCgpa}
+              value={minCgpa}
+              onChange={(e) => {
+                setMinCgpa(parseFloat(e.target.value) || 0);
+                setActivePreset('custom');
+              }}
+              className="w-full px-3 py-1.5 text-xs font-bold text-brand-primary rounded-lg border border-borderLine bg-background disabled:opacity-40"
+            />
+          </div>
+
+          {/* LeetCode Filter */}
+          <div className="space-y-1.5 p-3 rounded-lg border border-borderLine bg-surface">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-textPrimary flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={enableLeetCode}
+                  onChange={(e) => {
+                    setEnableLeetCode(e.target.checked);
+                    setActivePreset('custom');
+                  }}
+                  className="rounded text-brand-primary focus:ring-brand-primary"
+                />
+                Min LeetCode Solved
+              </label>
+              <span className={`text-[11px] font-bold ${enableLeetCode ? 'text-green-600' : 'text-textSecondary'}`}>
+                {enableLeetCode ? `≥ ${minLeetCode}` : 'Disabled'}
+              </span>
+            </div>
+            <input
+              type="number"
+              step="10"
+              min={0}
+              disabled={!enableLeetCode}
+              value={minLeetCode}
+              onChange={(e) => {
+                setMinLeetCode(parseInt(e.target.value) || 0);
+                setActivePreset('custom');
+              }}
+              className="w-full px-3 py-1.5 text-xs font-bold text-green-600 rounded-lg border border-borderLine bg-background disabled:opacity-40"
+            />
+          </div>
+
+          {/* GitHub Repos Filter */}
+          <div className="space-y-1.5 p-3 rounded-lg border border-borderLine bg-surface">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-textPrimary flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={enableGitHub}
+                  onChange={(e) => {
+                    setEnableGitHub(e.target.checked);
+                    setActivePreset('custom');
+                  }}
+                  className="rounded text-brand-primary focus:ring-brand-primary"
+                />
+                Min GitHub Repos
+              </label>
+              <span className={`text-[11px] font-bold ${enableGitHub ? 'text-purple-600' : 'text-textSecondary'}`}>
+                {enableGitHub ? `≥ ${minGitHub}` : 'Disabled'}
+              </span>
+            </div>
+            <input
+              type="number"
+              step="1"
+              min={0}
+              disabled={!enableGitHub}
+              value={minGitHub}
+              onChange={(e) => {
+                setMinGitHub(parseInt(e.target.value) || 0);
+                setActivePreset('custom');
+              }}
+              className="w-full px-3 py-1.5 text-xs font-bold text-purple-600 rounded-lg border border-borderLine bg-background disabled:opacity-40"
+            />
+          </div>
+
+          {/* Academic Year Filter */}
+          <div className="space-y-1.5 p-3 rounded-lg border border-borderLine bg-surface">
+            <label className="block text-xs font-bold text-textPrimary">Target Academic Year</label>
+            <select
+              value={targetYear}
+              onChange={(e) => setTargetYear(e.target.value)}
+              className="w-full px-3 py-1.5 text-xs font-bold text-textPrimary rounded-lg border border-borderLine bg-background"
+            >
+              <option value="All">All Batches & Years</option>
+              <option value="3rd Year">3rd Year</option>
+              <option value="4th Year">4th Year (Graduating Batch)</option>
+              <option value="2nd Year">2nd Year</option>
+              <option value="1st Year">1st Year</option>
+            </select>
+          </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-textSecondary mb-1">Min GitHub Repos</label>
+        {/* Live Search Input */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-borderLine bg-surface text-xs">
+          <Search className="w-3.5 h-3.5 text-textSecondary shrink-0" />
           <input
-            type="number"
-            step="1"
-            min={0}
-            value={minGitHub}
-            onChange={(e) => {
-              setMinGitHub(parseInt(e.target.value) || 0);
-              setPreset('custom');
-            }}
-            className="w-full px-3 py-2 text-xs font-bold text-purple-600 rounded-lg border border-borderLine bg-background"
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search candidate by name, roll number (e.g. 23091A3251) or email..."
+            className="w-full bg-transparent focus:outline-none text-textPrimary"
           />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-textSecondary mb-1">Target Academic Year</label>
-          <select
-            value={targetYear}
-            onChange={(e) => setTargetYear(e.target.value)}
-            className="w-full px-3 py-2 text-xs font-bold text-textPrimary rounded-lg border border-borderLine bg-background"
-          >
-            <option value="All">All Years</option>
-            <option value="3rd Year">3rd Year</option>
-            <option value="4th Year">4th Year (Graduating Batch)</option>
-          </select>
         </div>
       </div>
 
-      {/* Eligibility Status Banner */}
-      <div className="flex items-center justify-between p-4 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-200">
+      {/* Summary Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-200 gap-3">
         <div className="flex items-center gap-3">
           <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
           <div>
             <p className="text-sm font-bold">{eligibleStudents.length} Students Qualified for Placement Drive</p>
-            <p className="text-xs text-emerald-700">Satisfies: CGPA ≥ {minCgpa}, LeetCode ≥ {minLeetCode}, GitHub Repos ≥ {minGitHub}</p>
+            <p className="text-xs text-emerald-700">
+              Active Criteria:{' '}
+              {enableCgpa ? `CGPA ≥ ${minCgpa}` : 'CGPA (Any)'}
+              {enableLeetCode ? `, LeetCode ≥ ${minLeetCode}` : ''}
+              {enableGitHub ? `, GitHub ≥ ${minGitHub}` : ''}
+              {targetYear !== 'All' ? `, Year = ${targetYear}` : ''}
+            </p>
           </div>
         </div>
-        <span className="text-lg font-black text-emerald-700 bg-white px-3 py-1 rounded-lg border border-emerald-300">
+        <span className="text-lg font-black text-emerald-700 bg-white px-3 py-1 rounded-lg border border-emerald-300 self-start sm:self-auto">
           {ratioPct}% Qualified
         </span>
       </div>
@@ -261,20 +424,27 @@ export const PlacementEligibilitySection: React.FC<PlacementEligibilityProps> = 
           <tbody className="divide-y divide-borderLine">
             {eligibleStudents.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-6 text-center text-textSecondary text-xs">
-                  No students meet the specified placement criteria. Try lowering the CGPA or coding thresholds.
+                <td colSpan={8} className="py-8 text-center text-textSecondary text-xs">
+                  <p className="font-bold text-textPrimary mb-1">No candidates match current eligibility criteria</p>
+                  <p className="text-textSecondary mb-3">Try unchecking LeetCode / GitHub requirements or click below to view all students.</p>
+                  <button
+                    onClick={() => applyPreset('all')}
+                    className="px-3 py-1.5 rounded-lg bg-brand-primary text-white font-bold text-xs shadow-sm hover:bg-brand-primary/90"
+                  >
+                    View All {candidateDataset.length} Students
+                  </button>
                 </td>
               </tr>
             ) : (
-              eligibleStudents.slice(0, 15).map((s) => (
-                <tr key={s.regNo} className="hover:bg-background/50 transition-colors">
-                  <td className="py-2.5 px-3 font-bold text-textSecondary">#{s.rank}</td>
+              eligibleStudents.map((s, idx) => (
+                <tr key={s.regNo + idx} className="hover:bg-background/50 transition-colors">
+                  <td className="py-2.5 px-3 font-bold text-textSecondary">#{idx + 1}</td>
                   <td className="py-2.5 px-3 font-bold text-textPrimary">{s.name}</td>
                   <td className="py-2.5 px-3 font-mono font-bold text-brand-primary">{s.regNo}</td>
                   <td className="py-2.5 px-3 text-textSecondary">{s.year} • {s.section}</td>
-                  <td className="py-2.5 px-3 font-black text-brand-primary">{s.cgpa.toFixed(2)}</td>
-                  <td className="py-2.5 px-3 font-bold text-green-600">{s.leetcode} Solved</td>
-                  <td className="py-2.5 px-3 font-medium text-textPrimary">{s.github} Repos</td>
+                  <td className="py-2.5 px-3 font-black text-brand-primary">{s.cgpa > 0 ? s.cgpa.toFixed(2) : 'N/A'}</td>
+                  <td className="py-2.5 px-3 font-bold text-green-600">{s.leetcode > 0 ? `${s.leetcode} Solved` : '0'}</td>
+                  <td className="py-2.5 px-3 font-medium text-textPrimary">{s.github > 0 ? `${s.github} Repos` : '0'}</td>
                   <td className="py-2.5 px-3">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
                       {s.standing}
@@ -285,11 +455,6 @@ export const PlacementEligibilitySection: React.FC<PlacementEligibilityProps> = 
             )}
           </tbody>
         </table>
-        {eligibleStudents.length > 15 && (
-          <div className="p-2 text-center text-xs text-textSecondary bg-background border-t border-borderLine">
-            + {eligibleStudents.length - 15} more candidates included in CSV export
-          </div>
-        )}
       </div>
     </div>
   );

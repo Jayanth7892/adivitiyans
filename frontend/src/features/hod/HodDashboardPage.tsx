@@ -503,7 +503,7 @@ export const HodDashboardPage: React.FC = () => {
 
       {/* ── TAB: Placement Eligibility Engine ── */}
       {activeTab === 'placement' && (
-        <PlacementEligibilitySection students={filteredDataset} />
+        <PlacementEligibilitySection students={mergedStudentDataset} />
       )}
 
       {/* ── TAB 1: Year-Wise Overview ── */}
