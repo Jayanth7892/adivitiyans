@@ -105,9 +105,9 @@ export const ProfilePage: React.FC = () => {
             </span>
           </div>
           <p className="text-xs text-textSecondary mt-1.5 font-medium">
-            {student?.department || 'CSE'} • Batch {student?.batch || '2023-2027'} • Section {student?.section || 'A'} • {student?.year || '3rd Year'}
+            {student?.department || 'Dept Not Set'}{student?.batch ? ` • Batch ${student.batch}` : ''}{student?.section ? ` • Sec ${student.section}` : ''}{student?.year ? ` • ${student.year}` : ''}
           </p>
-          <p className="text-xs text-textSecondary mt-0.5">{student?.email || 'jayanth@rgmcet.edu.in'}</p>
+          <p className="text-xs text-textSecondary mt-0.5">{student?.email || user?.email || 'No email'}</p>
         </div>
       </div>
 

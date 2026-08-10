@@ -19,9 +19,9 @@ export const PlacementPreferencesTab: React.FC<PlacementPreferencesTabProps> = (
   onRefresh,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [career, setCareer] = useState(placement?.preferred_career || 'AI & Full Stack Engineer');
+  const [career, setCareer] = useState(placement?.preferred_career || '');
   const [specializations, setSpecializations] = useState<string[]>(
-    placement?.dream_company || ['Generative AI', 'Cloud Architecture', 'Distributed Systems']
+    placement?.dream_company || []
   );
   const [newInput, setNewInput] = useState('');
   const [higherStudies, setHigherStudies] = useState(placement?.higher_studies_interest || false);
@@ -159,7 +159,7 @@ export const PlacementPreferencesTab: React.FC<PlacementPreferencesTabProps> = (
               />
             ) : (
               <p className="text-sm font-medium text-textPrimary">
-                {needFromDept || 'Access to advanced cloud labs & research paper guidance.'}
+                {needFromDept || 'Not specified'}
               </p>
             )}
           </div>
@@ -189,26 +189,29 @@ export const PlacementPreferencesTab: React.FC<PlacementPreferencesTabProps> = (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="p-4 rounded-xl bg-background border border-borderLine">
             <p className="text-xs font-semibold text-textSecondary uppercase">Overall Academic Score</p>
-            <p className="text-2xl font-black text-brand-primary mt-1">{scoreData?.overallScore || 92.4} / 100</p>
+            <p className="text-2xl font-black text-brand-primary mt-1">{scoreData?.overallScore !== undefined ? `${scoreData.overallScore} / 100` : '0.0 / 100'}</p>
           </div>
           <div className="p-4 rounded-xl bg-background border border-borderLine">
             <p className="text-xs font-semibold text-textSecondary uppercase">Academic Potential</p>
-            <p className="text-2xl font-black text-success mt-1">4.9 / 5.0 ⭐</p>
+            <p className="text-2xl font-black text-success mt-1">
+              {scoreData?.academicsScore !== undefined ? `${(scoreData.academicsScore / 10).toFixed(1)} / 5.0 ⭐` : '0.0 / 5.0 ⭐'}
+            </p>
           </div>
           <div className="p-4 rounded-xl bg-background border border-borderLine">
             <p className="text-xs font-semibold text-textSecondary uppercase">Research & Innovation</p>
-            <p className="text-2xl font-black text-indigo-600 mt-1">4.5 / 5.0</p>
+            <p className="text-2xl font-black text-indigo-600 mt-1">
+              {scoreData?.certsScore !== undefined ? `${(scoreData.certsScore / 10).toFixed(1)} / 5.0` : '0.0 / 5.0'}
+            </p>
           </div>
         </div>
 
         <div>
           <h4 className="text-xs font-bold text-textSecondary uppercase tracking-wider mb-2">Identified Academic Focus Items</h4>
           <ul className="space-y-1.5 text-xs text-textPrimary">
-            {(scoreData?.feedback || [
-              'Deepen System Design experience with distributed databases',
-              'Obtain AWS Certified Developer Associate certification',
-              'Increase LeetCode problem count to 400+',
-            ]).map((item, idx) => (
+            {(scoreData?.feedback && scoreData.feedback.length > 0
+              ? scoreData.feedback
+              : ['Complete your profile details to generate academic focus insights']
+            ).map((item, idx) => (
               <li key={idx} className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-primary shrink-0" />
                 <span>{item}</span>

@@ -51,17 +51,17 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
       name: activeName,
       roll_number: activeRoll,
       email: activeEmail,
-      year: student?.year || '3rd Year',
+      year: (student?.year as any) || '',
       phone: student?.phone || '',
       address: student?.address || '',
       native_place: student?.native_place || '',
-      department: student?.department || 'CSE',
-      batch: student?.batch || '2023-2027',
-      section: student?.section || 'A',
-      hostel_day_scholar: student?.hostel_day_scholar || 'Day Scholar',
+      department: student?.department || '',
+      batch: student?.batch || '',
+      section: student?.section || '',
+      hostel_day_scholar: (student?.hostel_day_scholar as any) || '',
       driving_license: student?.driving_license ?? false,
       passport: student?.passport ?? false,
-      relocation_willingness: student?.relocation_willingness ?? true,
+      relocation_willingness: student?.relocation_willingness ?? false,
       family_business: student?.family_business || '',
       financial_background: student?.financial_background || '',
       linkedin_url: student?.linkedin_url || '',
@@ -112,14 +112,14 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
             {isEditing ? (
               <input {...register('name')} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
             ) : (
-              <p className="text-sm font-semibold text-textPrimary">{s?.name || activeName}</p>
+              <p className="text-sm font-semibold text-textPrimary">{s?.name || activeName || 'Not provided'}</p>
             )}
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Registration Number (Locked)</label>
             <p className="text-sm font-bold text-brand-primary bg-brand-soft px-3 py-1.5 rounded-lg inline-block">
-              {s?.roll_number || activeRoll}
+              {s?.roll_number || activeRoll || 'Not assigned'}
             </p>
           </div>
 
@@ -138,14 +138,18 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
             ) : (
               <div className="flex items-center gap-1.5">
                 <GraduationCap className="w-4 h-4 text-green-600 shrink-0" />
-                <p className="text-sm font-black text-green-600">9.16 / 10.00 CGPA</p>
+                <p className="text-sm font-black text-green-600">
+                  {(student as any)?.cgpa !== undefined && (student as any)?.cgpa !== null && Number((student as any).cgpa) > 0
+                    ? `${Number((student as any).cgpa).toFixed(2)} / 10.00 CGPA`
+                    : 'Not provided'}
+                </p>
               </div>
             )}
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">College Email (Locked)</label>
-            <p className="text-sm font-medium text-textPrimary">{s?.email || 'jayanth@rgmcet.edu.in'}</p>
+            <p className="text-sm font-medium text-textPrimary">{s?.email || activeEmail || 'Not provided'}</p>
           </div>
 
           {/* Year */}
@@ -153,12 +157,13 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Year</label>
             {isEditing ? (
               <select {...register('year')} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background">
+                <option value="">Select Year</option>
                 {YEARS.map((y) => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
             ) : (
-              <p className="text-sm font-medium text-textPrimary">{s?.year || '3rd Year'}</p>
+              <p className="text-sm font-medium text-textPrimary">{s?.year || 'Not specified'}</p>
             )}
           </div>
 
@@ -167,39 +172,40 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Department</label>
             {isEditing ? (
               <select {...register('department')} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background">
+                <option value="">Select Department</option>
                 {DEPARTMENTS.map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
             ) : (
-              <p className="text-sm font-medium text-textPrimary">{s?.department || 'CSE'}</p>
+              <p className="text-sm font-medium text-textPrimary">{s?.department || 'Not specified'}</p>
             )}
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Batch</label>
             {isEditing ? (
-              <input {...register('batch')} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
+              <input {...register('batch')} placeholder="e.g. 2023-2027" className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
             ) : (
-              <p className="text-sm font-medium text-textPrimary">{s?.batch || '2023-2027'}</p>
+              <p className="text-sm font-medium text-textPrimary">{s?.batch || 'Not specified'}</p>
             )}
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Section</label>
             {isEditing ? (
-              <input {...register('section')} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
+              <input {...register('section')} placeholder="e.g. A" className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
             ) : (
-              <p className="text-sm font-medium text-textPrimary">Sec {s?.section || 'A'}</p>
+              <p className="text-sm font-medium text-textPrimary">{s?.section ? `Sec ${s.section}` : 'Not specified'}</p>
             )}
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Mobile Phone</label>
             {isEditing ? (
-              <input {...register('phone')} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
+              <input {...register('phone')} placeholder="e.g. 9876543210" className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
             ) : (
-              <p className="text-sm font-medium text-textPrimary">{s?.phone || '9876543210'}</p>
+              <p className="text-sm font-medium text-textPrimary">{s?.phone || 'Not provided'}</p>
             )}
           </div>
 
@@ -207,20 +213,21 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Hostel / Day Scholar</label>
             {isEditing ? (
               <select {...register('hostel_day_scholar')} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background">
+                <option value="">Select Option</option>
                 <option value="Day Scholar">Day Scholar</option>
                 <option value="Hostel">Hostel</option>
               </select>
             ) : (
-              <p className="text-sm font-medium text-textPrimary">{s?.hostel_day_scholar || 'Day Scholar'}</p>
+              <p className="text-sm font-medium text-textPrimary">{s?.hostel_day_scholar || 'Not specified'}</p>
             )}
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Native Place</label>
             {isEditing ? (
-              <input {...register('native_place')} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
+              <input {...register('native_place')} placeholder="e.g. Nandyal" className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
             ) : (
-              <p className="text-sm font-medium text-textPrimary">{s?.native_place || 'Nandyal'}</p>
+              <p className="text-sm font-medium text-textPrimary">{s?.native_place || 'Not provided'}</p>
             )}
           </div>
 
@@ -228,19 +235,20 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Financial Background</label>
             {isEditing ? (
               <select {...register('financial_background')} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background">
+                <option value="">Select Background</option>
                 {FINANCIAL_BACKGROUNDS.map((f) => (
                   <option key={f} value={f}>{f}</option>
                 ))}
               </select>
             ) : (
-              <p className="text-sm font-medium text-textPrimary">{s?.financial_background || 'Middle Class'}</p>
+              <p className="text-sm font-medium text-textPrimary">{s?.financial_background || 'Not specified'}</p>
             )}
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Family Business</label>
             {isEditing ? (
-              <input {...register('family_business')} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
+              <input {...register('family_business')} placeholder="e.g. Retail, Agriculture" className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
             ) : (
               <p className="text-sm font-medium text-textPrimary">{s?.family_business || '—'}</p>
             )}
@@ -250,11 +258,11 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Driving License</label>
             {isEditing ? (
               <select {...register('driving_license', { setValueAs: (v) => v === 'true' })} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background">
-                <option value="true">Yes</option>
                 <option value="false">No</option>
+                <option value="true">Yes</option>
               </select>
             ) : (
-              <p className="text-sm font-medium text-textPrimary">{s?.driving_license ? 'Yes' : 'No'}</p>
+              <p className="text-sm font-medium text-textPrimary">{s?.driving_license !== undefined && s?.driving_license !== null ? (s.driving_license ? 'Yes' : 'No') : 'Not specified'}</p>
             )}
           </div>
 
@@ -262,11 +270,11 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Passport</label>
             {isEditing ? (
               <select {...register('passport', { setValueAs: (v) => v === 'true' })} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background">
-                <option value="true">Yes</option>
                 <option value="false">No</option>
+                <option value="true">Yes</option>
               </select>
             ) : (
-              <p className="text-sm font-medium text-textPrimary">{s?.passport ? 'Yes' : 'No'}</p>
+              <p className="text-sm font-medium text-textPrimary">{s?.passport !== undefined && s?.passport !== null ? (s.passport ? 'Yes' : 'No') : 'Not specified'}</p>
             )}
           </div>
 
@@ -278,14 +286,14 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
                 <option value="false">No, prefer local</option>
               </select>
             ) : (
-              <p className="text-sm font-medium text-textPrimary">{s?.relocation_willingness ? 'Yes, willing to relocate' : 'No, prefer local'}</p>
+              <p className="text-sm font-medium text-textPrimary">{s?.relocation_willingness !== undefined && s?.relocation_willingness !== null ? (s.relocation_willingness ? 'Yes, willing to relocate' : 'No, prefer local') : 'Not specified'}</p>
             )}
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">LinkedIn Profile</label>
             {isEditing ? (
-              <input {...register('linkedin_url')} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
+              <input {...register('linkedin_url')} placeholder="https://linkedin.com/in/yourprofile" className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
             ) : (
               s?.linkedin_url ? (
                 <a href={s.linkedin_url} target="_blank" rel="noreferrer" className="text-sm font-medium text-brand-primary hover:underline flex items-center gap-1">
@@ -302,9 +310,9 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
         <div>
           <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Residential Address</label>
           {isEditing ? (
-            <textarea {...register('address')} rows={2} className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
+            <textarea {...register('address')} rows={2} placeholder="Enter your full residential address" className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
           ) : (
-            <p className="text-sm font-medium text-textPrimary">{s?.address || 'Nandyal, Andhra Pradesh'}</p>
+            <p className="text-sm font-medium text-textPrimary">{s?.address || 'Not provided'}</p>
           )}
         </div>
 

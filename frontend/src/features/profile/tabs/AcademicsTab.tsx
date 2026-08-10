@@ -53,12 +53,12 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
   const overallCgpaVal =
     sortedAcademics.length > 0
       ? (sortedAcademics.reduce((sum, a) => sum + Number(a.semester_gpa), 0) / sortedAcademics.length).toFixed(2)
-      : '9.16';
+      : '0.00';
 
-  const firstSemGpa = sortedAcademics.length > 0 ? Number(sortedAcademics[0].semester_gpa) : 8.8;
-  const latestSemGpa = sortedAcademics.length > 0 ? Number(sortedAcademics[sortedAcademics.length - 1].semester_gpa) : 9.45;
+  const firstSemGpa = sortedAcademics.length > 0 ? Number(sortedAcademics[0].semester_gpa) : 0;
+  const latestSemGpa = sortedAcademics.length > 0 ? Number(sortedAcademics[sortedAcademics.length - 1].semester_gpa) : 0;
   const totalImprovement = Number((latestSemGpa - firstSemGpa).toFixed(2));
-  const highestSemGpa = sortedAcademics.length > 0 ? Math.max(...sortedAcademics.map((a) => Number(a.semester_gpa))) : 9.45;
+  const highestSemGpa = sortedAcademics.length > 0 ? Math.max(...sortedAcademics.map((a) => Number(a.semester_gpa))) : 0;
 
   const onSaveSemester = async (data: AcademicRecord) => {
     setSaving(true);

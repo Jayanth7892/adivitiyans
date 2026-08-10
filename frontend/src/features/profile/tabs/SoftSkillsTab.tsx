@@ -51,7 +51,7 @@ export const SoftSkillsTab: React.FC<SoftSkillsTabProps> = ({ softSkills, readOn
 
         <div className="space-y-5">
           {CORE_SOFT_SKILLS.map((skillName) => {
-            const selfRating = softSkills.find((s) => s.skill === skillName && s.rated_by === 'self')?.rating || 4;
+            const selfRating = softSkills.find((s) => s.skill === skillName && s.rated_by === 'self')?.rating || 0;
             const facultyRating = softSkills.find((s) => s.skill === skillName && s.rated_by === 'faculty')?.rating;
 
             return (
@@ -78,7 +78,7 @@ export const SoftSkillsTab: React.FC<SoftSkillsTabProps> = ({ softSkills, readOn
                         type="button"
                         onClick={() => handleRatingChange(skillName, star)}
                         className={`w-8 h-8 rounded-lg font-bold text-xs transition-all ${
-                          selfRating >= star
+                          selfRating >= star && selfRating > 0
                             ? 'bg-brand-primary text-white shadow-sm'
                             : 'bg-surface border border-borderLine text-textSecondary hover:bg-background'
                         }`}
@@ -87,7 +87,9 @@ export const SoftSkillsTab: React.FC<SoftSkillsTabProps> = ({ softSkills, readOn
                       </button>
                     ))}
                   </div>
-                  <span className="text-xs font-bold text-brand-primary w-12 text-right">{selfRating} / 5</span>
+                  <span className="text-xs font-bold text-brand-primary w-16 text-right">
+                    {selfRating > 0 ? `${selfRating} / 5` : 'Not rated'}
+                  </span>
                 </div>
               </div>
             );
