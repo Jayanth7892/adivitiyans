@@ -90,95 +90,35 @@ if (USE_MOCK) {
   const SAMPLE_STUDENTS = [
     {
       roll_number: '23091A3251', name: 'Jayanth Kumar', email: 'jayanth@rgmcet.edu.in',
-      year: '3rd Year', phone: '', address: '',
-      native_place: '', department: 'CSE', batch: '2023-2027', section: 'A',
-      hostel_day_scholar: 'Day Scholar', driving_license: false, passport: false,
-      relocation_willingness: true, family_business: '',
+      year: '', phone: '', address: '',
+      native_place: '', department: '', batch: '', section: '',
+      hostel_day_scholar: '', driving_license: false, passport: false,
+      relocation_willingness: false, family_business: '',
       financial_background: '', faculty_mentor_id: 'FAC001',
-      linkedin_url: '',
-    },
-    {
-      roll_number: '23091A3252', name: 'dasamneni', email: 'dasamneni@rgmcet.edu.in',
-      year: '3rd Year', phone: '', address: '',
-      native_place: '', department: 'CSE', batch: '2023-2027', section: 'B',
-      hostel_day_scholar: 'Day Scholar', driving_license: false, passport: false,
-      relocation_willingness: true, family_business: '',
-      financial_background: '', faculty_mentor_id: 'FAC001',
-      linkedin_url: '',
-    },
-    {
-      roll_number: '23091A3253', name: 'Pathipati Dinesh Kumar', email: 'dinesh@rgmcet.edu.in',
-      year: '4th Year', phone: '', address: '',
-      native_place: '', department: 'CSE', batch: '2022-2026', section: 'A',
-      hostel_day_scholar: 'Day Scholar', driving_license: false, passport: false,
-      relocation_willingness: true, family_business: '',
-      financial_background: '', faculty_mentor_id: 'FAC002',
-      linkedin_url: '',
-    },
-    {
-      roll_number: '23091A3207', name: 'amar', email: 'amar@rgmcet.edu.in',
-      year: '4th Year', phone: '', address: '',
-      native_place: '', department: 'CSE', batch: '2022-2026', section: 'A',
-      hostel_day_scholar: 'Day Scholar', driving_license: false, passport: false,
-      relocation_willingness: true, family_business: '',
-      financial_background: '', faculty_mentor_id: 'FAC001',
-      linkedin_url: '',
-    },
-    {
-      roll_number: '23091A3278', name: 'Bellamkonda Pranav', email: 'pranav@rgmcet.edu.in',
-      year: '4th Year', phone: '', address: '',
-      native_place: '', department: 'CSE', batch: '2022-2026', section: 'A',
-      hostel_day_scholar: 'Day Scholar', driving_license: false, passport: false,
-      relocation_willingness: true, family_business: '',
-      financial_background: '', faculty_mentor_id: 'FAC002',
       linkedin_url: '',
     },
   ];
 
   SAMPLE_STUDENTS.forEach((s) => {
     mockStudentsStore.set(s.roll_number, s);
-    mockAcademicsStore.set(s.roll_number, [
-      { semester: 1, semester_gpa: 8.8, programming_grade: 'A+', attendance_pct: 94.5, theory_grade: 'A', remarks: 'Excellent in C' },
-      { semester: 2, semester_gpa: 9.1, programming_grade: 'O', attendance_pct: 96.0, theory_grade: 'A+', remarks: 'Outstanding in DS' },
-      { semester: 3, semester_gpa: 9.3, programming_grade: 'O', attendance_pct: 95.0, theory_grade: 'O', remarks: 'Top rank Java' },
-      { semester: 4, semester_gpa: 9.45, programming_grade: 'O', attendance_pct: 98.0, theory_grade: 'O', remarks: 'Top score DBMS' },
-    ]);
+    mockAcademicsStore.set(s.roll_number, []);
     mockCodingStore.set(s.roll_number, []);
-    mockSkillsStore.set(s.roll_number, [
-      { id: '1', skill_category: 'AI/Agentic', specific_tool: 'Claude Code & CrewAI', self_rating: 5, verified: true },
-      { id: '2', skill_category: 'Cloud', specific_tool: 'AWS Lambda & S3', self_rating: 4, verified: true },
-      { id: '3', skill_category: 'Full Stack', specific_tool: 'React & TypeScript', self_rating: 5, verified: true },
-    ]);
-    mockCertsStore.set(s.roll_number, [
-      { id: '1', provider: 'AWS', title: 'AWS Certified Solutions Architect Associate', date_completed: '2024-03-15', certificate_file_url: null, suggested: false },
-      { id: '2', provider: 'Coursera', title: 'Deep Learning Specialization by Andrew Ng', date_completed: '2024-01-20', certificate_file_url: null, suggested: false },
-      { id: '3', provider: 'NPTEL', title: 'Programming, Data Structures And Algorithms Using Python', date_completed: null, certificate_file_url: null, suggested: true },
-    ]);
-    mockSoftSkillsStore.set(s.roll_number, [
-      { skill: 'Leadership', rating: 5, rated_by: 'self' },
-      { skill: 'Communication', rating: 4, rated_by: 'self' },
-      { skill: 'Teamwork', rating: 5, rated_by: 'self' },
-      { skill: 'Time Management', rating: 4, rated_by: 'self' },
-      { skill: 'Public Speaking', rating: 4, rated_by: 'self' },
-      { skill: 'Learning Ability', rating: 5, rated_by: 'self' },
-      { skill: 'Professionalism', rating: 5, rated_by: 'self' },
-    ]);
-    mockAchievementsStore.set(s.roll_number, [
-      { id: '1', type: 'Hackathon', title: '1st Place in Smart India Hackathon 2024', description: 'Built AI placement system', achievement_date: '2024-02-18', organization: 'AICTE' },
-      { id: '2', type: 'Capstone Project', title: 'Advitiyans Student 360 Platform', description: 'Architected serverless cloud platform', achievement_date: '2024-04-10', organization: 'RGMCET' },
-    ]);
+    mockSkillsStore.set(s.roll_number, []);
+    mockCertsStore.set(s.roll_number, []);
+    mockSoftSkillsStore.set(s.roll_number, []);
+    mockAchievementsStore.set(s.roll_number, []);
     mockPlacementStore.set(s.roll_number, {
       student_id: s.roll_number,
-      placement_category: 'Product Companies',
-      preferred_career: 'AI & Full Stack Engineer',
-      dream_company: ['Google', 'Microsoft', 'Amazon', 'Atlassian'],
-      employability_score: 92.4,
-      skill_gap: ['Deepen System Design experience', 'Kubernetes administration'],
-      suggested_certifications: ['AWS Certified Developer Associate', 'CKAD'],
+      placement_category: '',
+      preferred_career: '',
+      dream_company: [],
+      employability_score: 0,
+      skill_gap: [],
+      suggested_certifications: [],
       higher_studies_interest: false,
-      overall_potential: 4.9,
-      research_potential: 4.5,
-      need_from_department: 'Advanced mock interview sessions with industry alumni.',
+      overall_potential: 0,
+      research_potential: 0,
+      need_from_department: '',
     });
   });
 }

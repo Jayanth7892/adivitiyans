@@ -310,11 +310,11 @@ app.post('/students', async (req: Request, res: Response) => {
          updated_at = CURRENT_TIMESTAMP
        RETURNING *`,
       [
-        regNo, validatedData.name, validatedData.email, validatedData.year,
+        regNo, validatedData.name, validatedData.email, validatedData.year || '',
         validatedData.phone || null, validatedData.address || null, validatedData.native_place || null,
-        validatedData.department, validatedData.batch, validatedData.section,
-        validatedData.hostel_day_scholar, validatedData.driving_license, validatedData.passport,
-        validatedData.relocation_willingness, validatedData.family_business || null,
+        validatedData.department || '', validatedData.batch || '', validatedData.section || '',
+        validatedData.hostel_day_scholar || null, validatedData.driving_license || false, validatedData.passport || false,
+        validatedData.relocation_willingness || false, validatedData.family_business || null,
         validatedData.financial_background || null, validatedData.faculty_mentor_id || null,
         validatedData.photo_url || null, validatedData.resume_url || null, validatedData.linkedin_url || null,
       ]

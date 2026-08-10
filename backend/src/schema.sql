@@ -23,13 +23,13 @@ CREATE TABLE IF NOT EXISTS students (
     phone VARCHAR(20),
     address TEXT,
     native_place VARCHAR(100),
-    department VARCHAR(50) NOT NULL DEFAULT 'CSE',
-    batch VARCHAR(20) NOT NULL DEFAULT '2022-2026',
-    section VARCHAR(10) DEFAULT 'A',
-    hostel_day_scholar VARCHAR(20) DEFAULT 'Day Scholar' CHECK (hostel_day_scholar IN ('Hostel', 'Day Scholar')),
+    department VARCHAR(50) NOT NULL DEFAULT '',
+    batch VARCHAR(20) NOT NULL DEFAULT '',
+    section VARCHAR(10) DEFAULT '',
+    hostel_day_scholar VARCHAR(20) DEFAULT '',
     driving_license BOOLEAN DEFAULT FALSE,
     passport BOOLEAN DEFAULT FALSE,
-    relocation_willingness BOOLEAN DEFAULT TRUE,
+    relocation_willingness BOOLEAN DEFAULT FALSE,
     family_business TEXT,
     financial_background VARCHAR(50),
     faculty_mentor_id VARCHAR(50) REFERENCES faculty(faculty_id) ON DELETE SET NULL,
@@ -177,68 +177,4 @@ INSERT INTO faculty (faculty_id, name, email, department, role) VALUES
 ON CONFLICT (faculty_id) DO NOTHING;
 
 -- Insert Students
-INSERT INTO students (
-    roll_number, name, email, year, phone, address, native_place, department, batch, section,
-    hostel_day_scholar, driving_license, passport, relocation_willingness, family_business,
-    financial_background, faculty_mentor_id, linkedin_url
-) VALUES
-('23091A3251', 'Jayanth Kumar', 'jayanth@rgmcet.edu.in', '3rd Year', '9876543210', 'Nandyal, Andhra Pradesh', 'Nandyal', 'CSE', '2023-2027', 'A', 'Day Scholar', TRUE, TRUE, TRUE, 'Agriculture', 'Middle Class', 'FAC001', 'https://linkedin.com/in/jayanth-kumar'),
-('23091A3252', 'Ananya Sharma', 'ananya@rgmcet.edu.in', '3rd Year', '9876543211', 'Kurnool, Andhra Pradesh', 'Kurnool', 'CSE', '2023-2027', 'B', 'Hostel', FALSE, TRUE, TRUE, 'Retail Business', 'Upper Middle Class', 'FAC001', 'https://linkedin.com/in/ananya-sharma')
-ON CONFLICT (roll_number) DO NOTHING;
-
--- Insert Academics for Jayanth (23091A3251)
-INSERT INTO academics (student_id, semester, semester_gpa, programming_grade, attendance_pct, theory_grade, remarks) VALUES
-('23091A3251', 1, 8.80, 'A+', 94.50, 'A', 'Excellent performance in C Programming'),
-('23091A3251', 2, 9.10, 'O', 96.00, 'A+', 'Outstanding in Data Structures'),
-('23091A3251', 3, 9.30, 'O', 95.00, 'O', 'Top rank in Java & Algorithms'),
-('23091A3251', 4, 9.45, 'O', 98.00, 'O', 'Top score in Database Systems')
-ON CONFLICT (student_id, semester) DO NOTHING;
-
--- Insert Tech Skills for Jayanth (23091A3251)
-INSERT INTO tech_skills (student_id, skill_category, specific_tool, self_rating, verified) VALUES
-('23091A3251', 'AI/Agentic', 'Claude Code & CrewAI', 5, TRUE),
-('23091A3251', 'Cloud', 'AWS Lambda & S3', 4, TRUE),
-('23091A3251', 'Full Stack', 'React & TypeScript', 5, TRUE)
-ON CONFLICT (student_id, specific_tool) DO NOTHING;
-
--- Insert Certifications for Jayanth (23091A3251)
-INSERT INTO certifications (student_id, provider, title, date_completed, certificate_file_url, suggested) VALUES
-('23091A3251', 'AWS', 'AWS Certified Solutions Architect Associate', '2024-03-15', NULL, FALSE),
-('23091A3251', 'Coursera', 'Deep Learning Specialization by Andrew Ng', '2024-01-20', NULL, FALSE),
-('23091A3251', 'NPTEL', 'Programming, Data Structures And Algorithms Using Python', NULL, NULL, TRUE)
-ON CONFLICT DO NOTHING;
-
--- Insert Soft Skills for Jayanth (23091A3251)
-INSERT INTO soft_skills (student_id, skill, rating, rated_by) VALUES
-('23091A3251', 'Leadership', 5, 'self'),
-('23091A3251', 'Communication', 4, 'self'),
-('23091A3251', 'Teamwork', 5, 'self'),
-('23091A3251', 'Time Management', 4, 'self'),
-('23091A3251', 'Public Speaking', 4, 'self'),
-('23091A3251', 'Learning Ability', 5, 'self'),
-('23091A3251', 'Professionalism', 5, 'self')
-ON CONFLICT (student_id, skill, rated_by) DO NOTHING;
-
--- Insert Achievements for Jayanth (23091A3251)
-INSERT INTO achievements (student_id, type, title, description, achievement_date, organization) VALUES
-('23091A3251', 'Hackathon', '1st Place in Smart India Hackathon 2024', 'Built an automated campus placement readiness analyzer using AI', '2024-02-18', 'AICTE'),
-('23091A3251', 'Capstone Project', 'Advitiyans Student 360 Platform', 'Architected serverless cloud system for 3000+ university students', '2024-04-10', 'RGMCET')
-ON CONFLICT DO NOTHING;
-
--- Insert Placement Profile for Jayanth (23091A3251)
-INSERT INTO placement_profile (
-    student_id, placement_category, preferred_career, dream_company, employability_score,
-    skill_gap, suggested_certifications, higher_studies_interest, overall_potential, research_potential, need_from_department
-) VALUES (
-    '23091A3251',
-    'Product Companies',
-    'AI & Full Stack Cloud Engineer',
-    ARRAY['Google', 'Microsoft', 'Atlassian', 'AWS'],
-    92.40,
-    '["Deepen System Design experience", "Kubernetes cluster administration"]'::jsonb,
-    '["AWS Certified Developer Associate", "CKAD - Certified Kubernetes Application Developer"]'::jsonb,
-    FALSE,
-    4.9,
-    4.5,
-    'Advanced mock interview sessions with industry alumni and sponsorship for Cloud Certification exams.'
-) ON CONFLICT (student_id) DO NOTHING;
+-- End of schema.sql
