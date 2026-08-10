@@ -26,10 +26,12 @@ USER_POOL_ID=$(node -e "const o = require('./cdk-outputs.json'); console.log(Obj
 CLIENT_ID=$(node -e "const o = require('./cdk-outputs.json'); console.log(Object.values(o)[0].UserPoolClientId || '');")
 FRONTEND_BUCKET=$(node -e "const o = require('./cdk-outputs.json'); console.log(Object.values(o)[0].FrontendBucketName || '');")
 CLOUDFRONT_URL=$(node -e "const o = require('./cdk-outputs.json'); console.log(Object.values(o)[0].CloudFrontUrl || '');")
+DISTRIBUTION_ID=$(node -e "const o = require('./cdk-outputs.json'); console.log(Object.values(o)[0].CloudFrontDistributionId || '');")
 
 echo "✅ Infrastructure Deployed!"
 echo "   API Base URL: $API_URL"
 echo "   CloudFront HTTPS URL: $CLOUDFRONT_URL"
+echo "   CloudFront Distribution ID: $DISTRIBUTION_ID"
 echo "   User Pool ID: $USER_POOL_ID"
 echo "   Client ID: $CLIENT_ID"
 
@@ -49,10 +51,15 @@ VITE_COGNITO_CLIENT_ID="$CLIENT_ID" \
 npm run build
 cd ..
 
-# 4. Sync Frontend dist to S3 Bucket
+# 5. Sync Frontend dist to S3 Bucket & Invalidate CloudFront CDN
 if [ -n "$FRONTEND_BUCKET" ]; then
-  echo "📤 Step 4: Syncing build assets to S3 bucket: $FRONTEND_BUCKET..."
-  aws s3 sync frontend/dist/ "s3://$FRONTEND_BUCKET" --delete
+  echo "📤 Step 5: Syncing build assets to S3 bucket: $FRONTEND_BUCKET..."
+  aws s3 sync frontend/dist/ "s3://$FRONTEND_BUCKET" --delete --cache-control "max-age=0,no-cache,no-store,must-revalidate"
+fi
+
+if [ -n "$DISTRIBUTION_ID" ]; then
+  echo "🔄 Step 6: Invalidating CloudFront edge cache (Distribution: $DISTRIBUTION_ID)..."
+  aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/*" || echo "⚠️ CloudFront invalidation skipped"
 fi
 
 echo "======================================================="

@@ -365,6 +365,7 @@ export class AdvitiyansStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
     new cdk.CfnOutput(this, 'FrontendWebsiteUrl', { value: frontendBucket.bucketWebsiteUrl });
     new cdk.CfnOutput(this, 'CloudFrontUrl', { value: `https://${cfDistribution.distributionDomainName}` });
+    new cdk.CfnOutput(this, 'CloudFrontDistributionId', { value: cfDistribution.distributionId });
     new cdk.CfnOutput(this, 'FrontendBucketName', { value: frontendBucket.bucketName });
     new cdk.CfnOutput(this, 'UploadsBucketName', { value: uploadsBucket.bucketName });
     new cdk.CfnOutput(this, 'RdsProxyEndpoint', { value: rdsProxy.endpoint });
