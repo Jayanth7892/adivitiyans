@@ -51,6 +51,7 @@ export const facultySignUpSchema = z.object({
     .min(2, "Full name must be at least 2 characters")
     .max(100, "Full name cannot exceed 100 characters"),
   department: z.string().min(1, "Please select department"),
+  securityKey: z.string().min(1, "Faculty secret passcode is required"),
   email: z.string()
     .trim()
     .regex(RGMCET_EMAIL_REGEX, {

@@ -165,8 +165,14 @@ export const AuthPage: React.FC = () => {
     }
   };
 
+  const FACULTY_SECRET_KEY = 'RGMCET_FACULTY_2026';
+
   const onFacultySignUp = async (data: FacultySignUpInput) => {
     try {
+      if (data.securityKey !== FACULTY_SECRET_KEY) {
+        throw new Error(`Invalid Faculty Secret Passcode. Authorized security key is required for ${data.department} Faculty registration.`);
+      }
+
       const generatedFacId = `FAC_${data.email.split('@')[0].toUpperCase()}`;
       let jwtToken: string | undefined;
       await cognitoSignUp({
@@ -198,6 +204,10 @@ export const AuthPage: React.FC = () => {
 
   const onHodSignUp = async (data: FacultySignUpInput) => {
     try {
+      if (data.securityKey !== FACULTY_SECRET_KEY) {
+        throw new Error(`Invalid Faculty Secret Passcode. Authorized security key is required for HOD registration.`);
+      }
+
       const generatedHodId = `HOD_${data.email.split('@')[0].toUpperCase()}`;
       let jwtToken: string | undefined;
       await cognitoSignUp({
@@ -726,6 +736,22 @@ export const AuthPage: React.FC = () => {
                 </select>
                 {facultySignUpErrors.department && (
                   <p className="text-xs text-alert mt-1">{facultySignUpErrors.department.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1">
+                  Faculty Secret Security Key *
+                  <span className="text-[10px] text-brand-primary font-normal ml-2">(Passcode required for staff account)</span>
+                </label>
+                <input
+                  {...registerFacultySignUp('securityKey')}
+                  type="password"
+                  placeholder="Enter Secret Security Passcode (e.g. RGMCET_FACULTY_2026)"
+                  className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary font-mono text-xs"
+                />
+                {facultySignUpErrors.securityKey && (
+                  <p className="text-xs text-alert mt-1">{facultySignUpErrors.securityKey.message}</p>
                 )}
               </div>
 

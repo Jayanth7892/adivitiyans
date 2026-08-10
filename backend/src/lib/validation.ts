@@ -39,6 +39,18 @@ export const studentSignUpSchema = z.object({
   path: ["email"],
 });
 
+export const facultySignUpSchema = z.object({
+  fullName: z.string().min(2).max(100),
+  department: z.string().min(1),
+  securityKey: z.string().min(1, "Faculty secret passcode is required"),
+  email: emailSchema,
+  password: z.string().min(8),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
 export const studentProfileSchema = z.object({
   name: z.string().min(2).max(100),
   roll_number: registrationNumberSchema,
