@@ -20,6 +20,17 @@ jobs:
         with:
           node-version: 20
 
+      - name: Validate GitHub Secrets
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ] || [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "==============================================================================================="
+            echo "❌ CRITICAL ERROR: AWS Secrets are missing in your GitHub Repository settings!"
+            echo "   Please add AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY under:"
+            echo "   GitHub Repo -> Settings -> Secrets and variables -> Actions -> Repository secrets"
+            echo "==============================================================================================="
+            exit 1
+          fi
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:

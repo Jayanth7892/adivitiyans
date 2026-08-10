@@ -17,7 +17,7 @@ echo "☁️ Step 2: Deploying Infrastructure with AWS CDK..."
 cd infra
 npm install
 npm run build
-npx cdk deploy --require-approval never --outputs-file ../cdk-outputs.json
+npm run cdk -- deploy --require-approval never --outputs-file ../cdk-outputs.json
 cd ..
 
 # Extract CDK outputs
