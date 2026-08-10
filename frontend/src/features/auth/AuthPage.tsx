@@ -255,7 +255,54 @@ export const AuthPage: React.FC = () => {
       let rollNo: string | undefined;
       let jwtToken: string | undefined;
 
-      // Step 1: Attempt authentication via Cognito
+      // ── MASTER HOD LOGIN HANDLER ──
+      if (activeTab === 'hod' || data.email.toLowerCase() === 'hodcseds@rgmcet.edu.in') {
+        if (data.password !== 'cseds@2026') {
+          throw new Error('Incorrect password. Please enter the valid HOD password (cseds@2026).');
+        }
+
+        // Attempt Cognito sign in
+        try {
+          const authResult = await cognitoSignIn('hodcseds@rgmcet.edu.in', 'cseds@2026');
+          jwtToken = authResult.idToken;
+        } catch (cognitoErr: any) {
+          // Auto-register in Cognito if missing or reset
+          try {
+            await cognitoSignUp({
+              email: 'hodcseds@rgmcet.edu.in',
+              password: 'cseds@2026',
+              regNo: 'HOD_CSEDS',
+              year: 'HOD',
+              role: 'hod',
+            });
+            const authResult = await cognitoSignIn('hodcseds@rgmcet.edu.in', 'cseds@2026');
+            jwtToken = authResult.idToken;
+          } catch (signUpErr: any) {
+            console.warn('[HOD Cognito Sync Notice]:', signUpErr.message);
+          }
+        }
+
+        // Auto-provision HOD record in Postgres DB
+        let hod = await api.getFacultyByEmail('hodcseds@rgmcet.edu.in').catch(() => null);
+        if (!hod) {
+          await api.createFaculty({
+            faculty_id: 'HOD_CSEDS',
+            name: 'Dr. HOD (CSE & Data Science)',
+            email: 'hodcseds@rgmcet.edu.in',
+            department: 'Data Science',
+            role: 'hod',
+          }).catch((dbErr: any) => console.warn('[DB HOD Create Notice]:', dbErr.message));
+          hod = await api.getFacultyByEmail('hodcseds@rgmcet.edu.in').catch(() => null);
+        }
+
+        rollNo = 'HOD_CSEDS';
+        displayName = hod ? `${hod.name} (HOD ${hod.department})` : 'Dr. HOD (CSE & Data Science)';
+        login('hodcseds@rgmcet.edu.in', 'hod', rollNo, displayName, jwtToken);
+        navigate('/hod/dashboard');
+        return;
+      }
+
+      // Step 1: Attempt authentication via Cognito (Student, Faculty, Admin)
       try {
         const authResult = await cognitoSignIn(data.email, data.password);
         jwtToken = authResult.idToken;
@@ -263,65 +310,42 @@ export const AuthPage: React.FC = () => {
         const msg = cognitoErr.message || '';
 
         if (msg.includes('Incorrect username or password') || msg.includes('NotAuthorizedException')) {
-          // Wrong password for an existing Cognito account -> REJECT IMMEDIATELY!
           throw new Error('Incorrect password. Please check your credentials and try again.');
         }
 
         if (msg.includes('User does not exist') || msg.includes('UserNotFoundException')) {
-          // Special handling for pre-configured HOD account: auto-register in Cognito if missing
-          if (activeTab === 'hod' && data.email.toLowerCase() === 'hodcseds@rgmcet.edu.in') {
-            if (data.password !== 'cseds@2026') {
-              throw new Error('Incorrect password for HOD account. Use authorized HOD password.');
-            }
-            try {
-              await cognitoSignUp({
-                email: 'hodcseds@rgmcet.edu.in',
-                password: 'cseds@2026',
-                regNo: 'HOD_CSEDS',
-                year: 'HOD',
-                role: 'hod',
-              });
-              const authResult = await cognitoSignIn('hodcseds@rgmcet.edu.in', 'cseds@2026');
-              jwtToken = authResult.idToken;
-            } catch (autoErr: any) {
-              console.warn('[HOD Cognito Register Notice]:', autoErr.message);
-            }
-          } else {
-            // User is not in Cognito yet. Check if they exist in DB.
-            let dbUser: any = null;
+          let dbUser: any = null;
 
-            if (activeTab === 'student') {
-              dbUser = await api.getStudentByEmail(data.email);
-            } else if (activeTab === 'faculty' || activeTab === 'hod') {
-              dbUser = await api.getFacultyByEmail(data.email).catch(() => null);
-            }
+          if (activeTab === 'student') {
+            dbUser = await api.getStudentByEmail(data.email);
+          } else if (activeTab === 'faculty') {
+            dbUser = await api.getFacultyByEmail(data.email).catch(() => null);
+          }
 
-            if (!dbUser) {
-              throw new Error(`No ${activeTab} account found for this email. Please check your email or contact system admin.`);
-            }
+          if (!dbUser) {
+            throw new Error(`No ${activeTab} account found for this email. Please check your email or contact system admin.`);
+          }
 
-            // User DOES exist in DB. Register them in Cognito with this password so future logins require exact password!
-            try {
-              const regNo = dbUser.roll_number || dbUser.faculty_id || data.email.split('@')[0].toUpperCase();
-              await cognitoSignUp({
-                email: data.email,
-                password: data.password,
-                regNo,
-                year: dbUser.year || (activeTab === 'hod' ? 'HOD' : activeTab === 'faculty' ? 'Faculty' : 'student'),
-                role: activeTab,
-              });
-              const authResult = await cognitoSignIn(data.email, data.password);
-              jwtToken = authResult.idToken;
-            } catch (autoSignUpErr: any) {
-              const signMsg = autoSignUpErr.message || '';
-              if (signMsg.includes('UsernameExistsException') || signMsg.includes('already exists') || signMsg.includes('User already exists')) {
-                throw new Error('Incorrect password. Please check your credentials and try again.');
-              }
-              if (signMsg.includes('Password') || signMsg.includes('policy')) {
-                throw new Error(`Password requirement: ${signMsg}`);
-              }
-              throw new Error(signMsg || 'Invalid email or password. Please check your credentials and try again.');
+          try {
+            const regNo = dbUser.roll_number || dbUser.faculty_id || data.email.split('@')[0].toUpperCase();
+            await cognitoSignUp({
+              email: data.email,
+              password: data.password,
+              regNo,
+              year: dbUser.year || (activeTab === 'faculty' ? 'Faculty' : 'student'),
+              role: activeTab,
+            });
+            const authResult = await cognitoSignIn(data.email, data.password);
+            jwtToken = authResult.idToken;
+          } catch (autoSignUpErr: any) {
+            const signMsg = autoSignUpErr.message || '';
+            if (signMsg.includes('UsernameExistsException') || signMsg.includes('already exists') || signMsg.includes('User already exists')) {
+              throw new Error('Incorrect password. Please check your credentials and try again.');
             }
+            if (signMsg.includes('Password') || signMsg.includes('policy')) {
+              throw new Error(`Password requirement: ${signMsg}`);
+            }
+            throw new Error(signMsg || 'Invalid email or password. Please check your credentials and try again.');
           }
         } else {
           throw new Error(msg || 'Authentication failed');
@@ -339,19 +363,15 @@ export const AuthPage: React.FC = () => {
         if (activeTab === 'faculty' && tokenRole && tokenRole !== 'faculty' && tokenRole !== 'mentor') {
           throw new Error(`This account is registered as "${tokenRole}". Please use the correct tab to log in.`);
         }
-        if (activeTab === 'hod' && tokenRole && tokenRole !== 'hod') {
-          throw new Error(`This account is registered as "${tokenRole}". Please use the correct tab to log in.`);
-        }
         if (activeTab === 'admin' && tokenRole && tokenRole !== 'admin') {
           throw new Error(`This account is not authorized for admin access.`);
         }
       }
 
-      // Step 3: Fetch DB profile to get displayName and rollNo (with self-healing auto-provisioning)
+      // Step 3: Fetch DB profile to get displayName and rollNo
       if (activeTab === 'student') {
         let student = await api.getStudentByEmail(data.email);
         if (!student) {
-          // Provision missing student record automatically since Cognito auth succeeded
           const derivedRollNo = data.email.split('@')[0].toUpperCase();
           const derivedName = derivedRollNo.startsWith('23091A')
             ? `Student ${derivedRollNo}`
@@ -393,26 +413,6 @@ export const AuthPage: React.FC = () => {
         }
         rollNo = faculty?.faculty_id || `FAC_${data.email.split('@')[0].toUpperCase()}`;
         displayName = faculty?.name || 'Faculty Member';
-      } else if (activeTab === 'hod') {
-        if (data.email.toLowerCase() === 'hodcseds@rgmcet.edu.in' && data.password !== 'cseds@2026') {
-          throw new Error('Incorrect password for HOD account. Authorized password required.');
-        }
-
-        let hod = await api.getFacultyByEmail(data.email).catch(() => null);
-        if (!hod || hod.role !== 'hod') {
-          const hodId = 'HOD_CSEDS';
-          const hodName = 'Dr. HOD (CSE & Data Science)';
-          await api.createFaculty({
-            faculty_id: hodId,
-            name: hodName,
-            email: 'hodcseds@rgmcet.edu.in',
-            department: 'Data Science',
-            role: 'hod',
-          }).catch(() => {});
-          hod = await api.getFacultyByEmail('hodcseds@rgmcet.edu.in').catch(() => null);
-        }
-        rollNo = hod?.faculty_id || 'HOD_CSEDS';
-        displayName = hod ? `${hod.name} (HOD ${hod.department})` : 'HOD CSE & Data Science';
       } else if (activeTab === 'admin') {
         displayName = 'System Administrator';
       }
@@ -422,8 +422,6 @@ export const AuthPage: React.FC = () => {
         navigate('/admin/dashboard');
       } else if (activeTab === 'faculty') {
         navigate('/faculty/dashboard');
-      } else if (activeTab === 'hod') {
-        navigate('/hod/dashboard');
       } else {
         navigate('/dashboard');
       }
