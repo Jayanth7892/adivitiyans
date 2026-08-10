@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Users, Search, Eye, X, GraduationCap, Trophy, TrendingUp,
   Award, ExternalLink, BookOpen, Code2, BarChart2, Building2,
-  Download, Filter, ArrowUpRight, ArrowDownRight, PieChart as PieChartIcon, LineChart as LineChartIcon,
-  CheckCircle2, Sparkles, AlertCircle, Layers, Sliders, Activity, MousePointerClick
+  Download, Filter, ArrowUpRight, ArrowDownRight,
+  CheckCircle2, Sparkles, AlertCircle, Sliders, Activity
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -25,7 +25,6 @@ import {
   Legend,
 } from 'recharts';
 import { api } from '../../lib/api';
-import { StudentProfile, AcademicRecord } from '../../types';
 import { StatCard } from '../../components/common/StatCard';
 import { PersonalInfoTab } from '../profile/tabs/PersonalInfoTab';
 import { AcademicsTab } from '../profile/tabs/AcademicsTab';
@@ -44,7 +43,7 @@ const CODING_LEVELS = ['All Coders', 'Top Coders (>300 LC)', 'Active GitHub (>20
 // HOD Department context
 const DEPARTMENT_NAME = 'Computer Science & Engineering (CSE)';
 
-// Enhanced Student Directory Mock dataset for PowerBI-like cross-filtering
+// Enhanced Student Directory dataset for fallback when API data is empty
 const FULL_CSE_STUDENTS = [
   { rank: 1, name: 'Jayanth Kumar', regNo: '23091A3251', email: 'jayanth@rgmcet.edu.in', section: 'Sec A', year: '3rd Year', cgpa: 9.45, semGpas: [8.80, 8.95, 9.15, 9.30, 9.45], leetcode: 412, github: 42, standing: 'Distinction', placementStatus: 'Placed (18 LPA)' },
   { rank: 2, name: 'Ananya Sharma', regNo: '23091A3252', email: 'ananya@rgmcet.edu.in', section: 'Sec B', year: '3rd Year', cgpa: 9.30, semGpas: [8.70, 8.85, 9.05, 9.20, 9.30], leetcode: 378, github: 28, standing: 'Distinction', placementStatus: 'Interview Ready' },
@@ -62,10 +61,10 @@ const FULL_CSE_STUDENTS = [
 
 // Year-Wise Academic Distribution Summary
 const YEAR_CGPA_SUMMARY = [
-  { year: '1st Year', avgCgpa: 8.85, students: 120, distinction: 42, firstClass: 55, secondClass: 18, passClass: 5 },
-  { year: '2nd Year', avgCgpa: 8.95, students: 115, distinction: 45, firstClass: 50, secondClass: 15, passClass: 5 },
-  { year: '3rd Year', avgCgpa: 9.12, students: 125, distinction: 54, firstClass: 55, secondClass: 13, passClass: 3 },
-  { year: '4th Year', avgCgpa: 9.25, students: 110, distinction: 52, firstClass: 46, secondClass: 10, passClass: 2 },
+  { year: '1st Year', avgCgpa: 8.85, students: 120, distinction: 42, firstClass: 55, secondClass: 18 },
+  { year: '2nd Year', avgCgpa: 8.95, students: 115, distinction: 45, firstClass: 50, secondClass: 15 },
+  { year: '3rd Year', avgCgpa: 9.12, students: 125, distinction: 54, firstClass: 55, secondClass: 13 },
+  { year: '4th Year', avgCgpa: 9.25, students: 110, distinction: 52, firstClass: 46, secondClass: 10 },
 ];
 
 // Semester Progression Data — Year Batches across Semesters
@@ -79,14 +78,6 @@ const SEMESTER_PROGRESSION_DATA = [
   { semester: 'Sem 7', Year1: null, Year2: null, Year3: null, Year4: 9.30 },
 ];
 
-// Year-wise Coding Performance
-const CODING_STATS_BY_YEAR = [
-  { year: '1st Year', avgLeetCode: 140, avgGithubRepos: 8, activeCodersPct: 72 },
-  { year: '2nd Year', avgLeetCode: 260, avgGithubRepos: 16, activeCodersPct: 84 },
-  { year: '3rd Year', avgLeetCode: 380, avgGithubRepos: 28, activeCodersPct: 94 },
-  { year: '4th Year', avgLeetCode: 420, avgGithubRepos: 35, activeCodersPct: 96 },
-];
-
 // Section-Wise Breakdown (Sec A, Sec B, Sec C)
 const SECTION_CGPA_SUMMARY = [
   { section: 'Section A', avgCgpa: 9.15, students: 155, distinction: 68, firstClass: 72 },
@@ -94,7 +85,6 @@ const SECTION_CGPA_SUMMARY = [
   { section: 'Section C', avgCgpa: 8.95, students: 155, distinction: 61, firstClass: 76 },
 ];
 
-// Type for HOD cross-filter entries (used by both real API data and fallback)
 interface HodStudentEntry {
   rank: number;
   name: string;
@@ -110,7 +100,6 @@ interface HodStudentEntry {
   placementStatus: string;
 }
 
-// Helper: Convert API StudentProfile to HodStudentEntry
 function mapStudentToHodEntry(student: any, index: number): HodStudentEntry {
   const section = student.section
     ? (student.section.startsWith('Sec ') ? student.section : `Sec ${student.section}`)
@@ -140,7 +129,7 @@ export const HodDashboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'students' | 'rankings'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // PowerBI-Style Interactive Slicers State (Cross-filtering)
+  // Interactive Filter Slicers
   const [slicerYear, setSlicerYear] = useState<string>('All');
   const [slicerSection, setSlicerSection] = useState<string>('All');
   const [slicerStanding, setSlicerStanding] = useState<string>('All');
@@ -148,11 +137,9 @@ export const HodDashboardPage: React.FC = () => {
 
   const [inspectStudent, setInspectStudent] = useState<HodStudentEntry | null>(null);
   const [inspectTab, setInspectTab] = useState('academics-graph');
-  const [analyticsCategory, setAnalyticsCategory] = useState<'academics' | 'coding' | 'sections'>('academics');
 
   const location = useLocation();
 
-  // Sync active tab from URL query params
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
@@ -161,28 +148,22 @@ export const HodDashboardPage: React.FC = () => {
     }
   }, [location.search]);
 
-  // Queries
   const { data: students = [] } = useQuery({
     queryKey: ['hodStudents'],
     queryFn: () => api.getAllStudents(),
   });
 
-  // Merge API students with fallback: use API data when available (deduplicated by roll_number)
   const mergedStudentDataset: HodStudentEntry[] = useMemo(() => {
     if (students.length > 0) {
-      // Deduplicate API students by roll_number
       const uniqueStudents = Array.from(
         new Map(students.map((s) => [s.roll_number.toUpperCase(), s])).values()
       );
-      // Map API StudentProfile objects to HodStudentEntry shape
       return uniqueStudents.map((s, idx) => mapStudentToHodEntry(s, idx));
     }
-    // Fallback to demo data when API returns empty
     return FULL_CSE_STUDENTS;
   }, [students]);
 
-  // PowerBI-style Dynamic Cross-Filtered Dataset (Interactive Graph Clicks update this!)
-  const crossFilteredDataset = useMemo(() => {
+  const filteredDataset = useMemo(() => {
     return mergedStudentDataset.filter((s) => {
       const matchesSearch = !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.regNo.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesYear = slicerYear === 'All' || s.year === slicerYear;
@@ -197,45 +178,30 @@ export const HodDashboardPage: React.FC = () => {
     });
   }, [mergedStudentDataset, searchQuery, slicerYear, slicerSection, slicerStanding, slicerCoding]);
 
-  // PowerBI Dynamic Calculated Measures (KPI Metrics)
-  const powerBiMetrics = useMemo(() => {
-    const total = crossFilteredDataset.length;
+  const summaryMetrics = useMemo(() => {
+    const total = filteredDataset.length;
     if (total === 0) return { count: 0, avgCgpa: '0.00', avgLeetCode: 0, distinctionRatio: '0%' };
 
-    const avgCgpa = (crossFilteredDataset.reduce((s, p) => s + p.cgpa, 0) / total).toFixed(2);
-    const avgLeetCode = Math.round(crossFilteredDataset.reduce((s, p) => s + p.leetcode, 0) / total);
-    const distinctions = crossFilteredDataset.filter((p) => p.standing === 'Distinction').length;
+    const avgCgpa = (filteredDataset.reduce((s, p) => s + p.cgpa, 0) / total).toFixed(2);
+    const avgLeetCode = Math.round(filteredDataset.reduce((s, p) => s + p.leetcode, 0) / total);
+    const distinctions = filteredDataset.filter((p) => p.standing === 'Distinction').length;
     const distinctionRatio = `${Math.round((distinctions / total) * 100)}%`;
 
     return { count: total, avgCgpa, avgLeetCode, distinctionRatio };
-  }, [crossFilteredDataset]);
+  }, [filteredDataset]);
 
-  // Graph Click Handlers for Interactive PowerBI Cross-Filtering
-  const handleYearBarClick = (data: any) => {
-    const clickedYear = data?.year || data?.activeLabel;
-    if (!clickedYear) return;
-    setSlicerYear((prev) => (prev === clickedYear ? 'All' : clickedYear));
+  const isFiltered = slicerYear !== 'All' || slicerSection !== 'All' || slicerStanding !== 'All' || slicerCoding !== 'All' || searchQuery !== '';
+
+  const resetAllFilters = () => {
+    setSlicerYear('All');
+    setSlicerSection('All');
+    setSlicerStanding('All');
+    setSlicerCoding('All');
+    setSearchQuery('');
   };
 
-  const handleSectionBarClick = (data: any) => {
-    const clickedSection = data?.section || data?.activeLabel;
-    if (!clickedSection) return;
-    const formattedSec = clickedSection.includes('Section') ? clickedSection : `Section ${clickedSection.replace('Sec ', '')}`;
-    setSlicerSection((prev) => (prev === formattedSec ? 'All' : formattedSec));
-  };
-
-  // Individual Student Inspection Sub-resources
-  const inspectId = inspectStudent?.regNo || '';
-  const { data: inspectAcademics = [] } = useQuery({
-    queryKey: ['hodInspectAcademics', inspectId],
-    queryFn: () => api.getAcademics(inspectId),
-    enabled: Boolean(inspectId),
-  });
-
-  // Calculate individual student semester-by-semester growth trajectory
   const studentGraphData = useMemo(() => {
     if (!inspectStudent) return [];
-
     const semGpas = inspectStudent.semGpas || [8.80, 8.95, 9.15, 9.30, 9.45];
     return semGpas.map((gpa, idx) => {
       const prevGpa = idx > 0 ? semGpas[idx - 1] : null;
@@ -249,20 +215,17 @@ export const HodDashboardPage: React.FC = () => {
     });
   }, [inspectStudent]);
 
-  // Student Individual Growth KPIs
   const studentGrowthMetrics = useMemo(() => {
-    if (!inspectStudent || studentGraphData.length === 0) return { firstSem: 8.8, latestSem: 9.45, growth: +0.65, status: '🚀 Rapid Growth' };
+    if (!inspectStudent || studentGraphData.length === 0) return { firstSem: 8.8, latestSem: 9.45, growth: +0.65 };
     const first = studentGraphData[0].gpa;
     const latest = studentGraphData[studentGraphData.length - 1].gpa;
     const growth = Number((latest - first).toFixed(2));
-    const status = growth >= 0.5 ? '🚀 Rapid Growth' : growth > 0 ? '📈 Steady Improvement' : '⭐ High Consistency';
-    return { firstSem: first, latestSem: latest, growth, status };
+    return { firstSem: first, latestSem: latest, growth };
   }, [inspectStudent, studentGraphData]);
 
-  // CSV Report Generator
   const exportAnalyticsReport = () => {
     const headers = ['Rank', 'Name', 'Reg Number', 'Department', 'Year', 'Section', 'CGPA', 'LeetCode Solved', 'GitHub Repos', 'Standing', 'Placement Status'];
-    const rows = crossFilteredDataset.map((p) => [
+    const rows = filteredDataset.map((p) => [
       p.rank,
       `"${p.name}"`,
       p.regNo,
@@ -279,7 +242,7 @@ export const HodDashboardPage: React.FC = () => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `PowerBI_CSE_Filtered_Report_${Date.now()}.csv`);
+    link.setAttribute('download', `HOD_Department_Report_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -287,155 +250,132 @@ export const HodDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-surface border border-borderLine rounded-2xl p-6 md:p-8 shadow-sm relative overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-          <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 text-brand-primary flex items-center justify-center shrink-0">
-              <Building2 className="w-7 h-7" />
-            </div>
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-soft text-brand-primary text-xs font-semibold mb-2">
-                <GraduationCap className="w-3.5 h-3.5" />
-                <span>HOD Interactive BI Suite — {DEPARTMENT_NAME}</span>
-              </div>
-              <h1 className="text-2xl font-extrabold text-textPrimary">PowerBI Interactive Analytics & 360° Inspection</h1>
-              <p className="text-xs text-textSecondary mt-1">
-                Real-time cross-filtering slicers, click-to-filter graph interactivity, and semester-by-semester student growth graphs
-              </p>
-            </div>
+      {/* ── SLEEK EXECUTIVE HEADER ── */}
+      <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center shrink-0">
+            <Building2 className="w-6 h-6" />
           </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={exportAnalyticsReport}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-primary text-white text-xs font-bold shadow-md hover:bg-brand-primary/90 transition-all"
-            >
-              <Download className="w-4 h-4" />
-              <span>Export PowerBI CSV</span>
-            </button>
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-primary mb-1">
+              <GraduationCap className="w-3.5 h-3.5" />
+              <span>{DEPARTMENT_NAME}</span>
+            </div>
+            <h1 className="text-xl font-bold text-textPrimary tracking-tight">HOD Department Executive Dashboard</h1>
+            <p className="text-xs text-textSecondary">Real-time academic performance, student growth analytics, and directory</p>
           </div>
         </div>
+
+        <button
+          onClick={exportAnalyticsReport}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-primary text-white text-xs font-bold shadow-sm hover:bg-brand-primary/90 transition-all shrink-0 self-start md:self-auto"
+        >
+          <Download className="w-4 h-4" />
+          <span>Export Department Report (CSV)</span>
+        </button>
       </div>
 
-      {/* ── POWERBI-STYLE INTERACTIVE SLICERS & CLICK-TO-FILTER BAR ── */}
-      <div className="bg-surface border border-brand-primary/30 rounded-2xl p-4 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-extrabold text-brand-primary uppercase tracking-wider">
-            <Sliders className="w-4 h-4" />
-            <span>PowerBI Slicers & Graph Click-to-Filter Controls</span>
+      {/* ── UNIFIED FILTER ROW ── */}
+      <div className="bg-surface border border-borderLine rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Search Input */}
+          <div className="flex-1 flex items-center gap-2 px-3.5 py-2 rounded-xl border border-borderLine bg-background text-xs">
+            <Search className="w-4 h-4 text-textSecondary shrink-0" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search student by name or registration number..."
+              className="w-full bg-transparent focus:outline-none text-textPrimary"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="text-textSecondary hover:text-textPrimary">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-          {(slicerYear !== 'All' || slicerSection !== 'All' || slicerStanding !== 'All' || slicerCoding !== 'All' || searchQuery) && (
+
+          {/* Year Filter */}
+          <select
+            value={slicerYear}
+            onChange={(e) => setSlicerYear(e.target.value)}
+            className="px-3.5 py-2 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+          >
+            <option value="All">All Academic Years</option>
+            {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+
+          {/* Section Filter */}
+          <select
+            value={slicerSection}
+            onChange={(e) => setSlicerSection(e.target.value)}
+            className="px-3.5 py-2 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+          >
+            <option value="All">All Sections</option>
+            {SECTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+
+          {/* Standing Filter */}
+          <select
+            value={slicerStanding}
+            onChange={(e) => setSlicerStanding(e.target.value)}
+            className="px-3.5 py-2 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+          >
+            <option value="All">All Academic Standings</option>
+            {STANDINGS.map((st) => <option key={st} value={st}>{st}</option>)}
+          </select>
+
+          {/* Reset Filters */}
+          {isFiltered && (
             <button
-              onClick={() => { setSlicerYear('All'); setSlicerSection('All'); setSlicerStanding('All'); setSlicerCoding('All'); setSearchQuery(''); }}
-              className="text-xs font-bold text-alert hover:underline flex items-center gap-1"
+              onClick={resetAllFilters}
+              className="px-3 py-2 text-xs font-bold text-alert bg-alert/10 rounded-xl hover:bg-alert/20 transition-colors flex items-center gap-1 shrink-0"
             >
-              <X className="w-3.5 h-3.5" /> Reset All Slicers
+              <X className="w-3.5 h-3.5" /> Reset Filters
             </button>
           )}
         </div>
-
-        {/* Click-to-Filter Visual Hint */}
-        <div className="p-2.5 rounded-xl bg-brand-soft/60 border border-brand-primary/20 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2 text-brand-primary font-bold">
-            <MousePointerClick className="w-4 h-4" />
-            <span>PowerBI Tip: Click any bar or chart slice in the graphs below to cross-filter the entire dashboard reactively!</span>
-          </div>
-          <div className="flex gap-1.5">
-            {slicerYear !== 'All' && (
-              <span onClick={() => setSlicerYear('All')} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-primary text-white cursor-pointer flex items-center gap-1">
-                Year: {slicerYear} <X className="w-3 h-3" />
-              </span>
-            )}
-            {slicerSection !== 'All' && (
-              <span onClick={() => setSlicerSection('All')} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white cursor-pointer flex items-center gap-1">
-                Section: {slicerSection} <X className="w-3 h-3" />
-              </span>
-            )}
-            {slicerStanding !== 'All' && (
-              <span onClick={() => setSlicerStanding('All')} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-600 text-white cursor-pointer flex items-center gap-1">
-                Standing: {slicerStanding} <X className="w-3 h-3" />
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-          {/* Year Slicer */}
-          <div>
-            <label className="block text-[11px] font-semibold text-textSecondary mb-1">Academic Year</label>
-            <select
-              value={slicerYear}
-              onChange={(e) => setSlicerYear(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
-            >
-              <option value="All">All Years (1st to 4th)</option>
-              {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-
-          {/* Section Slicer */}
-          <div>
-            <label className="block text-[11px] font-semibold text-textSecondary mb-1">Section</label>
-            <select
-              value={slicerSection}
-              onChange={(e) => setSlicerSection(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
-            >
-              <option value="All">All Sections (A, B, C)</option>
-              {SECTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-
-          {/* Academic Standing Slicer */}
-          <div>
-            <label className="block text-[11px] font-semibold text-textSecondary mb-1">Academic Standing</label>
-            <select
-              value={slicerStanding}
-              onChange={(e) => setSlicerStanding(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
-            >
-              <option value="All">All Standings</option>
-              {STANDINGS.map((st) => <option key={st} value={st}>{st}</option>)}
-            </select>
-          </div>
-
-          {/* Coding Level Slicer */}
-          <div>
-            <label className="block text-[11px] font-semibold text-textSecondary mb-1">Coding Activity</label>
-            <select
-              value={slicerCoding}
-              onChange={(e) => setSlicerCoding(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
-            >
-              {CODING_LEVELS.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-
-          {/* Search Query */}
-          <div>
-            <label className="block text-[11px] font-semibold text-textSecondary mb-1">Student Search</label>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-borderLine bg-background text-xs">
-              <Search className="w-3.5 h-3.5 text-textSecondary shrink-0" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search name, reg no..."
-                className="w-full bg-transparent focus:outline-none text-textPrimary"
-              />
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* Tab Navigation */}
+      {/* ── KEY PERFORMANCE INDICATOR CARDS ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          icon={<Users className="w-5 h-5" />}
+          iconBgColor="bg-indigo-50 text-indigo-600"
+          label="Total Department Students"
+          value={`${summaryMetrics.count} Students`}
+          subtext={isFiltered ? 'Filtered dataset' : 'Enrolled in CSE'}
+        />
+        <StatCard
+          icon={<GraduationCap className="w-5 h-5" />}
+          iconBgColor="bg-emerald-50 text-emerald-600"
+          label="Department Average CGPA"
+          value={`${summaryMetrics.avgCgpa} / 10`}
+          subtext="Overall cumulative GPA"
+        />
+        <StatCard
+          icon={<Trophy className="w-5 h-5" />}
+          iconBgColor="bg-amber-50 text-amber-600"
+          label="Distinction Rate"
+          value={summaryMetrics.distinctionRatio}
+          subtext="Students with >9.0 CGPA"
+        />
+        <StatCard
+          icon={<Code2 className="w-5 h-5" />}
+          iconBgColor="bg-[#FFA116]/10 text-[#FFA116]"
+          label="Avg LeetCode Solved"
+          value={`${summaryMetrics.avgLeetCode} Solved`}
+          subtext="Coding activity index"
+        />
+      </div>
+
+      {/* ── TAB NAVIGATION ── */}
       <div className="flex border-b border-borderLine space-x-6 text-sm font-semibold overflow-x-auto">
         {[
-          { key: 'overview', label: 'Year-Wise Overview' },
-          { key: 'analytics', label: '📊 PowerBI Visual Analytics' },
-          { key: 'students', label: 'Student Directory & 360° Growth' },
-          { key: 'rankings', label: 'CGPA & Coding Leaderboard' },
+          { key: 'overview', label: '📊 Year-Wise Overview' },
+          { key: 'analytics', label: '📈 Academic Analytics' },
+          { key: 'students', label: '👨‍🎓 Student Directory & Inspection' },
+          { key: 'rankings', label: '🏆 Department Leaderboard' },
         ].map((t) => (
           <button
             key={t.key}
@@ -449,31 +389,13 @@ export const HodDashboardPage: React.FC = () => {
         ))}
       </div>
 
-      {/* Dynamic PowerBI Calculated KPI Cards (Updates instantly with Graph Clicks & Slicers) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={<Users className="w-5 h-5" />} iconBgColor="bg-indigo-50 text-indigo-600"
-          label="Sliced Student Count" value={`${powerBiMetrics.count} Students`} subtext="Cross-filtered dynamically" />
-        <StatCard icon={<GraduationCap className="w-5 h-5" />} iconBgColor="bg-emerald-50 text-emerald-600"
-          label="Filtered Avg CGPA" value={`${powerBiMetrics.avgCgpa} / 10`} subtext="Re-calculated from selection" />
-        <StatCard icon={<Trophy className="w-5 h-5" />} iconBgColor="bg-amber-50 text-amber-600"
-          label="Distinction Ratio" value={powerBiMetrics.distinctionRatio} subtext="Students with >9.0 CGPA" />
-        <StatCard icon={<Code2 className="w-5 h-5" />} iconBgColor="bg-[#FFA116]/10 text-[#FFA116]"
-          label="Filtered Avg LeetCode" value={`${powerBiMetrics.avgLeetCode} Solved`} subtext="Per student average" />
-      </div>
-
       {/* ── TAB 1: Year-Wise Overview ── */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          {/* Year-Wise Academic Distribution Table */}
           <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <BarChart2 className="w-5 h-5 text-brand-primary" />
-                <div>
-                  <h3 className="text-base font-bold text-textPrimary">CSE Department Year-Wise CGPA Breakdown</h3>
-                  <p className="text-xs text-textSecondary">Click any row to cross-filter the dashboard by that Academic Year</p>
-                </div>
-              </div>
+            <div className="mb-4">
+              <h3 className="text-base font-bold text-textPrimary">CSE Department Year-Wise CGPA Breakdown</h3>
+              <p className="text-xs text-textSecondary">Academic standing distribution across 1st to 4th year batches</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -488,469 +410,242 @@ export const HodDashboardPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-borderLine text-sm">
-                  {YEAR_CGPA_SUMMARY.map((y) => {
-                    const isSelected = slicerYear === y.year;
-                    return (
-                      <tr
-                        key={y.year}
-                        onClick={() => setSlicerYear((prev) => (prev === y.year ? 'All' : y.year))}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected ? 'bg-brand-soft/70 font-bold border-l-4 border-brand-primary' : 'hover:bg-background/50'
-                        }`}
-                      >
-                        <td className="py-3.5 px-4 font-bold text-textPrimary flex items-center gap-2">
-                          <span>{y.year}</span>
-                          {isSelected && <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-primary text-white font-bold">Active Filter</span>}
-                        </td>
-                        <td className="py-3.5 px-4 text-xs font-medium">{y.students}</td>
-                        <td className="py-3.5 px-4 font-black text-brand-primary">{y.avgCgpa.toFixed(2)}</td>
-                        <td className="py-3.5 px-4">
-                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700">{y.distinction} ({Math.round((y.distinction / y.students) * 100)}%)</span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-50 text-green-700">{y.firstClass} ({Math.round((y.firstClass / y.students) * 100)}%)</span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700">{y.secondClass}</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {YEAR_CGPA_SUMMARY.map((y) => (
+                    <tr key={y.year} className="hover:bg-background/50 transition-colors">
+                      <td className="py-3.5 px-4 font-bold text-textPrimary">{y.year}</td>
+                      <td className="py-3.5 px-4 text-textSecondary">{y.students} Students</td>
+                      <td className="py-3.5 px-4 font-extrabold text-brand-primary">{y.avgCgpa}</td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">
+                          {y.distinction} Students
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-brand-soft text-brand-primary">
+                          {y.firstClass} Students
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-textSecondary">{y.secondClass} Students</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           </div>
-
-          {/* Top Rankers Spotlight across Years */}
-          <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-amber-500" />
-                <div>
-                  <h3 className="text-base font-bold text-textPrimary">Top Department Rankers Spotlight (CSE)</h3>
-                  <p className="text-xs text-textSecondary">Highest CGPA & Coding performers — click card to view 360° student profile with CGPA growth graph</p>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-              {crossFilteredDataset.slice(0, 5).map((p) => (
-                <button key={p.rank} onClick={() => { setInspectStudent(p); setInspectTab('academics-graph'); }}
-                  className="bg-background border border-borderLine rounded-2xl p-4 text-center hover:border-brand-primary hover:shadow-md transition-all space-y-2 group">
-                  <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-50 text-amber-600 font-extrabold text-sm mb-1 group-hover:scale-110 transition-transform">
-                    {p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : p.rank === 3 ? '🥉' : `#${p.rank}`}
-                  </div>
-                  <p className="text-xs font-bold text-textPrimary truncate">{p.name}</p>
-                  <p className="text-xl font-black text-brand-primary">{p.cgpa}</p>
-                  <p className="text-[10px] text-textSecondary">{p.year} • {p.section}</p>
-                  <div className="flex justify-center gap-1.5 pt-1">
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#FFA116]/10 text-[#FFA116]">LC: {p.leetcode}</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-gray-100 text-gray-700">GH: {p.github}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       )}
 
-      {/* ── TAB 2: PowerBI Visual Analytics (CLICK-TO-FILTER CHARTS) ── */}
+      {/* ── TAB 2: Visual Analytics ── */}
       {activeTab === 'analytics' && (
         <div className="space-y-6">
-          <div className="flex items-center gap-2 bg-surface p-1.5 rounded-xl border border-borderLine w-fit">
-            <button
-              onClick={() => setAnalyticsCategory('academics')}
-              className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                analyticsCategory === 'academics' ? 'bg-brand-primary text-white shadow-sm' : 'text-textSecondary hover:text-textPrimary'
-              }`}
-            >
-              Semester CGPA Trajectory
-            </button>
-            <button
-              onClick={() => setAnalyticsCategory('coding')}
-              className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                analyticsCategory === 'coding' ? 'bg-brand-primary text-white shadow-sm' : 'text-textSecondary hover:text-textPrimary'
-              }`}
-            >
-              Year-Wise Coding Stats
-            </button>
-            <button
-              onClick={() => setAnalyticsCategory('sections')}
-              className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                analyticsCategory === 'sections' ? 'bg-brand-primary text-white shadow-sm' : 'text-textSecondary hover:text-textPrimary'
-              }`}
-            >
-              Section Performance (Sec A, B, C)
-            </button>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Semester Progression Chart */}
+            <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-textPrimary">Semester-by-Semester GPA Progression</h3>
+                <p className="text-xs text-textSecondary">Batch GPA trajectory from Sem 1 through Sem 7</p>
+              </div>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={SEMESTER_PROGRESSION_DATA} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="semester" stroke="#6b7280" fontSize={11} />
+                    <YAxis domain={[8.0, 9.5]} stroke="#6b7280" fontSize={11} />
+                    <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
+                    <Legend />
+                    <Line type="monotone" dataKey="Year4" name="4th Year" stroke="#4F46E5" strokeWidth={2.5} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="Year3" name="3rd Year" stroke="#10B981" strokeWidth={2.5} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="Year2" name="2nd Year" stroke="#F59E0B" strokeWidth={2.5} dot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="Year1" name="1st Year" stroke="#8B5CF6" strokeWidth={2.5} dot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Section Breakdown Chart */}
+            <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-textPrimary">Section-Wise Average CGPA</h3>
+                <p className="text-xs text-textSecondary">Comparison across Section A, Section B, and Section C</p>
+              </div>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={SECTION_CGPA_SUMMARY} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="section" stroke="#6b7280" fontSize={11} />
+                    <YAxis domain={[8.0, 10.0]} stroke="#6b7280" fontSize={11} />
+                    <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
+                    <Bar dataKey="avgCgpa" name="Avg CGPA" fill="#4F46E5" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           </div>
-
-          {/* Academic Progression Line Chart */}
-          {analyticsCategory === 'academics' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <LineChartIcon className="w-5 h-5 text-brand-primary" />
-                    <div>
-                      <h3 className="text-sm font-bold text-textPrimary">Semester-by-Semester Avg CGPA Progression</h3>
-                      <p className="text-xs text-textSecondary">Average CGPA trajectory from Semester 1 to Semester 7 across CSE batches</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="h-72 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={SEMESTER_PROGRESSION_DATA} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="semester" stroke="#6b7280" fontSize={11} />
-                      <YAxis domain={[8.0, 9.5]} stroke="#6b7280" fontSize={11} />
-                      <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
-                      <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                      <Line type="monotone" dataKey="Year4" name="4th Year Batch" stroke="#4F46E5" strokeWidth={slicerYear === '4th Year' ? 4 : 2.5} dot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="Year3" name="3rd Year Batch" stroke="#10B981" strokeWidth={slicerYear === '3rd Year' ? 4 : 2.5} dot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="Year2" name="2nd Year Batch" stroke="#F59E0B" strokeWidth={slicerYear === '2nd Year' ? 4 : 2.5} dot={{ r: 4 }} />
-                      <Line type="monotone" dataKey="Year1" name="1st Year Batch" stroke="#EC4899" strokeWidth={slicerYear === '1st Year' ? 4 : 2.5} dot={{ r: 4 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Year-wise Standing Bar Chart (INTERACTIVE POWERBI CLICK TO FILTER) */}
-              <div className="bg-surface border border-brand-primary/40 rounded-2xl p-6 shadow-sm relative">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <BarChart2 className="w-5 h-5 text-emerald-600" />
-                    <div>
-                      <h3 className="text-sm font-bold text-textPrimary flex items-center gap-1.5">
-                        Academic Standing Breakup by Year
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-soft text-brand-primary font-extrabold uppercase">Click Bar to Filter</span>
-                      </h3>
-                      <p className="text-xs text-textSecondary">Click any bar to filter all tables and metrics by that Academic Year</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="h-72 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={YEAR_CGPA_SUMMARY}
-                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                      onClick={handleYearBarClick}
-                      className="cursor-pointer"
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="year" stroke="#6b7280" fontSize={11} />
-                      <YAxis stroke="#6b7280" fontSize={11} />
-                      <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
-                      <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                      <Bar dataKey="distinction" name="Distinction (>9.0)" fill="#4F46E5" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="firstClass" name="1st Class (8.0-9.0)" fill="#10B981" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="secondClass" name="2nd Class (7.0-8.0)" fill="#F59E0B" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Coding Stats Chart (INTERACTIVE POWERBI CLICK TO FILTER) */}
-          {analyticsCategory === 'coding' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-surface border border-brand-primary/40 rounded-2xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Code2 className="w-5 h-5 text-[#FFA116]" />
-                    <div>
-                      <h3 className="text-sm font-bold text-textPrimary flex items-center gap-1.5">
-                        Avg LeetCode Solved by Academic Year
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#FFA116]/10 text-[#FFA116] font-extrabold uppercase">Click Bar to Filter</span>
-                      </h3>
-                      <p className="text-xs text-textSecondary">Click any bar to filter all tables and metrics by that Academic Year</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="h-72 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={CODING_STATS_BY_YEAR}
-                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                      onClick={handleYearBarClick}
-                      className="cursor-pointer"
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="year" stroke="#6b7280" fontSize={11} />
-                      <YAxis stroke="#6b7280" fontSize={11} />
-                      <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
-                      <Bar dataKey="avgLeetCode" name="Avg LeetCode Solved" fill="#FFA116" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                  <Sparkles className="w-5 h-5 text-indigo-600" />
-                  <div>
-                    <h3 className="text-sm font-bold text-textPrimary">Active Coders % by Academic Year</h3>
-                    <p className="text-xs text-textSecondary">Percentage of students with active linked coding profiles</p>
-                  </div>
-                </div>
-                <div className="h-72 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={CODING_STATS_BY_YEAR}
-                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                      onClick={handleYearBarClick}
-                      className="cursor-pointer"
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="year" stroke="#6b7280" fontSize={11} />
-                      <YAxis domain={[0, 100]} stroke="#6b7280" fontSize={11} />
-                      <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
-                      <Bar dataKey="activeCodersPct" name="Active Coders %" fill="#6366F1" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Section Performance (INTERACTIVE POWERBI CLICK TO FILTER) */}
-          {analyticsCategory === 'sections' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-surface border border-brand-primary/40 rounded-2xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Layers className="w-5 h-5 text-indigo-600" />
-                    <div>
-                      <h3 className="text-sm font-bold text-textPrimary flex items-center gap-1.5">
-                        Average CGPA Comparison across Sections
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand-soft text-brand-primary font-extrabold uppercase">Click Bar to Filter</span>
-                      </h3>
-                      <p className="text-xs text-textSecondary">Click Section A, Section B, or Section C bar to cross-filter dashboard</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="h-72 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={SECTION_CGPA_SUMMARY}
-                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                      onClick={handleSectionBarClick}
-                      className="cursor-pointer"
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis dataKey="section" stroke="#6b7280" fontSize={11} />
-                      <YAxis domain={[8.0, 10.0]} stroke="#6b7280" fontSize={11} />
-                      <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
-                      <Bar dataKey="avgCgpa" name="Avg CGPA" fill="#4F46E5" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-textPrimary mb-1">Section Performance Insights</h3>
-                  <p className="text-xs text-textSecondary mb-4">Internal section benchmarks for CSE HOD</p>
-
-                  <div className="space-y-3">
-                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-bold text-emerald-900">Section A Leading in CGPA (9.15)</p>
-                        <p className="text-[11px] text-emerald-700 mt-0.5">Section A has 68 students scoring above 9.0 CGPA, leading Section B (64) and Section C (61).</p>
-                      </div>
-                    </div>
-
-                    <div className="p-3.5 rounded-xl bg-indigo-50 border border-indigo-200 flex items-start gap-3">
-                      <Sparkles className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-bold text-indigo-900">Balanced Student Growth</p>
-                        <p className="text-[11px] text-indigo-700 mt-0.5">All 3 sections maintain a strong average CGPA above 8.95 with 92%+ active coding profile integration.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-borderLine flex justify-end">
-                  <button onClick={exportAnalyticsReport} className="text-xs font-bold text-brand-primary hover:underline flex items-center gap-1">
-                    <Download className="w-3.5 h-3.5" /> Download PowerBI CSE Analytics Report
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {/* ── TAB 3: Student Directory (Read-Only) ── */}
+      {/* ── TAB 3: Student Directory & 360 Inspection ── */}
       {activeTab === 'students' && (
-        <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
+        <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold text-textPrimary">CSE Student Directory & Semester Growth Inspection</h3>
-              <p className="text-xs text-textSecondary">Click 👁 to view individual student 360° profile and semester-by-semester CGPA growth graph</p>
+              <h3 className="text-base font-bold text-textPrimary">Student Directory & 360° Inspection</h3>
+              <p className="text-xs text-textSecondary">Click "Inspect Profile" on any student to view their complete academic growth and coding stats</p>
             </div>
-            <span className="text-xs font-bold px-3 py-1 bg-brand-soft text-brand-primary rounded-full">
-              Showing {crossFilteredDataset.length} Sliced Students
+            <span className="text-xs font-bold text-brand-primary bg-brand-soft px-3 py-1 rounded-full border border-brand-primary/20">
+              Showing {filteredDataset.length} Students
             </span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
-                  <th className="py-3 px-4">Student Name</th>
-                  <th className="py-3 px-4">Reg Number</th>
-                  <th className="py-3 px-4">Year / Sec</th>
-                  <th className="py-3 px-4">Overall CGPA</th>
-                  <th className="py-3 px-4">Sem-by-Sem Growth</th>
-                  <th className="py-3 px-4">Coding Platforms</th>
-                  <th className="py-3 px-4 text-right">Inspect 360°</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-borderLine text-sm">
-                {crossFilteredDataset.length === 0 && (
-                  <tr><td colSpan={7} className="py-10 text-center text-textSecondary text-xs">No CSE students found matching active slicers.</td></tr>
-                )}
-                {crossFilteredDataset.map((s) => (
-                  <tr key={s.regNo} className="hover:bg-background/50 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-textPrimary">
-                      {s.name}
-                      <p className="text-[11px] text-textSecondary font-normal">{s.email}</p>
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-brand-primary text-xs">{s.regNo}</td>
-                    <td className="py-3.5 px-4 text-xs font-medium">{s.year} • {s.section}</td>
-                    <td className="py-3.5 px-4 font-black text-emerald-600">{s.cgpa} / 10.0</td>
-                    <td className="py-3.5 px-4">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700">
-                        <TrendingUp className="w-3 h-3" />
-                        +0.65 (Sem 1 ➔ Sem 5)
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FFA116]/10 text-[#FFA116]">LC: {s.leetcode}</span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-800">GH: {s.github}</span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <button onClick={() => { setInspectStudent(s); setInspectTab('academics-graph'); }}
-                        className="p-1.5 rounded-lg border border-borderLine text-brand-primary hover:bg-brand-soft transition-colors flex items-center gap-1.5 ml-auto text-xs font-bold"
-                        title="View Full Profile & Graph">
-                        <Eye className="w-4 h-4" /> Inspect Graph
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
-      {/* ── TAB 4: CGPA & Coding Rankings ── */}
-      {activeTab === 'rankings' && (
-        <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-amber-500" />
-              <div>
-                <h3 className="text-base font-bold text-textPrimary">CSE Department Academic & Coding Leaderboard</h3>
-                <p className="text-xs text-textSecondary">Ranked by CGPA with LeetCode and GitHub metrics — click to inspect full profile & growth graph</p>
-              </div>
-            </div>
-            <button onClick={exportAnalyticsReport} className="text-xs font-bold text-brand-primary hover:underline flex items-center gap-1">
-              <Download className="w-3.5 h-3.5" /> Export CSE Leaderboard CSV
-            </button>
-          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
                   <th className="py-3 px-4">Rank</th>
                   <th className="py-3 px-4">Student Name</th>
-                  <th className="py-3 px-4">Reg No</th>
-                  <th className="py-3 px-4">Year / Sec</th>
-                  <th className="py-3 px-4">Overall CGPA</th>
-                  <th className="py-3 px-4">LeetCode Solved</th>
+                  <th className="py-3 px-4">Reg Number</th>
+                  <th className="py-3 px-4">Year & Sec</th>
+                  <th className="py-3 px-4">CGPA</th>
+                  <th className="py-3 px-4">LeetCode</th>
                   <th className="py-3 px-4">GitHub Repos</th>
                   <th className="py-3 px-4">Standing</th>
-                  <th className="py-3 px-4 text-right">Inspect 360° & Graph</th>
+                  <th className="py-3 px-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-borderLine text-sm">
-                {crossFilteredDataset.map((p) => (
-                  <tr key={p.rank} className="hover:bg-background/50 transition-colors">
-                    <td className="py-3.5 px-4">
-                      <span className={`font-extrabold text-sm ${p.rank === 1 ? 'text-amber-500' : p.rank === 2 ? 'text-gray-400' : p.rank === 3 ? 'text-amber-700' : 'text-textSecondary'}`}>
-                        {p.rank === 1 ? '🥇' : p.rank === 2 ? '🥈' : p.rank === 3 ? '🥉' : `#${p.rank}`}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-textPrimary text-xs">{p.name}</td>
-                    <td className="py-3.5 px-4 text-xs font-semibold text-textSecondary">{p.regNo}</td>
-                    <td className="py-3.5 px-4 text-xs">{p.year} • {p.section}</td>
-                    <td className="py-3.5 px-4 font-black text-brand-primary text-sm">{p.cgpa} / 10.0</td>
-                    <td className="py-3.5 px-4 font-semibold text-[#FFA116] text-xs">{p.leetcode} solved</td>
-                    <td className="py-3.5 px-4 font-semibold text-textPrimary text-xs">{p.github} repos</td>
-                    <td className="py-3.5 px-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${p.standing === 'Distinction' ? 'bg-indigo-50 text-indigo-700' : 'bg-green-50 text-green-700'}`}>
-                        {p.standing}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <button onClick={() => { setInspectStudent(p); setInspectTab('academics-graph'); }}
-                        className="p-1.5 rounded-lg border border-borderLine text-brand-primary hover:bg-brand-soft transition-colors flex items-center gap-1 ml-auto text-xs font-bold" title="View Full Profile">
-                        <Eye className="w-4 h-4" /> Inspect Graph
-                      </button>
+                {filteredDataset.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-textSecondary text-xs">
+                      No students found matching your filter criteria. Try clearing search or resetting filters.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredDataset.map((s) => (
+                    <tr key={s.regNo} className="hover:bg-background/50 transition-colors">
+                      <td className="py-3 px-4 font-bold text-textSecondary">#{s.rank}</td>
+                      <td className="py-3 px-4 font-bold text-textPrimary">{s.name}</td>
+                      <td className="py-3 px-4 font-mono text-xs text-brand-primary">{s.regNo}</td>
+                      <td className="py-3 px-4 text-xs text-textSecondary">{s.year} • {s.section}</td>
+                      <td className="py-3 px-4 font-black text-brand-primary">{s.cgpa}</td>
+                      <td className="py-3 px-4 text-xs font-bold text-[#FFA116]">{s.leetcode} Solved</td>
+                      <td className="py-3 px-4 text-xs text-textSecondary">{s.github} Repos</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          s.standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700' : 'bg-brand-soft text-brand-primary'
+                        }`}>
+                          {s.standing}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          onClick={() => {
+                            setInspectStudent(s);
+                            setInspectTab('academics-graph');
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:bg-brand-primary/90 transition-all inline-flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Inspect Profile</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
       )}
 
-      {/* ── MODAL: Full 360° Student Profile Inspection (READ-ONLY WITH INDIVIDUAL SEMESTER GROWTH GRAPH) ── */}
-      {inspectStudent && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-surface border border-borderLine rounded-2xl p-6 max-w-4xl w-full shadow-2xl max-h-[92vh] overflow-y-auto relative">
-            <button onClick={() => setInspectStudent(null)}
-              className="absolute top-4 right-4 text-textSecondary hover:text-textPrimary p-2 rounded-full hover:bg-background">
-              <X className="w-5 h-5" />
-            </button>
+      {/* ── TAB 4: Department Leaderboard ── */}
+      {activeTab === 'rankings' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* CGPA Leaderboard */}
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-500" />
+              <h3 className="text-base font-bold text-textPrimary">Top Academic Performers (CGPA)</h3>
+            </div>
+            <div className="space-y-3">
+              {mergedStudentDataset.slice(0, 5).map((s, idx) => (
+                <div key={s.regNo} className="p-3.5 rounded-xl bg-background border border-borderLine flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full font-black text-xs flex items-center justify-center ${
+                      idx === 0 ? 'bg-amber-100 text-amber-700' : idx === 1 ? 'bg-slate-200 text-slate-700' : 'bg-orange-100 text-orange-700'
+                    }`}>
+                      #{idx + 1}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-textPrimary">{s.name}</p>
+                      <p className="text-[11px] text-textSecondary">{s.regNo} • {s.year}</p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-black text-brand-primary">{s.cgpa} CGPA</span>
+                </div>
+              ))}
+            </div>
+          </div>
 
+          {/* Coding Leaderboard */}
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="flex items-center gap-2">
+              <Code2 className="w-5 h-5 text-[#FFA116]" />
+              <h3 className="text-base font-bold text-textPrimary">Top Coding Rankers (LeetCode)</h3>
+            </div>
+            <div className="space-y-3">
+              {[...mergedStudentDataset].sort((a, b) => b.leetcode - a.leetcode).slice(0, 5).map((s, idx) => (
+                <div key={s.regNo} className="p-3.5 rounded-xl bg-background border border-borderLine flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full font-black text-xs flex items-center justify-center ${
+                      idx === 0 ? 'bg-amber-100 text-amber-700' : 'bg-brand-soft text-brand-primary'
+                    }`}>
+                      #{idx + 1}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-textPrimary">{s.name}</p>
+                      <p className="text-[11px] text-textSecondary">{s.regNo} • {s.section}</p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-black text-[#FFA116]">{s.leetcode} Solved</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 360° STUDENT INSPECTION MODAL DRAWER ── */}
+      {inspectStudent && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-surface border border-borderLine rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative animate-in fade-in zoom-in-95">
             {/* Modal Header */}
-            <div className="border-b border-borderLine pb-4 mb-4">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-brand-soft text-brand-primary">HOD CSE Inspection — Read Only</span>
-                <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600">No Edit Access</span>
-                <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700">{studentGrowthMetrics.status}</span>
+            <div className="flex items-center justify-between pb-4 border-b border-borderLine mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-brand-primary text-white font-bold flex items-center justify-center text-base shadow-sm">
+                  {inspectStudent.name.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-textPrimary">{inspectStudent.name}</h3>
+                  <p className="text-xs text-textSecondary">{inspectStudent.regNo} • {inspectStudent.email} • {inspectStudent.year}</p>
+                </div>
               </div>
-              <h3 className="text-xl font-bold text-textPrimary">
-                {inspectStudent.name} <span className="text-sm text-textSecondary font-normal">({inspectStudent.regNo})</span>
-              </h3>
-              <p className="text-xs text-textSecondary">CSE Department • {inspectStudent.year} • {inspectStudent.section} • {inspectStudent.email}</p>
+              <button
+                onClick={() => setInspectStudent(null)}
+                className="p-2 rounded-full hover:bg-background text-textSecondary transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* ── INDIVIDUAL STUDENT SEMESTER-BY-SEMESTER CGPA GROWTH GRAPH SPOTLIGHT HERO BANNER ── */}
-            <div className="bg-gradient-to-r from-brand-soft/60 via-surface to-brand-soft/30 border border-brand-primary/20 rounded-2xl p-5 mb-6 shadow-sm">
+            {/* GPA Growth Curve Chart */}
+            <div className="bg-background border border-borderLine rounded-2xl p-4 mb-6">
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-brand-primary" />
-                  <div>
-                    <h4 className="text-sm font-extrabold text-textPrimary">Semester-by-Semester Academic Trajectory & CGPA Growth</h4>
-                    <p className="text-xs text-textSecondary">Visual GPA progression graph evaluating sem-by-sem academic improvement</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs text-textSecondary font-medium">Total Growth:</span>
-                  <span className="ml-1 text-sm font-black text-emerald-600">
-                    +{studentGrowthMetrics.growth} CGPA
-                  </span>
-                </div>
+                <h4 className="text-xs font-bold text-textPrimary uppercase tracking-wider">Semester GPA Growth Trajectory</h4>
+                <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                  <ArrowUpRight className="w-4 h-4" /> Growth: +{studentGrowthMetrics.growth} GPA
+                </span>
               </div>
-
-              {/* Individual Student Recharts Area Chart */}
-              <div className="h-56 w-full">
+              <div className="h-48 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={studentGraphData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
@@ -962,71 +657,49 @@ export const HodDashboardPage: React.FC = () => {
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="semester" stroke="#6b7280" fontSize={11} />
                     <YAxis domain={[7.5, 10.0]} stroke="#6b7280" fontSize={11} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }}
-                      formatter={(val: any) => [`${val} GPA`, 'Semester GPA']}
-                    />
+                    <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
                     <Area type="monotone" dataKey="gpa" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#studentGpaGradient)" dot={{ r: 5, fill: '#4F46E5' }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
-
-              {/* Individual Student KPI Cards */}
-              <div className="grid grid-cols-4 gap-3 pt-3 border-t border-borderLine mt-3">
-                <div className="bg-surface p-2.5 rounded-xl border border-borderLine text-center">
-                  <p className="text-[10px] text-textSecondary font-semibold">Sem 1 Starting GPA</p>
-                  <p className="text-sm font-bold text-textPrimary">{studentGrowthMetrics.firstSem}</p>
-                </div>
-                <div className="bg-surface p-2.5 rounded-xl border border-borderLine text-center">
-                  <p className="text-[10px] text-textSecondary font-semibold">Latest Sem GPA</p>
-                  <p className="text-sm font-bold text-brand-primary">{studentGrowthMetrics.latestSem}</p>
-                </div>
-                <div className="bg-surface p-2.5 rounded-xl border border-borderLine text-center">
-                  <p className="text-[10px] text-textSecondary font-semibold">Overall CGPA</p>
-                  <p className="text-sm font-black text-emerald-600">{inspectStudent.cgpa}</p>
-                </div>
-                <div className="bg-surface p-2.5 rounded-xl border border-borderLine text-center">
-                  <p className="text-[10px] text-textSecondary font-semibold">Sem Improvement</p>
-                  <p className="text-sm font-extrabold text-emerald-600 flex items-center justify-center gap-0.5">
-                    <ArrowUpRight className="w-3.5 h-3.5" /> +{studentGrowthMetrics.growth}
-                  </p>
-                </div>
-              </div>
             </div>
 
-            {/* Scrollable Tab Bar for 360° profile inspection */}
-            <div className="flex space-x-1 border-b border-borderLine pb-px mb-6 overflow-x-auto">
+            {/* Inspect Tabs Navigation */}
+            <div className="flex space-x-2 border-b border-borderLine pb-px mb-6 overflow-x-auto">
               {[
-                { key: 'academics-graph', label: '📊 CGPA Growth Graph' },
+                { key: 'academics-graph', label: '📊 Semester GPA' },
                 { key: 'personal-info', label: 'Personal Info' },
                 { key: 'coding-profiles', label: 'Coding Platforms' },
                 { key: 'tech-skills', label: 'Tech Skills' },
                 { key: 'certifications', label: 'Certifications' },
                 { key: 'soft-skills', label: 'Soft Skills' },
                 { key: 'achievements', label: 'Achievements' },
-                { key: 'academic-goals', label: 'Academic Goals' },
+                { key: 'academic-goals', label: 'Placement Goals' },
               ].map((t) => (
-                <button key={t.key} onClick={() => setInspectTab(t.key)}
-                  className={`px-3 py-2 text-xs font-bold rounded-t-lg transition-all whitespace-nowrap ${
+                <button
+                  key={t.key}
+                  onClick={() => setInspectTab(t.key)}
+                  className={`px-3.5 py-2 text-xs font-bold rounded-t-xl transition-all whitespace-nowrap ${
                     inspectTab === t.key ? 'bg-brand-soft text-brand-primary border-b-2 border-brand-primary' : 'text-textSecondary hover:text-textPrimary'
-                  }`}>
+                  }`}
+                >
                   {t.label}
                 </button>
               ))}
             </div>
 
-            {/* Tab Content */}
-            <div>
+            {/* Inspect Tab Content */}
+            <div className="p-2">
               {inspectTab === 'academics-graph' && (
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-textPrimary uppercase tracking-wider">Semester-by-Semester GPA Breakdown Table</h4>
+                  <h4 className="text-xs font-bold text-textPrimary uppercase tracking-wider">Semester-by-Semester GPA Table</h4>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase">
                           <th className="py-2.5 px-3">Semester</th>
                           <th className="py-2.5 px-3">Semester GPA</th>
-                          <th className="py-2.5 px-3">Sem-by-Sem Delta</th>
+                          <th className="py-2.5 px-3">Delta</th>
                           <th className="py-2.5 px-3">Attendance %</th>
                           <th className="py-2.5 px-3">Status</th>
                         </tr>
@@ -1051,7 +724,7 @@ export const HodDashboardPage: React.FC = () => {
                             </td>
                             <td className="py-3 px-3 text-textSecondary">{row.attendance}%</td>
                             <td className="py-3 px-3">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700">Passed (Distinction)</span>
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700">Passed</span>
                             </td>
                           </tr>
                         ))}
@@ -1061,19 +734,26 @@ export const HodDashboardPage: React.FC = () => {
                 </div>
               )}
 
-              {inspectTab === 'personal-info' && <PersonalInfoTab readOnly={true} student={{
-                roll_number: inspectStudent.regNo,
-                name: inspectStudent.name,
-                email: inspectStudent.email,
-                year: inspectStudent.year as any,
-                department: 'CSE',
-                batch: '2023-2027',
-                section: inspectStudent.section,
-                hostel_day_scholar: 'Day Scholar',
-                driving_license: true,
-                passport: true,
-                relocation_willingness: true,
-              }} onRefresh={() => {}} />}
+              {inspectTab === 'personal-info' && (
+                <PersonalInfoTab
+                  readOnly={true}
+                  student={{
+                    roll_number: inspectStudent.regNo,
+                    name: inspectStudent.name,
+                    email: inspectStudent.email,
+                    year: inspectStudent.year as any,
+                    department: 'CSE',
+                    batch: '2023-2027',
+                    section: inspectStudent.section,
+                    hostel_day_scholar: 'Day Scholar',
+                    driving_license: true,
+                    passport: true,
+                    relocation_willingness: true,
+                  }}
+                  onRefresh={() => {}}
+                />
+              )}
+
               {inspectTab === 'coding-profiles' && (
                 <CodingProfilesTab
                   studentName={inspectStudent.name}
@@ -1083,6 +763,7 @@ export const HodDashboardPage: React.FC = () => {
                   onRefresh={() => {}}
                 />
               )}
+
               {inspectTab === 'tech-skills' && <TechSkillsTab readOnly={true} skills={[]} onRefresh={() => {}} />}
               {inspectTab === 'certifications' && <CertificationsTab readOnly={true} certifications={[]} onRefresh={() => {}} />}
               {inspectTab === 'soft-skills' && <SoftSkillsTab softSkills={[]} onRefresh={() => {}} />}
