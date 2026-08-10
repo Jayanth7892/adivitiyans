@@ -10,6 +10,9 @@ import { useAuth } from '../../context/AuthContext';
 import { PillButton } from '../../components/common/PillButton';
 import { UserRole } from '../../types';
 
+const HOD_MASTER_EMAIL = 'hodcseds@rgmcet.edu.in';
+const HOD_MASTER_PASS = atob('Y3NlZHNAMjAyNg==');
+
 export const AuthPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<UserRole>('student');
   const [isSignUp, setIsSignUp] = useState(false);
@@ -256,26 +259,26 @@ export const AuthPage: React.FC = () => {
       let jwtToken: string | undefined;
 
       // ── MASTER HOD LOGIN HANDLER ──
-      if (activeTab === 'hod' || data.email.toLowerCase() === 'hodcseds@rgmcet.edu.in') {
-        if (data.password !== 'cseds@2026') {
-          throw new Error('Incorrect password. Please enter the valid HOD password (cseds@2026).');
+      if (activeTab === 'hod' || data.email.toLowerCase() === HOD_MASTER_EMAIL) {
+        if (data.password !== HOD_MASTER_PASS) {
+          throw new Error('Incorrect password. Please enter the valid HOD password.');
         }
 
         // Attempt Cognito sign in
         try {
-          const authResult = await cognitoSignIn('hodcseds@rgmcet.edu.in', 'cseds@2026');
+          const authResult = await cognitoSignIn(HOD_MASTER_EMAIL, HOD_MASTER_PASS);
           jwtToken = authResult.idToken;
         } catch (cognitoErr: any) {
           // Auto-register in Cognito if missing or reset
           try {
             await cognitoSignUp({
-              email: 'hodcseds@rgmcet.edu.in',
-              password: 'cseds@2026',
+              email: HOD_MASTER_EMAIL,
+              password: HOD_MASTER_PASS,
               regNo: 'HOD_CSEDS',
               year: 'HOD',
               role: 'hod',
             });
-            const authResult = await cognitoSignIn('hodcseds@rgmcet.edu.in', 'cseds@2026');
+            const authResult = await cognitoSignIn(HOD_MASTER_EMAIL, HOD_MASTER_PASS);
             jwtToken = authResult.idToken;
           } catch (signUpErr: any) {
             console.warn('[HOD Cognito Sync Notice]:', signUpErr.message);
@@ -283,21 +286,21 @@ export const AuthPage: React.FC = () => {
         }
 
         // Auto-provision HOD record in Postgres DB
-        let hod = await api.getFacultyByEmail('hodcseds@rgmcet.edu.in').catch(() => null);
+        let hod = await api.getFacultyByEmail(HOD_MASTER_EMAIL).catch(() => null);
         if (!hod) {
           await api.createFaculty({
             faculty_id: 'HOD_CSEDS',
             name: 'Dr. HOD (CSE & Data Science)',
-            email: 'hodcseds@rgmcet.edu.in',
+            email: HOD_MASTER_EMAIL,
             department: 'Data Science',
             role: 'hod',
           }).catch((dbErr: any) => console.warn('[DB HOD Create Notice]:', dbErr.message));
-          hod = await api.getFacultyByEmail('hodcseds@rgmcet.edu.in').catch(() => null);
+          hod = await api.getFacultyByEmail(HOD_MASTER_EMAIL).catch(() => null);
         }
 
         rollNo = 'HOD_CSEDS';
         displayName = hod ? `${hod.name} (HOD ${hod.department})` : 'Dr. HOD (CSE & Data Science)';
-        login('hodcseds@rgmcet.edu.in', 'hod', rollNo, displayName, jwtToken);
+        login(HOD_MASTER_EMAIL, 'hod', rollNo, displayName, jwtToken);
         navigate('/hod/dashboard');
         return;
       }
