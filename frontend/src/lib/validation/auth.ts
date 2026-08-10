@@ -30,6 +30,12 @@ export const studentSignUpSchema = z.object({
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
+}).refine((data) => {
+  const expectedEmail = `${data.registrationNumber.toLowerCase()}@rgmcet.edu.in`;
+  return data.email.toLowerCase() === expectedEmail;
+}, {
+  message: "Student email must match registration number (e.g. 23091a3205@rgmcet.edu.in)",
+  path: ["email"],
 });
 
 export const loginSchema = z.object({

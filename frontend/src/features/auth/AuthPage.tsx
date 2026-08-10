@@ -27,6 +27,7 @@ export const AuthPage: React.FC = () => {
     register: registerSignUp,
     handleSubmit: handleSignUpSubmit,
     watch: watchSignUp,
+    setValue: setValueSignUp,
     formState: { errors: signUpErrors, isSubmitting: isSignUpSubmitting },
   } = useForm<StudentSignUpInput>({
     resolver: zodResolver(studentSignUpSchema),
@@ -61,6 +62,11 @@ export const AuthPage: React.FC = () => {
       setRegNoStatus({ loading: false });
       return;
     }
+
+    // Auto-sync college email with student registration number (e.g. 23091a3205@rgmcet.edu.in)
+    const expectedEmail = `${watchedRegNo.toLowerCase()}@rgmcet.edu.in`;
+    setValueSignUp('email', expectedEmail, { shouldValidate: true });
+
     const timer = setTimeout(async () => {
       setRegNoStatus({ loading: true });
       try {
@@ -71,7 +77,7 @@ export const AuthPage: React.FC = () => {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [watchedRegNo]);
+  }, [watchedRegNo, setValueSignUp]);
 
   useEffect(() => {
     if (!watchedEmail || !watchedEmail.includes('@')) {
