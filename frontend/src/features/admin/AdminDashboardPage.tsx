@@ -20,6 +20,7 @@ import {
   Code2,
   Github,
   ExternalLink,
+  Upload,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { StudentProfile } from '../../types';
@@ -33,6 +34,8 @@ import { CertificationsTab } from '../profile/tabs/CertificationsTab';
 import { SoftSkillsTab } from '../profile/tabs/SoftSkillsTab';
 import { AchievementsTab } from '../profile/tabs/AchievementsTab';
 import { PlacementPreferencesTab } from '../profile/tabs/PlacementPreferencesTab';
+import { BulkImportModal } from './components/BulkImportModal';
+import { PlacementEligibilitySection } from '../hod/components/PlacementEligibilitySection';
 
 const DEPARTMENTS = ['CSE (Data Science)', 'CSE', 'Data Science', 'IT', 'ECE', 'EEE', 'Mechanical', 'Civil', 'AI & ML', 'Cyber Security', 'MBA', 'MCA'];
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'] as const;
@@ -53,6 +56,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [sectionFilter, setSectionFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentProfile | null>(null);
   const [inspectStudent, setInspectStudent] = useState<StudentProfile | null>(null);
   const [inspectTab, setInspectTab] = useState('personal-info');
@@ -272,7 +276,8 @@ export const AdminDashboardPage: React.FC = () => {
           <h1 className="text-2xl font-extrabold text-textPrimary">Student Directory & Academic Analytics</h1>
           <p className="text-xs text-textSecondary mt-1">Full administrative control over student records, CGPA rankings, and coding profile metrics</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2.5">
+          <PillButton variant="outline" size="sm" onClick={() => setShowBulkImportModal(true)} icon={<Upload className="w-4 h-4 text-brand-primary" />}>Bulk Import CSV</PillButton>
           <PillButton variant="outline" size="sm" onClick={exportCSV} icon={<Download className="w-4 h-4" />}>Export CSV</PillButton>
           <PillButton variant="primary" size="sm" onClick={openAddModal} icon={<Plus className="w-4 h-4" />}>Add Student</PillButton>
         </div>
@@ -733,6 +738,12 @@ export const AdminDashboardPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Bulk Import Roster & Marks Modal */}
+      <BulkImportModal
+        isOpen={showBulkImportModal}
+        onClose={() => setShowBulkImportModal(false)}
+        onSuccess={refetch}
+      />
     </div>
   );
 };

@@ -3,6 +3,7 @@ import cors from 'cors';
 import serverless from 'serverless-http';
 import { db } from '../db';
 import { calculateEmployabilityScore } from '../services/employability';
+import { runCodingProfileCronSync } from '../services/cronSync';
 import {
   studentProfileSchema,
   academicSchema,
@@ -343,6 +344,111 @@ app.post('/students', async (req: Request, res: Response) => {
     res.status(201).json({ message: 'Student created successfully', student: createdStudent });
   } catch (err: any) {
     res.status(400).json({ error: err.message || err });
+  }
+});
+
+// POST /students/bulk-import — Bulk Import Students & Marks from CSV/Excel
+app.post('/students/bulk-import', async (req: Request, res: Response) => {
+  try {
+    const studentsArray = Array.isArray(req.body) ? req.body : req.body.students;
+    if (!Array.isArray(studentsArray) || studentsArray.length === 0) {
+      return res.status(400).json({ error: 'Payload must contain a non-empty array of student records.' });
+    }
+
+    let importedCount = 0;
+    const errors: string[] = [];
+
+    for (let i = 0; i < studentsArray.length; i++) {
+      const s = studentsArray[i];
+      const rawRoll = (s.roll_number || s.regNo || s.registrationNumber || '').toString().trim().toUpperCase();
+      if (!rawRoll) {
+        errors.push(`Row ${i + 1}: Missing roll number`);
+        continue;
+      }
+      if (!REGISTRATION_NUMBER_REGEX.test(rawRoll)) {
+        errors.push(`Row ${i + 1} (${rawRoll}): Invalid registration number format`);
+        continue;
+      }
+
+      const name = s.name || s.fullName || `Student ${rawRoll}`;
+      const email = (s.email || `${rawRoll.toLowerCase()}@rgmcet.edu.in`).toString().trim().toLowerCase();
+      const year = s.year || '3rd Year';
+      const department = (!s.department || s.department === 'CSE' || s.department === 'Data Science' || s.department === 'CSE (Data Science)') ? 'CSE(Data Science)' : s.department;
+      const section = (s.section || 'A').toString().replace(/^Sec\s*/i, '');
+      const batch = s.batch || '2023-2027';
+      const phone = s.phone || null;
+      const cgpa = s.cgpa !== undefined && s.cgpa !== null && s.cgpa !== '' ? Number(s.cgpa) : 0;
+
+      if (db.isMock) {
+        const studentObj = { roll_number: rawRoll, name, email, year, department, section, batch, phone, cgpa, updated_at: new Date().toISOString() };
+        db.mockStore.students.set(rawRoll, studentObj);
+        importedCount++;
+        continue;
+      }
+
+      await db.query('ALTER TABLE students ADD COLUMN IF NOT EXISTS cgpa NUMERIC(4,2) DEFAULT 0.00;').catch(() => {});
+
+      await db.query(
+        `INSERT INTO students (roll_number, name, email, year, phone, department, batch, section, cgpa)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         ON CONFLICT (roll_number) DO UPDATE SET
+           name = EXCLUDED.name,
+           email = EXCLUDED.email,
+           year = EXCLUDED.year,
+           department = EXCLUDED.department,
+           batch = EXCLUDED.batch,
+           section = EXCLUDED.section,
+           cgpa = EXCLUDED.cgpa,
+           updated_at = CURRENT_TIMESTAMP`,
+        [rawRoll, name, email, year, phone, department, batch, section, cgpa]
+      );
+
+      // Save academic entry if CGPA provided
+      if (cgpa > 0) {
+        await db.query(
+          `INSERT INTO academics (student_id, semester, semester_gpa, attendance_pct)
+           VALUES ($1, 1, $2, 95.0)
+           ON CONFLICT (student_id, semester) DO UPDATE SET semester_gpa = EXCLUDED.semester_gpa`,
+          [rawRoll, cgpa]
+        ).catch(() => {});
+      }
+
+      // Ensure default coding profile entries
+      await db.query(
+        `INSERT INTO coding_profiles (student_id, platform, handle, streak, score_rating, easy_count, medium_count, hard_count, contest_rating)
+         VALUES ($1, 'LeetCode', $2, 0, 0, 0, 0, 0, 0)
+         ON CONFLICT (student_id, platform) DO NOTHING;
+
+         INSERT INTO coding_profiles (student_id, platform, handle, streak, repositories_count)
+         VALUES ($1, 'GitHub', $2, 0, 0)
+         ON CONFLICT (student_id, platform) DO NOTHING;`,
+        [rawRoll, rawRoll.toLowerCase()]
+      ).catch(() => {});
+
+      importedCount++;
+    }
+
+    res.json({
+      message: `Successfully processed ${importedCount} student records.`,
+      importedCount,
+      errorsCount: errors.length,
+      errors,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Bulk import failed' });
+  }
+});
+
+// POST /reports/cron-sync — Trigger Background Sync for LeetCode & GitHub Profiles
+app.post('/reports/cron-sync', async (_req: Request, res: Response) => {
+  try {
+    const result = await runCodingProfileCronSync();
+    res.json({
+      message: 'Background coding profile sync completed',
+      result,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Cron sync failed' });
   }
 });
 

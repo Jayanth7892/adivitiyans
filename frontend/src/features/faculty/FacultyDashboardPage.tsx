@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   X,
   Plus,
+  Upload,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { StudentProfile } from '../../types';
@@ -31,6 +32,8 @@ import { CertificationsTab } from '../profile/tabs/CertificationsTab';
 import { SoftSkillsTab } from '../profile/tabs/SoftSkillsTab';
 import { AchievementsTab } from '../profile/tabs/AchievementsTab';
 import { PlacementPreferencesTab } from '../profile/tabs/PlacementPreferencesTab';
+import { BulkImportModal } from '../admin/components/BulkImportModal';
+import { PlacementEligibilitySection } from '../hod/components/PlacementEligibilitySection';
 
 export const FacultyDashboardPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -45,6 +48,7 @@ export const FacultyDashboardPage: React.FC = () => {
   const [inspectTab, setInspectTab] = useState('personal-info');
   const [remarkInput, setRemarkInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
 
   // Fetch all students / mentees for faculty view
   const { data: mentees = [], refetch } = useQuery({
@@ -107,14 +111,11 @@ export const FacultyDashboardPage: React.FC = () => {
     if (!selectedMentee) return;
     setSaving(true);
     try {
-      await api.saveAcademicRecord(selectedMentee.roll_number, {
-        semester: 4,
-        semester_gpa: 9.2,
-        attendance_pct: 95.0,
-        remarks: remarkInput || 'Faculty verified performance',
-      });
-      alert(`Remarks saved for mentee ${selectedMentee.name}`);
+      await api.updateStudentProfile(selectedMentee.roll_number, {
+        remarks: remarkInput,
+      } as any);
       setSelectedMentee(null);
+      setRemarkInput('');
       refetch();
     } catch (e: any) {
       alert('Failed to save remarks');
@@ -135,6 +136,9 @@ export const FacultyDashboardPage: React.FC = () => {
           <h1 className="text-2xl font-extrabold text-textPrimary">Mentee Directory & Department Overview</h1>
           <p className="text-xs text-textSecondary mt-1">Track student progress, verify skills, and provide academic remarks</p>
         </div>
+        <PillButton variant="outline" size="sm" onClick={() => setShowBulkImportModal(true)} icon={<Upload className="w-4 h-4 text-brand-primary" />}>
+          Bulk Import CSV
+        </PillButton>
       </div>
 
       {/* Sub-Tab Switcher */}
@@ -154,6 +158,14 @@ export const FacultyDashboardPage: React.FC = () => {
           }`}
         >
           Department CGPA Analytics
+        </button>
+        <button
+          onClick={() => setSearchParams({ tab: 'placement' })}
+          className={`pb-3 transition-colors ${
+            activeTab === 'placement' ? 'border-b-2 border-brand-primary text-brand-primary' : 'text-textSecondary hover:text-textPrimary'
+          }`}
+        >
+          🎯 Placement Eligibility (T&P Drive)
         </button>
       </div>
 
@@ -403,6 +415,17 @@ export const FacultyDashboardPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Tab 3: Placement Eligibility Engine */}
+      {activeTab === 'placement' && (
+        <PlacementEligibilitySection students={mentees} />
+      )}
+
+      {/* Bulk Import Modal */}
+      <BulkImportModal
+        isOpen={showBulkImportModal}
+        onClose={() => setShowBulkImportModal(false)}
+        onSuccess={refetch}
+      />
     </div>
   );
 };

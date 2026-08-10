@@ -5,8 +5,10 @@ import {
   Users, Search, Eye, X, GraduationCap, Trophy, TrendingUp,
   Award, ExternalLink, BookOpen, Code2, BarChart2, Building2,
   Download, Filter, ArrowUpRight, ArrowDownRight,
-  CheckCircle2, Sparkles, AlertCircle, Sliders, Activity
+  CheckCircle2, Sparkles, AlertCircle, Sliders, Activity, RefreshCw, Upload,
 } from 'lucide-react';
+import { PlacementEligibilitySection } from './components/PlacementEligibilitySection';
+import { BulkImportModal } from '../admin/components/BulkImportModal';
 import {
   ResponsiveContainer,
   LineChart,
@@ -147,7 +149,7 @@ function mapStudentToHodEntry(student: any, index: number, liveSolved?: number):
 }
 
 export const HodDashboardPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'students' | 'rankings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'students' | 'rankings' | 'placement'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Interactive Filter Slicers
@@ -155,6 +157,9 @@ export const HodDashboardPage: React.FC = () => {
   const [slicerSection, setSlicerSection] = useState<string>('All');
   const [slicerStanding, setSlicerStanding] = useState<string>('All');
   const [slicerCoding, setSlicerCoding] = useState<string>('All');
+
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [syncingCron, setSyncingCron] = useState(false);
 
   const [inspectStudent, setInspectStudent] = useState<HodStudentEntry | null>(null);
   const [inspectTab, setInspectTab] = useState('academics-graph');
@@ -164,15 +169,28 @@ export const HodDashboardPage: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
-    if (tab === 'overview' || tab === 'analytics' || tab === 'students' || tab === 'rankings') {
+    if (tab === 'overview' || tab === 'analytics' || tab === 'students' || tab === 'rankings' || tab === 'placement') {
       setActiveTab(tab as any);
     }
   }, [location.search]);
 
-  const { data: students = [] } = useQuery({
+  const { data: students = [], refetch } = useQuery({
     queryKey: ['hodStudents'],
     queryFn: () => api.getAllStudents(),
   });
+
+  const handleForceCronSync = async () => {
+    setSyncingCron(true);
+    try {
+      const res = await api.triggerCronSync();
+      alert(`Background Coding Sync Completed!\nProcessed: ${res.result?.totalProcessed || 0} handles.\nLeetCode Updated: ${res.result?.leetcodeUpdated || 0}\nGitHub Updated: ${res.result?.githubUpdated || 0}`);
+      refetch();
+    } catch (e: any) {
+      alert('Sync failed: ' + e.message);
+    } finally {
+      setSyncingCron(false);
+    }
+  };
 
   const [liveSnapshots, setLiveSnapshots] = useState<Record<string, number>>({});
 
@@ -340,13 +358,32 @@ export const HodDashboardPage: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={exportAnalyticsReport}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-primary text-white text-xs font-bold shadow-sm hover:bg-brand-primary/90 transition-all shrink-0 self-start md:self-auto"
-        >
-          <Download className="w-4 h-4" />
-          <span>Export Department Report (CSV)</span>
-        </button>
+        <div className="flex flex-wrap gap-2.5 shrink-0 self-start md:self-auto">
+          <button
+            onClick={handleForceCronSync}
+            disabled={syncingCron}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-background border border-borderLine text-textPrimary text-xs font-bold shadow-sm hover:bg-surface transition-all"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-brand-primary ${syncingCron ? 'animate-spin' : ''}`} />
+            <span>{syncingCron ? 'Syncing...' : 'Sync Live Stats'}</span>
+          </button>
+
+          <button
+            onClick={() => setShowBulkImportModal(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-background border border-borderLine text-textPrimary text-xs font-bold shadow-sm hover:bg-surface transition-all"
+          >
+            <Upload className="w-3.5 h-3.5 text-brand-primary" />
+            <span>Bulk Import CSV</span>
+          </button>
+
+          <button
+            onClick={exportAnalyticsReport}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-primary text-white text-xs font-bold shadow-sm hover:bg-brand-primary/90 transition-all"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export Department Report (CSV)</span>
+          </button>
+        </div>
       </div>
 
       {/* ── UNIFIED FILTER ROW ── */}
@@ -448,6 +485,7 @@ export const HodDashboardPage: React.FC = () => {
         {[
           { key: 'overview', label: '📊 Year-Wise Overview' },
           { key: 'analytics', label: '📈 Academic Analytics' },
+          { key: 'placement', label: '🎯 Placement Eligibility Engine (T&P)' },
           { key: 'students', label: '👨‍🎓 Student Directory & Inspection' },
           { key: 'rankings', label: '🏆 Department Leaderboard' },
         ].map((t) => (
@@ -462,6 +500,11 @@ export const HodDashboardPage: React.FC = () => {
           </button>
         ))}
       </div>
+
+      {/* ── TAB: Placement Eligibility Engine ── */}
+      {activeTab === 'placement' && (
+        <PlacementEligibilitySection students={filteredDataset} />
+      )}
 
       {/* ── TAB 1: Year-Wise Overview ── */}
       {activeTab === 'overview' && (
@@ -882,6 +925,12 @@ export const HodDashboardPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Bulk Import Modal */}
+      <BulkImportModal
+        isOpen={showBulkImportModal}
+        onClose={() => setShowBulkImportModal(false)}
+        onSuccess={refetch}
+      />
     </div>
   );
 };

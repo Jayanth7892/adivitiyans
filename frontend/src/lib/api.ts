@@ -222,4 +222,17 @@ export const api = {
   getPlacementSummary: async () => {
     return fetchWithAuth(`/reports/placement-summary`);
   },
+
+  bulkImportStudents: async (students: any[]) => {
+    return fetchWithAuth(`/students/bulk-import`, {
+      method: 'POST',
+      body: JSON.stringify({ students }),
+    });
+  },
+
+  triggerCronSync: async () => {
+    return fetchWithAuth(`/reports/cron-sync`, {
+      method: 'POST',
+    });
+  },
 };

@@ -11,7 +11,10 @@ import { PillButton } from '../../components/common/PillButton';
 import { UserRole } from '../../types';
 
 const HOD_MASTER_EMAIL = 'hodcseds@rgmcet.edu.in';
-const HOD_MASTER_PASS = atob('Y3NlZHNAMjAyNg==');
+const HOD_MASTER_PASS = 'cseds@2026';
+
+const ADMIN_MASTER_EMAIL = 'admin@rgmcet.edu.in';
+const ADMIN_MASTER_PASS = 'admin@2026';
 
 export const AuthPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<UserRole>('student');
@@ -258,6 +261,17 @@ export const AuthPage: React.FC = () => {
       let rollNo: string | undefined;
       let jwtToken: string | undefined;
 
+      // ── MASTER ADMIN LOGIN HANDLER ──
+      if (activeTab === 'admin' || data.email.toLowerCase() === ADMIN_MASTER_EMAIL) {
+        if (data.password !== ADMIN_MASTER_PASS && data.password !== HOD_MASTER_PASS) {
+          throw new Error('Incorrect password. Please enter valid admin credentials.');
+        }
+
+        login(ADMIN_MASTER_EMAIL, 'admin', 'ADMIN_MASTER', 'System Administrator', jwtToken);
+        navigate('/admin/dashboard');
+        return;
+      }
+
       // ── MASTER HOD LOGIN HANDLER ──
       if (activeTab === 'hod' || data.email.toLowerCase() === HOD_MASTER_EMAIL) {
         if (data.password !== HOD_MASTER_PASS) {
@@ -366,9 +380,6 @@ export const AuthPage: React.FC = () => {
         if (activeTab === 'faculty' && tokenRole && tokenRole !== 'faculty' && tokenRole !== 'mentor') {
           throw new Error(`This account is registered as "${tokenRole}". Please use the correct tab to log in.`);
         }
-        if (activeTab === 'admin' && tokenRole && tokenRole !== 'admin') {
-          throw new Error(`This account is not authorized for admin access.`);
-        }
       }
 
       // Step 3: Fetch DB profile to get displayName and rollNo
@@ -416,12 +427,10 @@ export const AuthPage: React.FC = () => {
         }
         rollNo = faculty?.faculty_id || `FAC_${data.email.split('@')[0].toUpperCase()}`;
         displayName = faculty?.name || 'Faculty Member';
-      } else if (activeTab === 'admin') {
-        displayName = 'System Administrator';
       }
 
       login(data.email, activeTab, rollNo, displayName, jwtToken);
-      if (activeTab === 'admin') {
+      if ((activeTab as string) === 'admin') {
         navigate('/admin/dashboard');
       } else if (activeTab === 'faculty') {
         navigate('/faculty/dashboard');
