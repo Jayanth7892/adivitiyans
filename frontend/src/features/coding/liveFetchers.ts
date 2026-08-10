@@ -3,8 +3,8 @@ import { PlatformId, PlatformStatsSnapshot } from './platformData';
 // ─── Real Live API Fetchers ───────────────────────────────────────────────────
 
 /**
- * Fetches real LeetCode stats via public API endpoints (alfa-leetcode-api + Heroku fallback)
- * Note: Backend proxy is unavailable since Lambda runs in PRIVATE_ISOLATED subnet without NAT.
+ * Fetches real LeetCode stats via public API endpoints.
+ * Throws if the user does not exist.
  */
 export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSnapshot> {
   const cleanHandle = handle.replace(/^@/, '').trim();
@@ -22,6 +22,12 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
     const res = await fetch(VERCEL_API);
     if (res.ok) {
       const data = await res.json();
+
+      // Detect non-existent user — API returns errors array or completely empty object
+      if (data?.errors || data?.error) {
+        throw new Error(`LeetCode user "${cleanHandle}" not found.`);
+      }
+
       if (data && (data.totalSolved !== undefined || data.matchedUserStats)) {
         let easy = data.easySolved ?? 0;
         let medium = data.mediumSolved ?? 0;
@@ -49,32 +55,44 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
           totalHard: data.totalHard || 799,
         };
 
-        if (data.submissionCalendar) {
-          const rawCal = typeof data.submissionCalendar === 'string'
-            ? JSON.parse(data.submissionCalendar)
-            : data.submissionCalendar;
-          Object.entries(rawCal).forEach(([epochStr, count]) => {
-            const dateStr = new Date(Number(epochStr) * 1000).toISOString().slice(0, 10);
-            calendarObj[dateStr] = (calendarObj[dateStr] || 0) + Number(count);
-          });
+        // Parse submission calendar (epoch seconds → YYYY-MM-DD)
+        const rawCalField = data.submissionCalendar ?? data.submissionCalendarJSON;
+        if (rawCalField) {
+          try {
+            const rawCal = typeof rawCalField === 'string'
+              ? JSON.parse(rawCalField)
+              : rawCalField;
+            Object.entries(rawCal).forEach(([epochStr, count]) => {
+              const dateStr = new Date(Number(epochStr) * 1000).toISOString().slice(0, 10);
+              calendarObj[dateStr] = (calendarObj[dateStr] || 0) + Number(count);
+            });
+          } catch {
+            // ignore calendar parse errors
+          }
         }
 
-        if (Array.isArray(data.recentSubmissions)) {
-          recentActivities = data.recentSubmissions.slice(0, 15).map((sub: any) => ({
-            date: sub.timestamp ? new Date(Number(sub.timestamp) * 1000).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-            title: sub.title,
-            status: sub.statusDisplay || 'Accepted',
+        // Recent submissions — vercel API uses recentAcSubmissionNum or recentSubmissions
+        const recentList = data.recentSubmissions ?? data.recentAcSubmissionNum ?? [];
+        if (Array.isArray(recentList)) {
+          recentActivities = recentList.slice(0, 15).map((sub: any) => ({
+            date: sub.timestamp
+              ? new Date(Number(sub.timestamp) * 1000).toISOString().slice(0, 10)
+              : new Date().toISOString().slice(0, 10),
+            title: sub.title ?? sub.titleSlug ?? 'Problem',
+            status: sub.statusDisplay ?? sub.status ?? 'Accepted',
             type: 'submission',
           }));
         }
       }
     }
-  } catch (e) {
+  } catch (e: any) {
+    // Re-throw explicit "not found" errors
+    if (e.message?.includes('not found')) throw e;
     console.warn('Primary Vercel LeetCode API fallback triggered:', e);
   }
 
-  // Secondary Fallback: Alfa LeetCode API if primary failed
-  if (!profileData || (!profileData.totalSolved && !profileData.easySolved)) {
+  // Secondary Fallback: Alfa LeetCode API if primary yielded no data
+  if (!profileData || (profileData.totalSolved === 0 && profileData.easySolved === 0 && profileData.mediumSolved === 0)) {
     try {
       const [profileRes, contestRes] = await Promise.allSettled([
         fetch(ALFA_API),
@@ -83,6 +101,9 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
 
       if (profileRes.status === 'fulfilled' && profileRes.value.ok) {
         const data = await profileRes.value.json();
+        if (data?.errors || data?.error) {
+          throw new Error(`LeetCode user "${cleanHandle}" not found.`);
+        }
         profileData = {
           totalSolved: data.totalSolved ?? data.totalQuestions ?? 0,
           easySolved: data.easySolved ?? 0,
@@ -93,13 +114,16 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
           totalMedium: 1756,
           totalHard: 799,
         };
+      } else if (profileRes.status === 'fulfilled' && profileRes.value.status === 404) {
+        throw new Error(`LeetCode user "${cleanHandle}" not found.`);
       }
 
       if (contestRes.status === 'fulfilled' && contestRes.value.ok) {
         const contestJson = await contestRes.value.json();
         contestData = contestJson?.userContestRanking || {};
       }
-    } catch (e) {
+    } catch (e: any) {
+      if (e.message?.includes('not found')) throw e;
       console.warn('Alfa LeetCode API fallback failed:', e);
     }
   }
@@ -111,14 +135,14 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
 
   return {
     platform: 'leetcode',
-    handle,
-    profileUrl: `https://leetcode.com/${handle}`,
+    handle: cleanHandle,
+    profileUrl: `https://leetcode.com/${cleanHandle}`,
     lastRefreshedAt: new Date().toISOString(),
     syncStatus: 'synced',
     kpis: [
       { label: 'Total Questions Solved', value: totalSolved },
       { label: 'Total Contests Attended', value: contestData?.attendedContestsCount ?? 0 },
-      { label: 'User name', value: handle, isLink: true },
+      { label: 'User name', value: cleanHandle, isLink: true },
     ],
     breakdown: [
       { label: 'Easy', solved: easySolved, total: profileData?.totalEasy ?? 857, color: '#00b8a3' },
@@ -143,21 +167,31 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
 }
 
 /**
- * Fetches real GitHub user profile & repositories via GitHub REST API
+ * Fetches real GitHub user profile & repositories via GitHub REST API.
+ * Throws if the user does not exist.
  */
 export async function fetchLiveGitHub(handle: string): Promise<PlatformStatsSnapshot> {
+  const cleanHandle = handle.replace(/^@/, '').trim();
   const headers = { 'Accept': 'application/vnd.github+json' };
 
-  const [userRes, reposRes, eventsRes] = await Promise.allSettled([
-    fetch(`https://api.github.com/users/${encodeURIComponent(handle)}`, { headers }),
-    fetch(`https://api.github.com/users/${encodeURIComponent(handle)}/repos?sort=updated&per_page=100`, { headers }),
-    fetch(`https://api.github.com/users/${encodeURIComponent(handle)}/events/public?per_page=30`, { headers }),
-  ]);
-
-  let user: any = { login: handle, public_repos: 0, followers: 0 };
-  if (userRes.status === 'fulfilled' && userRes.value.ok) {
-    user = await userRes.value.json();
+  // Validate user first — throw immediately for non-existent handles
+  const userRes = await fetch(`https://api.github.com/users/${encodeURIComponent(cleanHandle)}`, { headers });
+  if (userRes.status === 404) {
+    throw new Error(`GitHub user "${cleanHandle}" not found.`);
   }
+  if (!userRes.ok) {
+    throw new Error(`GitHub API error: ${userRes.status}`);
+  }
+  const user = await userRes.json();
+  if (!user?.login) {
+    throw new Error(`GitHub user "${cleanHandle}" not found.`);
+  }
+
+  // Fetch repos and events in parallel
+  const [reposRes, eventsRes] = await Promise.allSettled([
+    fetch(`https://api.github.com/users/${encodeURIComponent(cleanHandle)}/repos?sort=updated&per_page=100`, { headers }),
+    fetch(`https://api.github.com/users/${encodeURIComponent(cleanHandle)}/events/public?per_page=30`, { headers }),
+  ]);
 
   const repos: any[] = reposRes.status === 'fulfilled' && reposRes.value.ok ? await reposRes.value.json() : [];
   const events: any[] = eventsRes.status === 'fulfilled' && eventsRes.value.ok ? await eventsRes.value.json() : [];
@@ -176,6 +210,7 @@ export async function fetchLiveGitHub(handle: string): Promise<PlatformStatsSnap
   const activities: any[] = [];
 
   events.forEach((ev) => {
+    if (!ev.created_at) return;
     const dateStr = new Date(ev.created_at).toISOString().slice(0, 10);
     heatmap[dateStr] = (heatmap[dateStr] || 0) + 1;
 
@@ -206,14 +241,14 @@ export async function fetchLiveGitHub(handle: string): Promise<PlatformStatsSnap
 
   return {
     platform: 'github',
-    handle,
-    profileUrl: user.html_url || `https://github.com/${handle}`,
+    handle: cleanHandle,
+    profileUrl: user.html_url || `https://github.com/${cleanHandle}`,
     lastRefreshedAt: new Date().toISOString(),
     syncStatus: 'synced',
     kpis: [
       { label: 'Public Repositories', value: user.public_repos ?? repos.length },
       { label: 'Total Stars Earned', value: totalStars },
-      { label: 'User name', value: handle, isLink: true },
+      { label: 'User name', value: cleanHandle, isLink: true },
     ],
     awards: [
       { title: 'Public Contributor', icon: '🐙' },
@@ -227,21 +262,28 @@ export async function fetchLiveGitHub(handle: string): Promise<PlatformStatsSnap
 }
 
 /**
- * Fetches real Codeforces profile & rating history via Codeforces API
+ * Fetches real Codeforces profile & rating history via Codeforces API.
+ * Throws if the user does not exist.
  */
 export async function fetchLiveCodeforces(handle: string): Promise<PlatformStatsSnapshot> {
+  const cleanHandle = handle.replace(/^@/, '').trim();
+
   const [infoRes, ratingRes, statusRes] = await Promise.allSettled([
-    fetch(`https://codeforces.com/api/user.info?handles=${encodeURIComponent(handle)}`),
-    fetch(`https://codeforces.com/api/user.rating?handle=${encodeURIComponent(handle)}`),
-    fetch(`https://codeforces.com/api/user.status?handle=${encodeURIComponent(handle)}&from=1&count=100`),
+    fetch(`https://codeforces.com/api/user.info?handles=${encodeURIComponent(cleanHandle)}`),
+    fetch(`https://codeforces.com/api/user.rating?handle=${encodeURIComponent(cleanHandle)}`),
+    fetch(`https://codeforces.com/api/user.status?handle=${encodeURIComponent(cleanHandle)}&from=1&count=100`),
   ]);
 
-  let userInfo: any = { handle, rating: 1200, maxRating: 1400, rank: 'pupil' };
+  let userInfo: any = null;
   if (infoRes.status === 'fulfilled' && infoRes.value.ok) {
     const infoJson = await infoRes.value.json();
     if (infoJson.status === 'OK' && infoJson.result?.[0]) {
       userInfo = infoJson.result[0];
+    } else {
+      throw new Error(`Codeforces user "${cleanHandle}" not found.`);
     }
+  } else {
+    throw new Error(`Could not reach Codeforces API. Please try again.`);
   }
 
   let ratingHistory: any[] = [];
@@ -276,7 +318,7 @@ export async function fetchLiveCodeforces(handle: string): Promise<PlatformStats
         if (activities.length < 15) {
           activities.push({
             date: dateStr,
-            title: `${sub.problem?.index || ''} ${sub.problem?.name || 'Problem'}`,
+            title: `${sub.problem?.index || ''} ${sub.problem?.name || 'Problem'}`.trim(),
             status: sub.verdict === 'OK' ? 'Accepted' : sub.verdict || 'Submitted',
             type: 'submission',
           });
@@ -291,14 +333,14 @@ export async function fetchLiveCodeforces(handle: string): Promise<PlatformStats
 
   return {
     platform: 'codeforces',
-    handle,
-    profileUrl: `https://codeforces.com/profile/${handle}`,
+    handle: cleanHandle,
+    profileUrl: `https://codeforces.com/profile/${cleanHandle}`,
     lastRefreshedAt: new Date().toISOString(),
     syncStatus: 'synced',
     kpis: [
       { label: 'Current Rating', value: userInfo.rating ?? 'Unrated' },
       { label: 'Max Rating', value: userInfo.maxRating ?? 'Unrated' },
-      { label: 'User name', value: handle, isLink: true },
+      { label: 'User name', value: cleanHandle, isLink: true },
     ],
     ratingHistory,
     awards: [
@@ -312,45 +354,318 @@ export async function fetchLiveCodeforces(handle: string): Promise<PlatformStats
 }
 
 /**
- * Universal live fetcher function with graceful error handling per platform
+ * Fetches GeeksforGeeks profile via unofficial stats API.
+ * Returns real solved counts per difficulty, coding score, streak, and institute rank.
+ * Gracefully degrades to profile link if API is unreachable.
+ */
+export async function fetchLiveGeeksforGeeks(handle: string): Promise<PlatformStatsSnapshot> {
+  const cleanHandle = handle.replace(/^@/, '').trim();
+
+  // Primary unofficial GFG stats API
+  const GFG_API = `https://geeks-for-geeks-stats-api.vercel.app/?raw=Y&userName=${encodeURIComponent(cleanHandle)}`;
+  // Fallback unofficial GFG API
+  const GFG_API_2 = `https://gfgapi.vercel.app/api/${encodeURIComponent(cleanHandle)}`;
+
+  let userData: any = null;
+
+  try {
+    const res = await fetch(GFG_API);
+    if (res.status === 404) {
+      throw new Error(`GeeksforGeeks user "${cleanHandle}" not found.`);
+    }
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.error) {
+        throw new Error(`GeeksforGeeks user "${cleanHandle}" not found.`);
+      }
+      if (data?.info) {
+        userData = data;
+      }
+    }
+  } catch (e: any) {
+    if (e.message?.includes('not found')) throw e;
+    console.warn('GFG primary API failed, trying fallback:', e);
+  }
+
+  if (!userData) {
+    try {
+      const res = await fetch(GFG_API_2);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && !data.error) {
+          userData = data;
+        }
+      }
+    } catch (e) {
+      console.warn('GFG fallback API also failed:', e);
+    }
+  }
+
+  const info = userData?.info || {};
+  const solvedStats = userData?.solvedStats || {};
+
+  const school = Number(solvedStats.school?.count) || 0;
+  const basic = Number(solvedStats.basic?.count) || 0;
+  const easy = Number(solvedStats.easy?.count) || 0;
+  const medium = Number(solvedStats.medium?.count) || 0;
+  const hard = Number(solvedStats.hard?.count) || 0;
+  const totalSolved = Number(info.totalProblemsSolved) || (school + basic + easy + medium + hard);
+  const codingScore = Number(info.codingScore) || 0;
+  const streak = Number(info.streak) || 0;
+  const instituteRank = info.instituteRank ?? 'N/A';
+  const monthlyScore = Number(info.monthlyCodingScore) || 0;
+
+  const topicList = [
+    { label: 'School', count: school },
+    { label: 'Basic', count: basic },
+    { label: 'Easy', count: easy },
+    { label: 'Medium', count: medium },
+    { label: 'Hard', count: hard },
+  ].filter((t) => t.count > 0);
+
+  return {
+    platform: 'geeksforgeeks',
+    handle: cleanHandle,
+    profileUrl: `https://auth.geeksforgeeks.org/user/${cleanHandle}`,
+    lastRefreshedAt: new Date().toISOString(),
+    syncStatus: 'synced',
+    kpis: [
+      { label: 'Total Problems Solved', value: totalSolved },
+      { label: 'Coding Score', value: codingScore },
+      { label: 'User name', value: cleanHandle, isLink: true },
+    ],
+    breakdown: [
+      { label: 'School', solved: school, total: Math.max(school + 10, 50), color: '#86efac' },
+      { label: 'Basic', solved: basic, total: Math.max(basic + 10, 100), color: '#4ade80' },
+      { label: 'Easy', solved: easy, total: Math.max(easy + 10, 200), color: '#22c55e' },
+      { label: 'Medium', solved: medium, total: Math.max(medium + 10, 150), color: '#16a34a' },
+      { label: 'Hard', solved: hard, total: Math.max(hard + 10, 80), color: '#15803d' },
+    ],
+    awards: [
+      { title: 'GFG Coder', icon: '🌿' },
+      ...(streak > 0 ? [{ title: `${streak}-Day Streak`, icon: '🔥' }] : []),
+      ...(typeof instituteRank === 'number' && instituteRank <= 100
+        ? [{ title: `Institute Rank #${instituteRank}`, icon: '🏆' }]
+        : []),
+      ...(monthlyScore > 0 ? [{ title: `Monthly Score: ${monthlyScore}`, icon: '📅' }] : []),
+    ],
+    topicAnalysis: topicList.length > 0 ? topicList : [{ label: 'Practice', count: 0 }],
+    activity: [],
+    heatmap: {},
+  };
+}
+
+/**
+ * Fetches CodeChef profile by scraping the user page directly.
+ * Parses the Drupal.settings JSON embedded in every CodeChef profile page
+ * to extract the full contest rating history, current rating, and highest rating.
+ * Stars are inferred from CodeChef's official rating tier thresholds.
+ * Throws if user not found.
+ */
+export async function fetchLiveCodeChef(handle: string): Promise<PlatformStatsSnapshot> {
+  const cleanHandle = handle.replace(/^@/, '').trim();
+
+  const CC_URL = `https://www.codechef.com/users/${encodeURIComponent(cleanHandle)}`;
+
+  let html = '';
+  try {
+    const res = await fetch(CC_URL, {
+      headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'text/html' },
+    });
+    if (res.status === 404) {
+      throw new Error(`CodeChef user "${cleanHandle}" not found.`);
+    }
+    if (!res.ok) {
+      throw new Error(`CodeChef page returned HTTP ${res.status}`);
+    }
+    html = await res.text();
+  } catch (e: any) {
+    if (e.message?.includes('not found')) throw e;
+    console.warn('CodeChef fetch failed:', e);
+  }
+
+  // Extract contest rating history from Drupal.settings embedded JSON
+  const ratingHistory: { date: string; rating: number; contestName?: string }[] = [];
+  if (html) {
+    try {
+      const drupalMatch = html.match(/jQuery\.extend\(Drupal\.settings,\s*({.+?})\);/s);
+      if (drupalMatch) {
+        const settings = JSON.parse(drupalMatch[1]);
+        const allEntries: any[] = settings?.date_versus_rating?.all || [];
+        allEntries.forEach((entry: any) => {
+          const dateStr = entry.end_date
+            ? String(entry.end_date).slice(0, 10)
+            : `${entry.getyear}-${String(entry.getmonth).padStart(2, '0')}-${String(entry.getday).padStart(2, '0')}`;
+          ratingHistory.push({
+            date: dateStr,
+            rating: Number(entry.rating) || 0,
+            contestName: entry.name || undefined,
+          });
+        });
+      }
+    } catch (e) {
+      console.warn('CodeChef Drupal settings parse failed:', e);
+    }
+  }
+
+  // Derive current and highest rating from history
+  const currentRating = ratingHistory.length > 0
+    ? ratingHistory[ratingHistory.length - 1].rating
+    : 0;
+  const highestRating = ratingHistory.length > 0
+    ? Math.max(...ratingHistory.map((r) => r.rating))
+    : 0;
+
+  // Stars follow CodeChef's official rating tier thresholds
+  const getStars = (rating: number) => {
+    if (rating >= 2500) return '7★';
+    if (rating >= 2200) return '6★';
+    if (rating >= 2000) return '5★';
+    if (rating >= 1800) return '4★';
+    if (rating >= 1600) return '3★';
+    if (rating >= 1400) return '2★';
+    if (rating >= 1) return '1★';
+    return '0★';
+  };
+
+  // Try to read stars directly from the HTML profile section
+  const starsHtmlMatch = html.match(/>(\d)(?:&#9733;|★)/);
+  const stars = starsHtmlMatch ? `${starsHtmlMatch[1]}★` : getStars(currentRating);
+
+  return {
+    platform: 'codechef',
+    handle: cleanHandle,
+    profileUrl: `https://www.codechef.com/users/${cleanHandle}`,
+    lastRefreshedAt: new Date().toISOString(),
+    syncStatus: 'synced',
+    kpis: [
+      { label: 'Current Rating', value: currentRating || 'Unrated' },
+      { label: 'Highest Rating', value: highestRating || 'Unrated' },
+      { label: 'User name', value: cleanHandle, isLink: true },
+    ],
+    ratingHistory,
+    awards: [
+      { title: `${stars} CodeChef`, icon: '🍴' },
+      ...(currentRating >= 1400 ? [{ title: '2★ Achiever', icon: '⭐' }] : []),
+      ...(currentRating >= 1600 ? [{ title: '3★ Expert', icon: '🏆' }] : []),
+      ...(currentRating >= 1800 ? [{ title: '4★ Master', icon: '💎' }] : []),
+    ],
+    topicAnalysis: [
+      { label: 'Current Rating', count: currentRating },
+      { label: 'Highest Rating', count: highestRating },
+    ].filter((t) => t.count > 0),
+    activity: [],
+    heatmap: {},
+  };
+}
+
+/**
+ * Fetches HackerRank profile and badges via public REST endpoints.
+ * Returns total stars, score, and badge list.
+ * Gracefully degrades if CORS or API limits are hit.
+ */
+export async function fetchLiveHackerRank(handle: string): Promise<PlatformStatsSnapshot> {
+  const cleanHandle = handle.replace(/^@/, '').trim();
+
+  const HR_PROFILE = `https://www.hackerrank.com/rest/hackers/${encodeURIComponent(cleanHandle)}/profile`;
+  const HR_BADGES = `https://www.hackerrank.com/rest/hackers/${encodeURIComponent(cleanHandle)}/badges`;
+
+  let profileData: any = null;
+  let badges: any[] = [];
+
+  try {
+    const [profileRes, badgesRes] = await Promise.allSettled([
+      fetch(HR_PROFILE, { headers: { Accept: 'application/json' } }),
+      fetch(HR_BADGES, { headers: { Accept: 'application/json' } }),
+    ]);
+
+    if (profileRes.status === 'fulfilled') {
+      if (profileRes.value.status === 404) {
+        throw new Error(`HackerRank user "${cleanHandle}" not found.`);
+      }
+      if (profileRes.value.ok) {
+        const data = await profileRes.value.json();
+        profileData = data?.model || null;
+      }
+    }
+
+    if (badgesRes.status === 'fulfilled' && badgesRes.value.ok) {
+      const data = await badgesRes.value.json();
+      badges = data?.models || [];
+    }
+  } catch (e: any) {
+    if (e.message?.includes('not found')) throw e;
+    console.warn('HackerRank API failed (likely CORS):', e);
+  }
+
+  const totalStars = badges.reduce((acc: number, b: any) => acc + (Number(b.stars) || 0), 0);
+  const score = Number(profileData?.score) || 0;
+
+  const topicAnalysis = badges
+    .filter((b: any) => b.badge_name || b.name)
+    .map((b: any) => ({
+      label: b.badge_name || b.name || 'Badge',
+      count: Number(b.stars) || 1,
+    }));
+
+  return {
+    platform: 'hackerrank',
+    handle: cleanHandle,
+    profileUrl: `https://www.hackerrank.com/profile/${cleanHandle}`,
+    lastRefreshedAt: new Date().toISOString(),
+    syncStatus: 'synced',
+    kpis: [
+      { label: 'Total Stars', value: totalStars },
+      { label: 'Score', value: score },
+      { label: 'User name', value: cleanHandle, isLink: true },
+    ],
+    breakdown: [],
+    awards: [
+      { title: 'HackerRank Connected', icon: '🏆' },
+      ...badges.slice(0, 4).map((b: any) => ({
+        title: b.badge_name || b.name || 'Badge',
+        icon: '⭐',
+      })),
+    ],
+    topicAnalysis: topicAnalysis.length > 0 ? topicAnalysis : [{ label: 'Practice', count: 0 }],
+    activity: [],
+    heatmap: {},
+  };
+}
+
+/**
+ * Universal live fetcher — routes to the correct platform-specific fetcher.
+ * All platforms now have real API implementations.
  */
 export async function fetchLivePlatformSnapshot(
   platformId: PlatformId,
   handle: string
 ): Promise<PlatformStatsSnapshot> {
-  if (platformId === 'leetcode') {
-    return await fetchLiveLeetCode(handle);
-  }
-  if (platformId === 'github') {
-    return await fetchLiveGitHub(handle);
-  }
-  if (platformId === 'codeforces') {
-    return await fetchLiveCodeforces(handle);
-  }
+  if (platformId === 'leetcode') return await fetchLiveLeetCode(handle);
+  if (platformId === 'github') return await fetchLiveGitHub(handle);
+  if (platformId === 'codeforces') return await fetchLiveCodeforces(handle);
+  if (platformId === 'geeksforgeeks') return await fetchLiveGeeksforGeeks(handle);
+  if (platformId === 'codechef') return await fetchLiveCodeChef(handle);
+  if (platformId === 'hackerrank') return await fetchLiveHackerRank(handle);
 
-  // Generic fallback adapter for GeeksforGeeks, HackerRank, CodeChef
+  // Final safety fallback for any unrecognised platform IDs
+  const cleanHandle = handle.replace(/^@/, '').trim();
   return {
     platform: platformId,
-    handle,
-    profileUrl:
-      platformId === 'geeksforgeeks' ? `https://auth.geeksforgeeks.org/user/${handle}` :
-      platformId === 'hackerrank' ? `https://www.hackerrank.com/${handle}` :
-      `https://www.codechef.com/users/${handle}`,
+    handle: cleanHandle,
+    profileUrl: '',
     lastRefreshedAt: new Date().toISOString(),
     syncStatus: 'synced',
     kpis: [
       { label: 'Total Solved', value: 0 },
-      { label: 'Platform Rating', value: 'Synced' },
-      { label: 'User name', value: handle, isLink: true },
+      { label: 'Platform Rating', value: 'N/A' },
+      { label: 'User name', value: cleanHandle, isLink: true },
     ],
-    breakdown: [
-      { label: 'Easy', solved: 0, total: 100, color: '#22C55E' },
-      { label: 'Medium', solved: 0, total: 100, color: '#EAB308' },
-      { label: 'Hard', solved: 0, total: 100, color: '#EF4444' },
-    ],
+    breakdown: [],
     awards: [{ title: `${platformId} Connected`, icon: '🏆' }],
     topicAnalysis: [{ label: 'General Practice', count: 0 }],
     activity: [],
     heatmap: {},
   };
 }
+
