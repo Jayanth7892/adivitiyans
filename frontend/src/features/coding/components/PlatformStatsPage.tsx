@@ -1,7 +1,8 @@
 import React from 'react';
-import { ExternalLink, Trophy, Code2, Flame, Award } from 'lucide-react';
+import { ExternalLink, Trophy, Code2, Flame, Award, Edit3 } from 'lucide-react';
 import { PlatformConfig, PlatformStatsSnapshot } from '../platformData';
 import { RefreshButton } from './RefreshButton';
+import { PillButton } from '../../../components/common/PillButton';
 import { DonutBreakdown } from './DonutBreakdown';
 import { RatingLineChart } from './RatingLineChart';
 import { AwardsPanel } from './AwardsPanel';
@@ -13,17 +14,31 @@ interface PlatformStatsPageProps {
   config: PlatformConfig;
   snapshot: PlatformStatsSnapshot;
   onRefresh: () => Promise<void>;
+  onEditHandle?: () => void;
+  readOnly?: boolean;
 }
 
 export const PlatformStatsPage: React.FC<PlatformStatsPageProps> = ({
   config,
   snapshot,
   onRefresh,
+  onEditHandle,
+  readOnly = false,
 }) => {
   return (
     <div className="space-y-6">
-      {/* 3.1 Top Right Controls (Refresh Data Button + Last Refresh) */}
-      <div className="flex justify-end pr-1">
+      {/* 3.1 Top Right Controls (Update Handle Button + Refresh Data Button) */}
+      <div className="flex items-center justify-end gap-2 pr-1">
+        {!readOnly && onEditHandle && config.id !== 'coding-stats' && (
+          <PillButton
+            variant="outline"
+            size="sm"
+            onClick={onEditHandle}
+            icon={<Edit3 className="w-3.5 h-3.5" />}
+          >
+            Update Handle
+          </PillButton>
+        )}
         <RefreshButton
           lastRefreshedAt={snapshot.lastRefreshedAt}
           onRefresh={onRefresh}

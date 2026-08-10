@@ -589,6 +589,33 @@ app.post('/students/:id/coding-profiles', async (req: Request, res: Response) =>
   }
 });
 
+app.delete('/students/:id/coding-profiles/:platform', async (req: Request, res: Response) => {
+  try {
+    const studentId = req.params.id.toUpperCase();
+    const platform = String(req.params.platform);
+
+    if (db.isMock) {
+      const existing = db.mockStore.codingProfiles.get(studentId) || [];
+      const updated = existing.filter(p => p.platform.toLowerCase() !== platform.toLowerCase());
+      db.mockStore.codingProfiles.set(studentId, updated);
+      return res.json({ message: 'Coding profile deleted', profiles: updated });
+    }
+
+    await db.query(
+      'DELETE FROM coding_profiles WHERE UPPER(student_id) = $1 AND LOWER(platform) = $2',
+      [studentId, platform.toLowerCase()]
+    );
+
+    const result = await db.query(
+      'SELECT * FROM coding_profiles WHERE student_id = $1 ORDER BY platform',
+      [studentId]
+    );
+    res.json({ message: 'Coding profile deleted', profiles: result.rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /proxy/leetcode/:handle — Proxy live LeetCode stats via GraphQL
 app.get('/proxy/leetcode/:handle', async (req: Request, res: Response) => {
   try {

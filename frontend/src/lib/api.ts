@@ -113,6 +113,12 @@ export const api = {
     });
   },
 
+  deleteCodingProfile: async (id: string, platform: string): Promise<CodingProfile[]> => {
+    return fetchWithAuth(`/students/${id}/coding-profiles/${encodeURIComponent(platform)}`, {
+      method: 'DELETE',
+    });
+  },
+
   getLeetCodeStats: async (handle: string): Promise<any> => {
     return fetchWithAuth(`/proxy/leetcode/${encodeURIComponent(handle)}`);
   },

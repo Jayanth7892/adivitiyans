@@ -242,6 +242,27 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
     }
   };
 
+  const handleDeleteHandle = async () => {
+    if (!linkingPlatformId || readOnly) return;
+    if (!confirm(`Are you sure you want to remove your ${linkingPlatformId.toUpperCase()} profile link?`)) return;
+    setSaving(true);
+    try {
+      await api.deleteCodingProfile(activeRollNo, linkingPlatformId);
+      await refetchCodingProfiles();
+      setSnapshots((prev) => {
+        const copy = { ...prev };
+        delete copy[linkingPlatformId];
+        return copy;
+      });
+      setLinkingPlatformId(null);
+      setHandleInput('');
+    } catch (e: any) {
+      alert('Failed to remove platform handle: ' + (e.message || e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const currentConfig = PLATFORM_CONFIGS.find((p) => p.id === activePlatform) || PLATFORM_CONFIGS[0];
   const currentSnapshot = snapshots[activePlatform];
 
@@ -258,8 +279,9 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
         onSelectPlatform={handleSelectPlatform}
         onLinkPlatform={(id) => {
           if (!readOnly) {
-            setLinkingPlatformId(id === 'coding-stats' ? 'leetcode' : id);
-            setHandleInput('');
+            const targetId = id === 'coding-stats' ? 'leetcode' : id;
+            setLinkingPlatformId(targetId);
+            setHandleInput(snapshots[targetId]?.handle || '');
           }
         }}
       />
@@ -280,6 +302,11 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
             config={currentConfig}
             snapshot={currentSnapshot}
             onRefresh={() => handleRefreshPlatform(activePlatform)}
+            onEditHandle={() => {
+              setLinkingPlatformId(activePlatform);
+              setHandleInput(currentSnapshot.handle || '');
+            }}
+            readOnly={readOnly}
           />
         ) : (
           /* Unlinked Platform State */
@@ -320,7 +347,7 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
         )}
       </div>
 
-      {/* Connect Handle Modal */}
+      {/* Connect / Edit Handle Modal */}
       {linkingPlatformId && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-surface border border-borderLine rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
@@ -336,10 +363,10 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
               </div>
               <div>
                 <h3 className="text-base font-bold text-textPrimary">
-                  Connect {PLATFORM_CONFIGS.find((p) => p.id === linkingPlatformId)?.name}
+                  {snapshots[linkingPlatformId]?.handle ? 'Update' : 'Connect'} {PLATFORM_CONFIGS.find((p) => p.id === linkingPlatformId)?.name} Handle
                 </h3>
                 <p className="text-xs text-textSecondary">
-                  Enter your real profile username / handle
+                  Enter your official platform username / handle
                 </p>
               </div>
             </div>
@@ -354,11 +381,21 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
                 onChange={(e) => setHandleInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSaveHandle()}
                 placeholder={`e.g. ${linkingPlatformId}_handle`}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-[#1E65FF]/30"
+                className="w-full px-3 py-2 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-[#1E65FF]/30 font-medium"
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-borderLine">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-borderLine">
+              {snapshots[linkingPlatformId]?.handle && (
+                <button
+                  type="button"
+                  onClick={handleDeleteHandle}
+                  disabled={saving}
+                  className="text-xs text-red-600 font-semibold hover:underline mr-auto"
+                >
+                  Unlink Handle
+                </button>
+              )}
               <PillButton
                 variant="outline"
                 size="sm"
@@ -372,7 +409,7 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
                 onClick={handleSaveHandle}
                 disabled={saving || !handleInput.trim()}
               >
-                {saving ? 'Connecting...' : 'Connect Profile'}
+                {saving ? 'Saving...' : snapshots[linkingPlatformId]?.handle ? 'Update Handle' : 'Connect Profile'}
               </PillButton>
             </div>
           </div>
