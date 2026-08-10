@@ -333,12 +333,38 @@ export class AdvitiyansStack extends cdk.Stack {
     });
 
     // ========================================================================
+    // 13. CloudFront Distribution for HTTPS & CDN Acceleration
+    // ========================================================================
+    const cfDistribution = new cloudfront.Distribution(this, 'AdvitiyansCloudFront', {
+      defaultBehavior: {
+        origin: new origins.S3StaticWebsiteOrigin(frontendBucket),
+        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      },
+      defaultRootObject: 'index.html',
+      errorResponses: [
+        {
+          httpStatus: 404,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+          ttl: cdk.Duration.seconds(0),
+        },
+        {
+          httpStatus: 403,
+          responseHttpStatus: 200,
+          responsePagePath: '/index.html',
+          ttl: cdk.Duration.seconds(0),
+        },
+      ],
+    });
+
+    // ========================================================================
     // Stack Outputs
     // ========================================================================
     new cdk.CfnOutput(this, 'ApiGatewayUrl', { value: api.url });
     new cdk.CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId });
     new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId });
     new cdk.CfnOutput(this, 'FrontendWebsiteUrl', { value: frontendBucket.bucketWebsiteUrl });
+    new cdk.CfnOutput(this, 'CloudFrontUrl', { value: `https://${cfDistribution.distributionDomainName}` });
     new cdk.CfnOutput(this, 'FrontendBucketName', { value: frontendBucket.bucketName });
     new cdk.CfnOutput(this, 'UploadsBucketName', { value: uploadsBucket.bucketName });
     new cdk.CfnOutput(this, 'RdsProxyEndpoint', { value: rdsProxy.endpoint });

@@ -25,9 +25,11 @@ API_URL=$(node -e "const o = require('./cdk-outputs.json'); console.log(Object.v
 USER_POOL_ID=$(node -e "const o = require('./cdk-outputs.json'); console.log(Object.values(o)[0].UserPoolId || '');")
 CLIENT_ID=$(node -e "const o = require('./cdk-outputs.json'); console.log(Object.values(o)[0].UserPoolClientId || '');")
 FRONTEND_BUCKET=$(node -e "const o = require('./cdk-outputs.json'); console.log(Object.values(o)[0].FrontendBucketName || '');")
+CLOUDFRONT_URL=$(node -e "const o = require('./cdk-outputs.json'); console.log(Object.values(o)[0].CloudFrontUrl || '');")
 
 echo "✅ Infrastructure Deployed!"
 echo "   API Base URL: $API_URL"
+echo "   CloudFront HTTPS URL: $CLOUDFRONT_URL"
 echo "   User Pool ID: $USER_POOL_ID"
 echo "   Client ID: $CLIENT_ID"
 
