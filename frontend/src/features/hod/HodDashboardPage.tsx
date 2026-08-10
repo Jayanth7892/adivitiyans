@@ -25,6 +25,7 @@ import {
   Legend,
 } from 'recharts';
 import { api } from '../../lib/api';
+import { fetchLivePlatformSnapshot } from '../coding/liveFetchers';
 import { StatCard } from '../../components/common/StatCard';
 import { PersonalInfoTab } from '../profile/tabs/PersonalInfoTab';
 import { AcademicsTab } from '../profile/tabs/AcademicsTab';
@@ -45,18 +46,18 @@ const DEPARTMENT_NAME = 'Computer Science & Engineering (CSE)';
 
 // Enhanced Student Directory dataset for fallback when API data is empty
 const FULL_CSE_STUDENTS = [
-  { rank: 1, name: 'Jayanth Kumar', regNo: '23091A3251', email: 'jayanth@rgmcet.edu.in', section: 'Sec A', year: '3rd Year', cgpa: 9.45, semGpas: [8.80, 8.95, 9.15, 9.30, 9.45], leetcode: 412, github: 42, standing: 'Distinction', placementStatus: 'Placed (18 LPA)' },
-  { rank: 2, name: 'Ananya Sharma', regNo: '23091A3252', email: 'ananya@rgmcet.edu.in', section: 'Sec B', year: '3rd Year', cgpa: 9.30, semGpas: [8.70, 8.85, 9.05, 9.20, 9.30], leetcode: 378, github: 28, standing: 'Distinction', placementStatus: 'Interview Ready' },
-  { rank: 3, name: 'Vikram Reddy', regNo: '20091A0588', email: 'vikram@rgmcet.edu.in', section: 'Sec A', year: '4th Year', cgpa: 9.25, semGpas: [8.60, 8.80, 9.00, 9.15, 9.25, 9.30, 9.25], leetcode: 450, github: 48, standing: 'Distinction', placementStatus: 'Placed (16 LPA)' },
-  { rank: 4, name: 'Sneha Patel', regNo: '24091A0512', email: 'sneha@rgmcet.edu.in', section: 'Sec C', year: '2nd Year', cgpa: 9.10, semGpas: [8.90, 9.00, 9.10], leetcode: 295, github: 18, standing: 'Distinction', placementStatus: 'Training Ongoing' },
-  { rank: 5, name: 'Karthik Raja', regNo: '21091A0544', email: 'karthik@rgmcet.edu.in', section: 'Sec B', year: '4th Year', cgpa: 9.05, semGpas: [8.50, 8.70, 8.85, 8.95, 9.00, 9.05], leetcode: 380, github: 32, standing: 'Distinction', placementStatus: 'Placed (14 LPA)' },
-  { rank: 6, name: 'Priya Nair', regNo: '23091A3256', email: 'priya@rgmcet.edu.in', section: 'Sec A', year: '3rd Year', cgpa: 8.90, semGpas: [8.40, 8.60, 8.75, 8.85, 8.90], leetcode: 310, github: 22, standing: 'First Class', placementStatus: 'Interview Ready' },
-  { rank: 7, name: 'Arjun Singh', regNo: '24091A0590', email: 'arjun@rgmcet.edu.in', section: 'Sec B', year: '2nd Year', cgpa: 8.85, semGpas: [8.60, 8.75, 8.85], leetcode: 240, github: 15, standing: 'First Class', placementStatus: 'Training Ongoing' },
-  { rank: 8, name: 'Rohan Gupta', regNo: '25091A0501', email: 'rohan@rgmcet.edu.in', section: 'Sec A', year: '1st Year', cgpa: 8.80, semGpas: [8.80], leetcode: 160, github: 10, standing: 'First Class', placementStatus: 'Foundational Phase' },
-  { rank: 9, name: 'Divya Sri', regNo: '23091A3260', email: 'divya@rgmcet.edu.in', section: 'Sec C', year: '3rd Year', cgpa: 8.75, semGpas: [8.20, 8.40, 8.60, 8.70, 8.75], leetcode: 280, github: 19, standing: 'First Class', placementStatus: 'Interview Ready' },
-  { rank: 10, name: 'Manish Kumar', regNo: '24091A0545', email: 'manish@rgmcet.edu.in', section: 'Sec A', year: '2nd Year', cgpa: 8.65, semGpas: [8.30, 8.50, 8.65], leetcode: 210, github: 14, standing: 'First Class', placementStatus: 'Training Ongoing' },
-  { rank: 11, name: 'Bhavana Reddy', regNo: '21091A0518', email: 'bhavana@rgmcet.edu.in', section: 'Sec C', year: '4th Year', cgpa: 8.50, semGpas: [8.10, 8.25, 8.35, 8.45, 8.50], leetcode: 230, github: 16, standing: 'First Class', placementStatus: 'Placed (10 LPA)' },
-  { rank: 12, name: 'Siddharth Rao', regNo: '25091A0530', email: 'siddharth@rgmcet.edu.in', section: 'Sec B', year: '1st Year', cgpa: 8.40, semGpas: [8.40], leetcode: 120, github: 8, standing: 'First Class', placementStatus: 'Foundational Phase' },
+  { rank: 1, name: 'Jayanth Kumar', regNo: '23091A3251', email: 'jayanth@rgmcet.edu.in', section: 'Sec A', year: '3rd Year', cgpa: 9.45, semGpas: [8.80, 8.95, 9.15, 9.30, 9.45], leetcode: 412, isLcLinked: true, github: 42, isGhLinked: true, standing: 'Distinction', placementStatus: 'Placed (18 LPA)' },
+  { rank: 2, name: 'Ananya Sharma', regNo: '23091A3252', email: 'ananya@rgmcet.edu.in', section: 'Sec B', year: '3rd Year', cgpa: 9.30, semGpas: [8.70, 8.85, 9.05, 9.20, 9.30], leetcode: 378, isLcLinked: true, github: 28, isGhLinked: true, standing: 'Distinction', placementStatus: 'Interview Ready' },
+  { rank: 3, name: 'Vikram Reddy', regNo: '20091A0588', email: 'vikram@rgmcet.edu.in', section: 'Sec A', year: '4th Year', cgpa: 9.25, semGpas: [8.60, 8.80, 9.00, 9.15, 9.25, 9.30, 9.25], leetcode: 450, isLcLinked: true, github: 48, isGhLinked: true, standing: 'Distinction', placementStatus: 'Placed (16 LPA)' },
+  { rank: 4, name: 'Sneha Patel', regNo: '24091A0512', email: 'sneha@rgmcet.edu.in', section: 'Sec C', year: '2nd Year', cgpa: 9.10, semGpas: [8.90, 9.00, 9.10], leetcode: 295, isLcLinked: true, github: 18, isGhLinked: true, standing: 'Distinction', placementStatus: 'Training Ongoing' },
+  { rank: 5, name: 'Karthik Raja', regNo: '21091A0544', email: 'karthik@rgmcet.edu.in', section: 'Sec B', year: '4th Year', cgpa: 9.05, semGpas: [8.50, 8.70, 8.85, 8.95, 9.00, 9.05], leetcode: 380, isLcLinked: true, github: 32, isGhLinked: true, standing: 'Distinction', placementStatus: 'Placed (14 LPA)' },
+  { rank: 6, name: 'Priya Nair', regNo: '23091A3256', email: 'priya@rgmcet.edu.in', section: 'Sec A', year: '3rd Year', cgpa: 8.90, semGpas: [8.40, 8.60, 8.75, 8.85, 8.90], leetcode: 310, isLcLinked: true, github: 22, isGhLinked: true, standing: 'First Class', placementStatus: 'Interview Ready' },
+  { rank: 7, name: 'Arjun Singh', regNo: '24091A0590', email: 'arjun@rgmcet.edu.in', section: 'Sec B', year: '2nd Year', cgpa: 8.85, semGpas: [8.60, 8.75, 8.85], leetcode: 240, isLcLinked: true, github: 15, isGhLinked: true, standing: 'First Class', placementStatus: 'Training Ongoing' },
+  { rank: 8, name: 'Rohan Gupta', regNo: '25091A0501', email: 'rohan@rgmcet.edu.in', section: 'Sec A', year: '1st Year', cgpa: 8.80, semGpas: [8.80], leetcode: 160, isLcLinked: true, github: 10, isGhLinked: true, standing: 'First Class', placementStatus: 'Foundational Phase' },
+  { rank: 9, name: 'Divya Sri', regNo: '23091A3260', email: 'divya@rgmcet.edu.in', section: 'Sec C', year: '3rd Year', cgpa: 8.75, semGpas: [8.20, 8.40, 8.60, 8.70, 8.75], leetcode: 280, isLcLinked: true, github: 19, isGhLinked: true, standing: 'First Class', placementStatus: 'Interview Ready' },
+  { rank: 10, name: 'Manish Kumar', regNo: '24091A0545', email: 'manish@rgmcet.edu.in', section: 'Sec A', year: '2nd Year', cgpa: 8.65, semGpas: [8.30, 8.50, 8.65], leetcode: 210, isLcLinked: true, github: 14, isGhLinked: true, standing: 'First Class', placementStatus: 'Training Ongoing' },
+  { rank: 11, name: 'Bhavana Reddy', regNo: '21091A0518', email: 'bhavana@rgmcet.edu.in', section: 'Sec C', year: '4th Year', cgpa: 8.50, semGpas: [8.10, 8.25, 8.35, 8.45, 8.50], leetcode: 230, isLcLinked: true, github: 16, isGhLinked: true, standing: 'First Class', placementStatus: 'Placed (10 LPA)' },
+  { rank: 12, name: 'Siddharth Rao', regNo: '25091A0530', email: 'siddharth@rgmcet.edu.in', section: 'Sec B', year: '1st Year', cgpa: 8.40, semGpas: [8.40], leetcode: 120, isLcLinked: true, github: 8, isGhLinked: true, standing: 'First Class', placementStatus: 'Foundational Phase' },
 ];
 
 // Year-Wise Academic Distribution Summary
@@ -95,32 +96,35 @@ interface HodStudentEntry {
   cgpa: number;
   semGpas: number[];
   leetcode: number;
+  leetcodeHandle: string | null;
+  isLcLinked: boolean;
   github: number;
+  githubHandle: string | null;
+  isGhLinked: boolean;
   standing: string;
   placementStatus: string;
 }
 
-function mapStudentToHodEntry(student: any, index: number): HodStudentEntry {
+function mapStudentToHodEntry(student: any, index: number, liveSolved?: number): HodStudentEntry {
   const section = student.section
     ? (student.section.startsWith('Sec ') ? student.section : `Sec ${student.section}`)
     : 'Sec A';
 
-  const rawCgpa = student.cgpa !== undefined && student.cgpa !== null ? Number(student.cgpa) : 0;
-  const cgpa = rawCgpa > 0 ? rawCgpa : Number((8.4 + ((index * 37) % 15) / 10).toFixed(2));
+  // Strictly use real CGPA recorded in DB, 0 if not present
+  const cgpa = student.cgpa !== undefined && student.cgpa !== null ? Number(student.cgpa) : 0;
 
-  const rawLeetcode = student.leetcode_solved !== undefined && student.leetcode_solved !== null ? Number(student.leetcode_solved) : 0;
-  const leetcode = rawLeetcode > 0 ? rawLeetcode : (140 + ((index * 53) % 290));
+  // Real LeetCode profile linking check
+  const rawLcHandle = (student.leetcode_handle || student.leetcode || '').toString().trim();
+  const isLcLinked = Boolean(rawLcHandle) && rawLcHandle !== 'Not Linked' && !rawLcHandle.startsWith('@23091') && !rawLcHandle.startsWith('23091');
+  const dbLeetcode = student.leetcode_solved !== undefined && student.leetcode_solved !== null ? Number(student.leetcode_solved) : 0;
+  const leetcode = liveSolved !== undefined ? liveSolved : (isLcLinked ? dbLeetcode : 0);
 
-  const rawGithub = student.github_repos !== undefined && student.github_repos !== null ? Number(student.github_repos) : 0;
-  const github = rawGithub > 0 ? rawGithub : (12 + ((index * 13) % 30));
+  // Real GitHub profile linking check
+  const rawGhHandle = (student.github_handle || student.github || '').toString().trim();
+  const isGhLinked = Boolean(rawGhHandle) && rawGhHandle !== 'Not Linked' && !rawGhHandle.startsWith('@23091') && !rawGhHandle.startsWith('23091');
+  const github = isGhLinked ? Number(student.github_repos || 0) : 0;
 
-  const standing = student.standing || (cgpa >= 9.0 ? 'Distinction' : 'First Class');
-
-  const sem1 = Number(Math.max(6.5, cgpa - 0.5).toFixed(2));
-  const sem2 = Number(Math.max(6.8, cgpa - 0.35).toFixed(2));
-  const sem3 = Number(Math.max(7.2, cgpa - 0.2).toFixed(2));
-  const sem4 = Number(Math.max(7.5, cgpa - 0.1).toFixed(2));
-  const sem5 = Number(cgpa.toFixed(2));
+  const standing = student.standing || (cgpa >= 9.0 ? 'Distinction' : (cgpa >= 6.5 ? 'First Class' : (cgpa > 0 ? 'Pass' : 'N/A')));
 
   return {
     rank: index + 1,
@@ -130,10 +134,14 @@ function mapStudentToHodEntry(student: any, index: number): HodStudentEntry {
     section,
     year: student.year || '3rd Year',
     cgpa,
-    semGpas: [sem1, sem2, sem3, sem4, sem5],
+    semGpas: [cgpa, cgpa, cgpa, cgpa, cgpa],
     leetcode,
+    leetcodeHandle: isLcLinked ? rawLcHandle : null,
+    isLcLinked: isLcLinked || leetcode > 0,
     github,
-    standing: standing.includes('Distinction') ? 'Distinction' : 'First Class',
+    githubHandle: isGhLinked ? rawGhHandle : null,
+    isGhLinked: isGhLinked || github > 0,
+    standing,
     placementStatus: 'Active',
   };
 }
@@ -166,20 +174,60 @@ export const HodDashboardPage: React.FC = () => {
     queryFn: () => api.getAllStudents(),
   });
 
+  const [liveSnapshots, setLiveSnapshots] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadLiveStats() {
+      if (students.length === 0) return;
+      const snapshotMap: Record<string, number> = {};
+
+      await Promise.all(
+        students.map(async (s: any) => {
+          const lcHandle = s.leetcode_handle;
+          const isValidHandle = lcHandle && lcHandle !== 'Not Linked' && !lcHandle.startsWith('@23091') && !lcHandle.startsWith('23091');
+          if (isValidHandle) {
+            try {
+              const cleanHandle = lcHandle.replace(/^@/, '').trim();
+              const snapshot = await fetchLivePlatformSnapshot('leetcode', cleanHandle);
+              const total = typeof snapshot.kpis[0]?.value === 'number' ? snapshot.kpis[0].value : 0;
+              snapshotMap[s.roll_number] = total;
+            } catch (e) {
+              console.warn(`[HOD Dashboard] Live fetch failed for ${s.roll_number}:`, e);
+            }
+          }
+        })
+      );
+
+      if (mounted) {
+        setLiveSnapshots(snapshotMap);
+      }
+    }
+    loadLiveStats();
+    return () => { mounted = false; };
+  }, [students]);
+
   const mergedStudentDataset: HodStudentEntry[] = useMemo(() => {
     let dataset: HodStudentEntry[];
     if (students.length > 0) {
       const uniqueStudents = Array.from(
         new Map(students.map((s) => [s.roll_number.toUpperCase(), s])).values()
       );
-      dataset = uniqueStudents.map((s, idx) => mapStudentToHodEntry(s, idx));
+      dataset = uniqueStudents.map((s, idx) => {
+        const liveSolved = liveSnapshots[s.roll_number];
+        return mapStudentToHodEntry(s, idx, liveSolved);
+      });
     } else {
-      dataset = FULL_CSE_STUDENTS;
+      dataset = FULL_CSE_STUDENTS.map((s, idx) => ({
+        ...s,
+        leetcodeHandle: 'demo',
+        isLcLinked: true,
+        githubHandle: 'demo',
+        isGhLinked: true,
+      }));
     }
-    return dataset
-      .sort((a, b) => b.cgpa - a.cgpa)
-      .map((s, idx) => ({ ...s, rank: idx + 1 }));
-  }, [students]);
+    return dataset.map((s, idx) => ({ ...s, rank: idx + 1 }));
+  }, [students, liveSnapshots]);
 
   const filteredDataset = useMemo(() => {
     return mergedStudentDataset.filter((s) => {
@@ -200,9 +248,17 @@ export const HodDashboardPage: React.FC = () => {
     const total = filteredDataset.length;
     if (total === 0) return { count: 0, avgCgpa: '0.00', avgLeetCode: 0, distinctionRatio: '0%' };
 
-    const avgCgpa = (filteredDataset.reduce((s, p) => s + p.cgpa, 0) / total).toFixed(2);
-    const avgLeetCode = Math.round(filteredDataset.reduce((s, p) => s + p.leetcode, 0) / total);
-    const distinctions = filteredDataset.filter((p) => p.standing === 'Distinction').length;
+    const cgpaStudents = filteredDataset.filter((p) => p.cgpa > 0);
+    const avgCgpa = cgpaStudents.length > 0
+      ? (cgpaStudents.reduce((s, p) => s + p.cgpa, 0) / cgpaStudents.length).toFixed(2)
+      : '0.00';
+
+    const lcStudents = filteredDataset.filter((p) => p.isLcLinked && p.leetcode > 0);
+    const avgLeetCode = lcStudents.length > 0
+      ? Math.round(lcStudents.reduce((s, p) => s + p.leetcode, 0) / lcStudents.length)
+      : 0;
+
+    const distinctions = filteredDataset.filter((p) => p.standing.includes('Distinction')).length;
     const distinctionRatio = `${Math.round((distinctions / total) * 100)}%`;
 
     return { count: total, avgCgpa, avgLeetCode, distinctionRatio };
@@ -544,9 +600,21 @@ export const HodDashboardPage: React.FC = () => {
                       <td className="py-3 px-4 font-bold text-textPrimary">{s.name}</td>
                       <td className="py-3 px-4 font-mono text-xs text-brand-primary">{s.regNo}</td>
                       <td className="py-3 px-4 text-xs text-textSecondary">{s.year} • {s.section}</td>
-                      <td className="py-3 px-4 font-black text-brand-primary">{s.cgpa}</td>
-                      <td className="py-3 px-4 text-xs font-bold text-[#FFA116]">{s.leetcode} Solved</td>
-                      <td className="py-3 px-4 text-xs text-textSecondary">{s.github} Repos</td>
+                      <td className="py-3 px-4 font-black text-brand-primary">{s.cgpa > 0 ? `${s.cgpa} CGPA` : <span className="text-textSecondary italic text-xs font-normal">N/A</span>}</td>
+                      <td className="py-3 px-4 text-xs font-bold text-[#FFA116]">
+                        {s.isLcLinked && s.leetcode > 0 ? (
+                          `${s.leetcode} Solved`
+                        ) : (
+                          <span className="text-textSecondary font-semibold px-2 py-0.5 rounded-md bg-background border border-borderLine">Not Linked</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-xs text-textSecondary">
+                        {s.isGhLinked && s.github > 0 ? (
+                          `${s.github} Repos`
+                        ) : (
+                          <span className="text-textSecondary font-semibold px-2 py-0.5 rounded-md bg-background border border-borderLine">Not Linked</span>
+                        )}
+                      </td>
                       <td className="py-3 px-4">
                         <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                           s.standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700' : 'bg-brand-soft text-brand-primary'
@@ -585,22 +653,32 @@ export const HodDashboardPage: React.FC = () => {
               <h3 className="text-base font-bold text-textPrimary">Top Academic Performers (CGPA)</h3>
             </div>
             <div className="space-y-3">
-              {[...filteredDataset].sort((a, b) => b.cgpa - a.cgpa).slice(0, 5).map((s, idx) => (
-                <div key={s.regNo} className="p-3.5 rounded-xl bg-background border border-borderLine flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full font-black text-xs flex items-center justify-center ${
-                      idx === 0 ? 'bg-amber-100 text-amber-700' : idx === 1 ? 'bg-slate-200 text-slate-700' : 'bg-orange-100 text-orange-700'
-                    }`}>
-                      #{idx + 1}
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-textPrimary">{s.name}</p>
-                      <p className="text-[11px] text-textSecondary">{s.regNo} • {s.year}</p>
-                    </div>
-                  </div>
-                  <span className="text-sm font-black text-brand-primary">{s.cgpa} CGPA</span>
+              {filteredDataset.filter((s) => s.cgpa > 0).length === 0 ? (
+                <div className="p-4 text-center text-xs text-textSecondary bg-background rounded-xl border border-borderLine">
+                  No academic CGPA records published yet.
                 </div>
-              ))}
+              ) : (
+                [...filteredDataset]
+                  .filter((s) => s.cgpa > 0)
+                  .sort((a, b) => b.cgpa - a.cgpa)
+                  .slice(0, 5)
+                  .map((s, idx) => (
+                    <div key={s.regNo} className="p-3.5 rounded-xl bg-background border border-borderLine flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full font-black text-xs flex items-center justify-center ${
+                          idx === 0 ? 'bg-amber-100 text-amber-700' : idx === 1 ? 'bg-slate-200 text-slate-700' : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          #{idx + 1}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-textPrimary">{s.name}</p>
+                          <p className="text-[11px] text-textSecondary">{s.regNo} • {s.year}</p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-black text-brand-primary">{s.cgpa} CGPA</span>
+                    </div>
+                  ))
+              )}
             </div>
           </div>
 
@@ -611,22 +689,35 @@ export const HodDashboardPage: React.FC = () => {
               <h3 className="text-base font-bold text-textPrimary">Top Coding Rankers (LeetCode)</h3>
             </div>
             <div className="space-y-3">
-              {[...filteredDataset].sort((a, b) => b.leetcode - a.leetcode).slice(0, 5).map((s, idx) => (
-                <div key={s.regNo} className="p-3.5 rounded-xl bg-background border border-borderLine flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full font-black text-xs flex items-center justify-center ${
-                      idx === 0 ? 'bg-amber-100 text-amber-700' : 'bg-brand-soft text-brand-primary'
-                    }`}>
-                      #{idx + 1}
+              {[...filteredDataset]
+                .sort((a, b) => {
+                  if (a.isLcLinked && !b.isLcLinked) return -1;
+                  if (!a.isLcLinked && b.isLcLinked) return 1;
+                  return b.leetcode - a.leetcode;
+                })
+                .slice(0, 5)
+                .map((s, idx) => (
+                  <div key={s.regNo} className="p-3.5 rounded-xl bg-background border border-borderLine flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full font-black text-xs flex items-center justify-center ${
+                        idx === 0 && s.isLcLinked ? 'bg-amber-100 text-amber-700' : 'bg-brand-soft text-brand-primary'
+                      }`}>
+                        #{idx + 1}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-textPrimary">{s.name}</p>
+                        <p className="text-[11px] text-textSecondary">{s.regNo} • {s.section}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-textPrimary">{s.name}</p>
-                      <p className="text-[11px] text-textSecondary">{s.regNo} • {s.section}</p>
-                    </div>
+                    {s.isLcLinked && s.leetcode > 0 ? (
+                      <span className="text-sm font-black text-[#FFA116]">{s.leetcode} Solved</span>
+                    ) : (
+                      <span className="text-xs font-semibold text-textSecondary bg-surface border border-borderLine px-2.5 py-1 rounded-lg">
+                        Not Linked
+                      </span>
+                    )}
                   </div>
-                  <span className="text-sm font-black text-[#FFA116]">{s.leetcode} Solved</span>
-                </div>
-              ))}
+                ))}
             </div>
           </div>
         </div>
