@@ -277,7 +277,11 @@ app.get('/students', async (req: Request, res: Response) => {
       GROUP BY s.roll_number, s.name, s.email, s.year, s.phone, s.address, s.native_place, s.department, s.batch, s.section, s.hostel_day_scholar, s.driving_license, s.passport, s.relocation_willingness, s.family_business, s.financial_background, s.faculty_mentor_id, s.photo_url, s.resume_url, s.linkedin_url, s.linkedin_updated, s.created_at, s.updated_at
       ORDER BY s.roll_number, s.created_at DESC
     `, params);
-    res.json(result.rows);
+    const formattedRows = result.rows.map((r: any) => ({
+      ...r,
+      department: (!r.department || r.department === 'CSE' || r.department === 'Data Science' || r.department === 'CSE (Data Science)') ? 'CSE(Data Science)' : r.department,
+    }));
+    res.json(formattedRows);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -386,7 +390,11 @@ app.get('/students/:id', async (req: Request, res: Response) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Student not found' });
     }
-    res.json(result.rows[0]);
+    const student = result.rows[0];
+    if (student) {
+      student.department = (!student.department || student.department === 'CSE' || student.department === 'Data Science' || student.department === 'CSE (Data Science)') ? 'CSE(Data Science)' : student.department;
+    }
+    res.json(student);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -400,9 +408,12 @@ app.put('/students/:id', async (req: Request, res: Response) => {
 
     if (db.isMock) {
       const existing = db.mockStore.students.get(studentId) || { roll_number: studentId };
+      const rawDept = body.department && body.department !== '' ? body.department : (existing.department || 'CSE(Data Science)');
+      const normDept = (!rawDept || rawDept === 'CSE' || rawDept === 'Data Science' || rawDept === 'CSE (Data Science)') ? 'CSE(Data Science)' : rawDept;
       const updated = {
         ...existing,
         ...body,
+        department: normDept,
         year: body.year && body.year !== '' ? body.year : (existing.year || '3rd Year'),
         hostel_day_scholar: body.hostel_day_scholar && body.hostel_day_scholar !== '' ? body.hostel_day_scholar : (existing.hostel_day_scholar || 'Day Scholar'),
         cgpa: body.cgpa !== undefined && body.cgpa !== null && body.cgpa !== '' ? Number(body.cgpa) : (existing.cgpa || 0),
@@ -424,7 +435,8 @@ app.put('/students/:id', async (req: Request, res: Response) => {
     const phone = body.phone !== undefined ? body.phone : (existing.phone || null);
     const address = body.address !== undefined ? body.address : (existing.address || null);
     const native_place = body.native_place !== undefined ? body.native_place : (existing.native_place || null);
-    const department = body.department && body.department !== '' ? body.department : (existing.department || 'CSE');
+    const rawDept = body.department && body.department !== '' ? body.department : (existing.department || 'CSE(Data Science)');
+    const department = (!rawDept || rawDept === 'CSE' || rawDept === 'Data Science' || rawDept === 'CSE (Data Science)') ? 'CSE(Data Science)' : rawDept;
     const batch = body.batch && body.batch !== '' ? body.batch : (existing.batch || '2023-2027');
     const section = body.section && body.section !== '' ? body.section : (existing.section || 'A');
     const hostel_day_scholar = body.hostel_day_scholar && body.hostel_day_scholar !== '' ? body.hostel_day_scholar : (existing.hostel_day_scholar || 'Day Scholar');

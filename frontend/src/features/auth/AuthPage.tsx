@@ -153,7 +153,7 @@ export const AuthPage: React.FC = () => {
         name: data.fullName,
         email: data.email,
         year: data.year,
-        department: 'CSE',
+        department: 'CSE(Data Science)',
         batch: '2023-2027',
         section: 'A',
       }).catch((dbErr: any) => {
@@ -385,7 +385,7 @@ export const AuthPage: React.FC = () => {
             name: derivedName,
             email: data.email,
             year: '4th Year',
-            department: 'CSE',
+            department: 'CSE(Data Science)',
             batch: '2023-2027',
             section: 'A',
           }).catch((e) => console.warn('[Self-heal student create error]:', e));
@@ -409,7 +409,7 @@ export const AuthPage: React.FC = () => {
             faculty_id: facId,
             name: facName,
             email: data.email,
-            department: 'CSE',
+            department: 'CSE(Data Science)',
             role: 'mentor',
           }).catch(() => {});
           faculty = await api.getFacultyByEmail(data.email).catch(() => null);

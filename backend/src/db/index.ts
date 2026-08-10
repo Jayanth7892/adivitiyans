@@ -148,7 +148,7 @@ async function ensureSchema(p: Pool) {
       phone VARCHAR(20),
       address TEXT,
       native_place VARCHAR(100),
-      department VARCHAR(50) NOT NULL DEFAULT 'CSE',
+      department VARCHAR(50) NOT NULL DEFAULT 'CSE(Data Science)',
       batch VARCHAR(20) NOT NULL DEFAULT '2023-2027',
       section VARCHAR(10) DEFAULT 'A',
       hostel_day_scholar VARCHAR(20) DEFAULT 'Day Scholar',
@@ -165,6 +165,8 @@ async function ensureSchema(p: Pool) {
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`,
+
+    `UPDATE students SET department = 'CSE(Data Science)' WHERE department IS NULL OR department = '' OR department = 'CSE' OR department = 'Data Science' OR department = 'CSE (Data Science)';`,
 
     `CREATE TABLE IF NOT EXISTS academics (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

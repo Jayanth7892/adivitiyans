@@ -194,7 +194,11 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
                 ))}
               </select>
             ) : (
-              <p className="text-sm font-medium text-textPrimary">{s?.department || 'Not specified'}</p>
+              <p className="text-sm font-medium text-textPrimary">
+                {(!s?.department || s.department === 'CSE' || s.department === 'Data Science' || s.department === 'CSE (Data Science)')
+                  ? 'CSE(Data Science)'
+                  : s.department}
+              </p>
             )}
           </div>
 

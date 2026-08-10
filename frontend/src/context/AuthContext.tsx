@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name: formattedName,
       role: userRole,
       rollNumber: formattedReg,
-      department: 'CSE',
+      department: 'CSE(Data Science)',
     };
     setUser(newUser);
 

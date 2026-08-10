@@ -211,7 +211,7 @@ export const api = {
   },
 
   // Reports & Analytics
-  getDepartmentReport: async (dept: string = 'CSE') => {
+  getDepartmentReport: async (dept: string = 'CSE(Data Science)') => {
     return fetchWithAuth(`/reports/department/${dept}`);
   },
 

@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS students (
     phone VARCHAR(20),
     address TEXT,
     native_place VARCHAR(100),
-    department VARCHAR(50) NOT NULL DEFAULT '',
+    department VARCHAR(50) NOT NULL DEFAULT 'CSE(Data Science)',
     batch VARCHAR(20) NOT NULL DEFAULT '',
     section VARCHAR(10) DEFAULT '',
     hostel_day_scholar VARCHAR(20) DEFAULT '',
