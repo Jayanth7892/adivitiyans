@@ -71,26 +71,28 @@ export const CodingAnalyticsPage: React.FC = () => {
       setLoadingLive(true);
       const snapshotMap: Record<string, { total: number; easy: number; medium: number; hard: number; rating: number }> = {};
 
-      for (const s of uniqueStudents) {
-        const lcHandle = (s as any).leetcode_handle;
-        const isValidHandle = lcHandle && !lcHandle.startsWith('@23091') && !lcHandle.startsWith('23091');
+      await Promise.all(
+        uniqueStudents.map(async (s) => {
+          const lcHandle = (s as any).leetcode_handle;
+          const isValidHandle = lcHandle && !lcHandle.startsWith('@23091') && !lcHandle.startsWith('23091');
 
-        if (isValidHandle) {
-          try {
-            const cleanHandle = lcHandle.replace(/^@/, '');
-            const snapshot = await fetchLivePlatformSnapshot('leetcode', cleanHandle);
-            const total = typeof snapshot.kpis[0]?.value === 'number' ? snapshot.kpis[0].value : 0;
-            const easy = snapshot.breakdown?.find((b: any) => b.label === 'Easy')?.solved || 0;
-            const medium = snapshot.breakdown?.find((b: any) => b.label === 'Medium')?.solved || 0;
-            const hard = snapshot.breakdown?.find((b: any) => b.label === 'Hard')?.solved || 0;
-            const rating = (s as any).leetcode_contest || (total > 0 ? Math.max(1400, 1200 + total * 1.5) : 0);
+          if (isValidHandle) {
+            try {
+              const cleanHandle = lcHandle.replace(/^@/, '');
+              const snapshot = await fetchLivePlatformSnapshot('leetcode', cleanHandle);
+              const total = typeof snapshot.kpis[0]?.value === 'number' ? snapshot.kpis[0].value : 0;
+              const easy = snapshot.breakdown?.find((b: any) => b.label === 'Easy')?.solved || 0;
+              const medium = snapshot.breakdown?.find((b: any) => b.label === 'Medium')?.solved || 0;
+              const hard = snapshot.breakdown?.find((b: any) => b.label === 'Hard')?.solved || 0;
+              const rating = (s as any).leetcode_contest || (total > 0 ? Math.max(1400, 1200 + total * 1.5) : 0);
 
-            snapshotMap[s.roll_number] = { total, easy, medium, hard, rating };
-          } catch (e) {
-            console.warn(`Failed live fetch for ${s.roll_number}:`, e);
+              snapshotMap[s.roll_number] = { total, easy, medium, hard, rating };
+            } catch (e) {
+              console.warn(`Failed live fetch for ${s.roll_number}:`, e);
+            }
           }
-        }
-      }
+        })
+      );
 
       if (mounted) {
         setLiveSnapshots(snapshotMap);

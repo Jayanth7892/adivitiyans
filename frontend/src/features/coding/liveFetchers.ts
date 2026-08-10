@@ -7,8 +7,9 @@ import { PlatformId, PlatformStatsSnapshot } from './platformData';
  * Note: Backend proxy is unavailable since Lambda runs in PRIVATE_ISOLATED subnet without NAT.
  */
 export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSnapshot> {
-  const LC_PRIMARY = 'https://alfa-leetcode-api.onrender.com';
-  const LC_SECONDARY = `https://leetcode-stats-api.herokuapp.com/${encodeURIComponent(handle)}`;
+  const cleanHandle = handle.replace(/^@/, '').trim();
+  const VERCEL_API = `https://leetcode-api-faisalshohag.vercel.app/${encodeURIComponent(cleanHandle)}`;
+  const ALFA_API = `https://alfa-leetcode-api.onrender.com/userProfile/${encodeURIComponent(cleanHandle)}`;
 
   let profileData: any = null;
   let calendarObj: Record<string, number> = {};
@@ -16,101 +17,97 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
   let topicAnalysis: { label: string; count: number }[] = [];
   let recentActivities: any[] = [];
 
-  // Try Primary (alfa-leetcode-api)
+  // Primary: Try Vercel fast LeetCode API endpoint
   try {
-    const [profileRes, calendarRes, contestRes, skillRes, recentRes] = await Promise.allSettled([
-      fetch(`${LC_PRIMARY}/userProfile/${encodeURIComponent(handle)}`),
-      fetch(`${LC_PRIMARY}/${encodeURIComponent(handle)}/calendar`),
-      fetch(`${LC_PRIMARY}/userContestRankingInfo/${encodeURIComponent(handle)}`),
-      fetch(`${LC_PRIMARY}/skillStats/${encodeURIComponent(handle)}`),
-      fetch(`${LC_PRIMARY}/recentAc/${encodeURIComponent(handle)}?limit=15`),
-    ]);
+    const res = await fetch(VERCEL_API);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && (data.totalSolved !== undefined || data.matchedUserStats)) {
+        let easy = data.easySolved ?? 0;
+        let medium = data.mediumSolved ?? 0;
+        let hard = data.hardSolved ?? 0;
+        let total = data.totalSolved ?? (easy + medium + hard);
 
-    if (profileRes.status === 'fulfilled' && profileRes.value.ok) {
-      profileData = await profileRes.value.json();
-    }
+        // Extract from matchedUserStats if top-level fields are missing
+        if (!total && data.matchedUserStats?.acSubmissionNum) {
+          const stats = data.matchedUserStats.acSubmissionNum;
+          easy = stats.find((s: any) => s.difficulty === 'Easy')?.count || 0;
+          medium = stats.find((s: any) => s.difficulty === 'Medium')?.count || 0;
+          hard = stats.find((s: any) => s.difficulty === 'Hard')?.count || 0;
+          total = stats.find((s: any) => s.difficulty === 'All')?.count || (easy + medium + hard);
+        }
 
-    if (calendarRes.status === 'fulfilled' && calendarRes.value.ok) {
-      const calJson = await calendarRes.value.json();
-      const rawCal = calJson?.submissionCalendar
-        ? typeof calJson.submissionCalendar === 'string'
-          ? JSON.parse(calJson.submissionCalendar)
-          : calJson.submissionCalendar
-        : {};
+        profileData = {
+          totalSolved: total,
+          easySolved: easy,
+          mediumSolved: medium,
+          hardSolved: hard,
+          ranking: data.ranking ?? 0,
+          acceptanceRate: data.acceptanceRate ?? 0,
+          totalEasy: data.totalEasy || 857,
+          totalMedium: data.totalMedium || 1756,
+          totalHard: data.totalHard || 799,
+        };
 
-      Object.entries(rawCal).forEach(([epochStr, count]) => {
-        const dateStr = new Date(Number(epochStr) * 1000).toISOString().slice(0, 10);
-        calendarObj[dateStr] = (calendarObj[dateStr] || 0) + Number(count);
-      });
-    }
+        if (data.submissionCalendar) {
+          const rawCal = typeof data.submissionCalendar === 'string'
+            ? JSON.parse(data.submissionCalendar)
+            : data.submissionCalendar;
+          Object.entries(rawCal).forEach(([epochStr, count]) => {
+            const dateStr = new Date(Number(epochStr) * 1000).toISOString().slice(0, 10);
+            calendarObj[dateStr] = (calendarObj[dateStr] || 0) + Number(count);
+          });
+        }
 
-    if (contestRes.status === 'fulfilled' && contestRes.value.ok) {
-      const contestJson = await contestRes.value.json();
-      contestData = contestJson?.userContestRanking || {};
-    }
-
-    if (skillRes.status === 'fulfilled' && skillRes.value.ok) {
-      const skillJson = await skillRes.value.json();
-      const advanced = skillJson?.data?.matchedUser?.tagProblemCounts?.advanced || [];
-      const intermediate = skillJson?.data?.matchedUser?.tagProblemCounts?.intermediate || [];
-      const fundamental = skillJson?.data?.matchedUser?.tagProblemCounts?.fundamental || [];
-
-      const allTags = [...fundamental, ...intermediate, ...advanced];
-      topicAnalysis = allTags
-        .map((t: any) => ({ label: t.tagName, count: t.problemsSolved }))
-        .sort((a, b) => b.count - a.count);
-    }
-
-    if (recentRes.status === 'fulfilled' && recentRes.value.ok) {
-      const recentJson = await recentRes.value.json();
-      const recentList = recentJson?.recentAcSubmissionList || (Array.isArray(recentJson) ? recentJson : []);
-      recentActivities = recentList.map((sub: any) => ({
-        date: new Date(Number(sub.timestamp) * 1000).toISOString().slice(0, 10),
-        title: sub.title,
-        status: 'Accepted',
-        type: 'submission',
-      }));
-    }
-  } catch (e) {
-    console.warn('Alfa LeetCode API fallback triggered:', e);
-  }
-
-  // If primary endpoint didn't return profile, try Secondary fallback
-  if (!profileData || profileData.error || profileData.detail) {
-    try {
-      const secRes = await fetch(LC_SECONDARY);
-      if (secRes.ok) {
-        const secJson = await secRes.json();
-        if (secJson.status === 'success') {
-          profileData = {
-            totalSolved: secJson.totalSolved,
-            easySolved: secJson.easySolved,
-            mediumSolved: secJson.mediumSolved,
-            hardSolved: secJson.hardSolved,
-            ranking: secJson.ranking,
-            acceptanceRate: secJson.acceptanceRate,
-            totalEasy: secJson.totalEasy || 857,
-            totalMedium: secJson.totalMedium || 1756,
-            totalHard: secJson.totalHard || 799,
-          };
-          if (secJson.submissionCalendar) {
-            Object.entries(secJson.submissionCalendar).forEach(([epochStr, count]) => {
-              const dateStr = new Date(Number(epochStr) * 1000).toISOString().slice(0, 10);
-              calendarObj[dateStr] = (calendarObj[dateStr] || 0) + Number(count);
-            });
-          }
+        if (Array.isArray(data.recentSubmissions)) {
+          recentActivities = data.recentSubmissions.slice(0, 15).map((sub: any) => ({
+            date: sub.timestamp ? new Date(Number(sub.timestamp) * 1000).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+            title: sub.title,
+            status: sub.statusDisplay || 'Accepted',
+            type: 'submission',
+          }));
         }
       }
+    }
+  } catch (e) {
+    console.warn('Primary Vercel LeetCode API fallback triggered:', e);
+  }
+
+  // Secondary Fallback: Alfa LeetCode API if primary failed
+  if (!profileData || (!profileData.totalSolved && !profileData.easySolved)) {
+    try {
+      const [profileRes, contestRes] = await Promise.allSettled([
+        fetch(ALFA_API),
+        fetch(`https://alfa-leetcode-api.onrender.com/userContestRankingInfo/${encodeURIComponent(cleanHandle)}`),
+      ]);
+
+      if (profileRes.status === 'fulfilled' && profileRes.value.ok) {
+        const data = await profileRes.value.json();
+        profileData = {
+          totalSolved: data.totalSolved ?? data.totalQuestions ?? 0,
+          easySolved: data.easySolved ?? 0,
+          mediumSolved: data.mediumSolved ?? 0,
+          hardSolved: data.hardSolved ?? 0,
+          ranking: data.ranking ?? 0,
+          totalEasy: 857,
+          totalMedium: 1756,
+          totalHard: 799,
+        };
+      }
+
+      if (contestRes.status === 'fulfilled' && contestRes.value.ok) {
+        const contestJson = await contestRes.value.json();
+        contestData = contestJson?.userContestRanking || {};
+      }
     } catch (e) {
-      console.warn('Secondary LeetCode API fallback failed:', e);
+      console.warn('Alfa LeetCode API fallback failed:', e);
     }
   }
 
-  // Default structure if profileData is still empty
   const easySolved = profileData?.easySolved ?? 0;
   const mediumSolved = profileData?.mediumSolved ?? 0;
   const hardSolved = profileData?.hardSolved ?? 0;
-  const totalSolved = profileData?.totalSolved ?? (profileData ? easySolved + mediumSolved + hardSolved : 0);
+  const totalSolved = profileData?.totalSolved ?? (easySolved + mediumSolved + hardSolved);
 
   return {
     platform: 'leetcode',
