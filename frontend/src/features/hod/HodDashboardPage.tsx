@@ -42,7 +42,7 @@ const STANDINGS = ['Distinction', 'First Class', 'Second Class'] as const;
 const CODING_LEVELS = ['All Coders', 'Top Coders (>300 LC)', 'Active GitHub (>20 repos)'] as const;
 
 // HOD Department context
-const DEPARTMENT_NAME = 'Computer Science & Engineering (CSE)';
+const DEPARTMENT_NAME = 'CSE (Data Science)';
 
 // Enhanced Student Directory dataset for fallback when API data is empty
 const FULL_CSE_STUDENTS = [
@@ -303,7 +303,7 @@ export const HodDashboardPage: React.FC = () => {
       p.rank,
       `"${p.name}"`,
       p.regNo,
-      'CSE',
+      'CSE (Data Science)',
       p.year,
       p.section,
       p.cgpa,
@@ -335,7 +335,7 @@ export const HodDashboardPage: React.FC = () => {
               <GraduationCap className="w-3.5 h-3.5" />
               <span>{DEPARTMENT_NAME}</span>
             </div>
-            <h1 className="text-xl font-bold text-textPrimary tracking-tight">HOD Department Executive Dashboard</h1>
+            <h1 className="text-xl font-bold text-textPrimary tracking-tight">HOD CSE (Data Science) Executive Dashboard</h1>
             <p className="text-xs text-textSecondary">Real-time academic performance, student growth analytics, and directory</p>
           </div>
         </div>

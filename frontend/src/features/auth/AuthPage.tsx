@@ -751,7 +751,7 @@ export const AuthPage: React.FC = () => {
                   {...registerFacultySignUp('department')}
                   className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
                 >
-                  <option value="Data Science">Data Science</option>
+                  <option value="CSE (Data Science)">CSE (Data Science)</option>
                   <option value="CSE">Computer Science & Engineering (CSE)</option>
                   <option value="ECE">Electronics & Communication (ECE)</option>
                   <option value="EEE">Electrical & Electronics (EEE)</option>

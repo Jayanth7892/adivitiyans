@@ -34,12 +34,12 @@ import { SoftSkillsTab } from '../profile/tabs/SoftSkillsTab';
 import { AchievementsTab } from '../profile/tabs/AchievementsTab';
 import { PlacementPreferencesTab } from '../profile/tabs/PlacementPreferencesTab';
 
-const DEPARTMENTS = ['CSE', 'IT', 'ECE', 'EEE', 'Mechanical', 'Civil', 'Data Science', 'AI & ML', 'Cyber Security', 'MBA', 'MCA'];
+const DEPARTMENTS = ['CSE (Data Science)', 'CSE', 'Data Science', 'IT', 'ECE', 'EEE', 'Mechanical', 'Civil', 'AI & ML', 'Cyber Security', 'MBA', 'MCA'];
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'] as const;
 
 // Initial Faculty data store (admin-managed)
 const INITIAL_FACULTY = [
-  { id: 'FAC001', name: 'Dr. K. V. Subbaiah', email: 'kvsubbaiah@rgmcet.edu.in', department: 'CSE', designation: 'Coordinator', menteesCount: 3 },
+  { id: 'FAC001', name: 'Dr. K. V. Subbaiah', email: 'kvsubbaiah@rgmcet.edu.in', department: 'CSE (Data Science)', designation: 'Coordinator', menteesCount: 3 },
   { id: 'FAC002', name: 'Prof. M. Ramesh', email: 'mramesh@rgmcet.edu.in', department: 'ECE', designation: 'Mentor', menteesCount: 2 },
 ];
 
@@ -63,7 +63,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [formRegNo, setFormRegNo] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formYear, setFormYear] = useState<typeof YEARS[number]>('3rd Year');
-  const [formDept, setFormDept] = useState('CSE');
+  const [formDept, setFormDept] = useState('CSE (Data Science)');
   const [formBatch, setFormBatch] = useState('2023-2027');
   const [formSection, setFormSection] = useState('A');
   const [formPhone, setFormPhone] = useState('9876543210');
@@ -75,7 +75,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [showAddFacultyModal, setShowAddFacultyModal] = useState(false);
   const [facFormName, setFacFormName] = useState('');
   const [facFormEmail, setFacFormEmail] = useState('');
-  const [facFormDept, setFacFormDept] = useState('CSE');
+  const [facFormDept, setFacFormDept] = useState('CSE (Data Science)');
   const [facFormDesignation, setFacFormDesignation] = useState('Mentor');
 
   // Queries
