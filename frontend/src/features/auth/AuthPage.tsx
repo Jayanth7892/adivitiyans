@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, UserCheck, Lock, CheckCircle2, XCircle, Loader2, Sparkles } from 'lucide-react';
+import { ShieldCheck, UserCheck, Lock, CheckCircle2, XCircle, Loader2, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { studentSignUpSchema, facultySignUpSchema, loginSchema, StudentSignUpInput, FacultySignUpInput, LoginInput } from '../../lib/validation/auth';
 import { api } from '../../lib/api';
 import { cognitoSignUp, cognitoSignIn } from '../../lib/cognitoAuth';
@@ -15,6 +15,9 @@ export const AuthPage: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [regNoStatus, setRegNoStatus] = useState<{ loading: boolean; available?: boolean; message?: string }>({ loading: false });
   const [emailStatus, setEmailStatus] = useState<{ loading: boolean; available?: boolean; message?: string }>({ loading: false });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -530,24 +533,44 @@ export const AuthPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-textPrimary mb-1">Password *</label>
-                    <input
-                      {...registerSignUp('password')}
-                      type="password"
-                      placeholder="Min 8 chars, 1 letter, 1 num"
-                      className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                    />
+                    <div className="relative">
+                      <input
+                        {...registerSignUp('password')}
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Min 8 chars, 1 letter, 1 num"
+                        className="w-full px-3.5 py-2 pr-10 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary p-1 rounded-md transition-colors"
+                        title={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4 text-brand-primary" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                     {signUpErrors.password && (
                       <p className="text-xs text-alert mt-1">{signUpErrors.password.message}</p>
                     )}
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-textPrimary mb-1">Confirm Password *</label>
-                    <input
-                      {...registerSignUp('confirmPassword')}
-                      type="password"
-                      placeholder="Re-enter password"
-                      className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                    />
+                    <div className="relative">
+                      <input
+                        {...registerSignUp('confirmPassword')}
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        placeholder="Re-enter password"
+                        className="w-full px-3.5 py-2 pr-10 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary p-1 rounded-md transition-colors"
+                        title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4 text-brand-primary" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                     {signUpErrors.confirmPassword && (
                       <p className="text-xs text-alert mt-1">{signUpErrors.confirmPassword.message}</p>
                     )}
@@ -594,12 +617,22 @@ export const AuthPage: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-semibold text-textPrimary mb-1">Password *</label>
-                  <input
-                    {...registerLogin('password')}
-                    type="password"
-                    placeholder="Enter password"
-                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                  />
+                  <div className="relative">
+                    <input
+                      {...registerLogin('password')}
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter password"
+                      className="w-full px-3.5 py-2 pr-10 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary p-1 rounded-md transition-colors"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4 text-brand-primary" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                   {loginErrors.password && (
                     <p className="text-xs text-alert mt-1">{loginErrors.password.message}</p>
                   )}
@@ -683,24 +716,44 @@ export const AuthPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-textPrimary mb-1">Password *</label>
-                  <input
-                    {...registerFacultySignUp('password')}
-                    type="password"
-                    placeholder="Min 8 chars"
-                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                  />
+                  <div className="relative">
+                    <input
+                      {...registerFacultySignUp('password')}
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Min 8 chars"
+                      className="w-full px-3.5 py-2 pr-10 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary p-1 rounded-md transition-colors"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4 text-brand-primary" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                   {facultySignUpErrors.password && (
                     <p className="text-xs text-alert mt-1">{facultySignUpErrors.password.message}</p>
                   )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-textPrimary mb-1">Confirm Password *</label>
-                  <input
-                    {...registerFacultySignUp('confirmPassword')}
-                    type="password"
-                    placeholder="Re-enter password"
-                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                  />
+                  <div className="relative">
+                    <input
+                      {...registerFacultySignUp('confirmPassword')}
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="Re-enter password"
+                      className="w-full px-3.5 py-2 pr-10 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary p-1 rounded-md transition-colors"
+                      title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4 text-brand-primary" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                   {facultySignUpErrors.confirmPassword && (
                     <p className="text-xs text-alert mt-1">{facultySignUpErrors.confirmPassword.message}</p>
                   )}
@@ -769,12 +822,22 @@ export const AuthPage: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-semibold text-textPrimary mb-1">Password</label>
-                  <input
-                    {...registerLogin('password')}
-                    type="password"
-                    placeholder="Enter password"
-                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                  />
+                  <div className="relative">
+                    <input
+                      {...registerLogin('password')}
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter password"
+                      className="w-full px-3.5 py-2 pr-10 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary p-1 rounded-md transition-colors"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4 text-brand-primary" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                   {loginErrors.password && (
                     <p className="text-xs text-alert mt-1">{loginErrors.password.message}</p>
                   )}
