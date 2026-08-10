@@ -283,11 +283,14 @@ app.get('/students', async (req: Request, res: Response) => {
   }
 });
 
-// POST /students — Create Student
 app.post('/students', async (req: Request, res: Response) => {
   try {
     const validatedData = studentProfileSchema.parse(req.body);
-    const regNo = validatedData.roll_number.toUpperCase();
+    const rawRoll = (validatedData.roll_number || req.body.roll_number || '').toString();
+    if (!rawRoll) {
+      return res.status(400).json({ error: 'roll_number is required' });
+    }
+    const regNo = rawRoll.toUpperCase();
 
     if (db.isMock) {
       if (db.mockStore.students.has(regNo)) {
@@ -370,7 +373,16 @@ app.get('/students/:id', async (req: Request, res: Response) => {
       return res.json(student);
     }
 
-    const result = await db.query('SELECT * FROM students WHERE UPPER(roll_number) = $1', [studentId]);
+    await db.query('ALTER TABLE students ADD COLUMN IF NOT EXISTS cgpa NUMERIC(4,2) DEFAULT 0.00;').catch(() => {});
+
+    const result = await db.query(
+      `SELECT s.*, COALESCE(ROUND(AVG(a.semester_gpa), 2), s.cgpa, 0.00) AS cgpa
+       FROM students s
+       LEFT JOIN academics a ON a.student_id = s.roll_number
+       WHERE UPPER(s.roll_number) = $1
+       GROUP BY s.roll_number, s.name, s.email, s.year, s.phone, s.address, s.native_place, s.department, s.batch, s.section, s.hostel_day_scholar, s.driving_license, s.passport, s.relocation_willingness, s.family_business, s.financial_background, s.faculty_mentor_id, s.photo_url, s.resume_url, s.linkedin_url, s.linkedin_updated, s.created_at, s.updated_at, s.cgpa`,
+      [studentId]
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Student not found' });
     }
@@ -380,43 +392,85 @@ app.get('/students/:id', async (req: Request, res: Response) => {
   }
 });
 
-// PUT /students/:id — Update Student Profile
+// PUT /students/:id — Update Student Profile (Supports Partial Updates)
 app.put('/students/:id', async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
-    const validatedData = studentProfileSchema.parse(req.body);
+    const body = req.body || {};
 
     if (db.isMock) {
-      const existing = db.mockStore.students.get(studentId);
-      if (!existing) return res.status(404).json({ error: 'Student not found' });
-      const updated = { ...existing, ...validatedData, roll_number: studentId, updated_at: new Date().toISOString() };
+      const existing = db.mockStore.students.get(studentId) || { roll_number: studentId };
+      const updated = {
+        ...existing,
+        ...body,
+        year: body.year && body.year !== '' ? body.year : (existing.year || '3rd Year'),
+        hostel_day_scholar: body.hostel_day_scholar && body.hostel_day_scholar !== '' ? body.hostel_day_scholar : (existing.hostel_day_scholar || 'Day Scholar'),
+        cgpa: body.cgpa !== undefined && body.cgpa !== null && body.cgpa !== '' ? Number(body.cgpa) : (existing.cgpa || 0),
+        updated_at: new Date().toISOString(),
+      };
       db.mockStore.students.set(studentId, updated);
       return res.json({ message: 'Profile updated successfully', student: updated });
     }
 
-    const result = await db.query(
-      `UPDATE students SET name=$1, email=$2, year=$3, phone=$4, address=$5, native_place=$6,
-       department=$7, batch=$8, section=$9, hostel_day_scholar=$10, driving_license=$11,
-       passport=$12, relocation_willingness=$13, family_business=$14, financial_background=$15,
-       faculty_mentor_id=$16, photo_url=$17, resume_url=$18, linkedin_url=$19, updated_at=CURRENT_TIMESTAMP
-       WHERE roll_number = $20 RETURNING *`,
-      [
-        validatedData.name, validatedData.email, validatedData.year,
-        validatedData.phone || null, validatedData.address || null, validatedData.native_place || null,
-        validatedData.department, validatedData.batch, validatedData.section,
-        validatedData.hostel_day_scholar, validatedData.driving_license, validatedData.passport,
-        validatedData.relocation_willingness, validatedData.family_business || null,
-        validatedData.financial_background || null, validatedData.faculty_mentor_id || null,
-        validatedData.photo_url || null, validatedData.resume_url || null, validatedData.linkedin_url || null,
-        studentId,
-      ]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Student not found' });
+    await db.query('ALTER TABLE students ADD COLUMN IF NOT EXISTS cgpa NUMERIC(4,2) DEFAULT 0.00;').catch(() => {});
+
+    // Fetch existing student record to merge partial updates
+    const existingRes = await db.query('SELECT * FROM students WHERE UPPER(roll_number) = $1', [studentId]);
+    const existing = existingRes.rows[0] || {};
+
+    const name = body.name || existing.name || 'Student';
+    const email = body.email || existing.email || `${studentId.toLowerCase()}@rgmcet.edu.in`;
+    const year = body.year && body.year !== '' ? body.year : (existing.year || '3rd Year');
+    const phone = body.phone !== undefined ? body.phone : (existing.phone || null);
+    const address = body.address !== undefined ? body.address : (existing.address || null);
+    const native_place = body.native_place !== undefined ? body.native_place : (existing.native_place || null);
+    const department = body.department && body.department !== '' ? body.department : (existing.department || 'CSE');
+    const batch = body.batch && body.batch !== '' ? body.batch : (existing.batch || '2023-2027');
+    const section = body.section && body.section !== '' ? body.section : (existing.section || 'A');
+    const hostel_day_scholar = body.hostel_day_scholar && body.hostel_day_scholar !== '' ? body.hostel_day_scholar : (existing.hostel_day_scholar || 'Day Scholar');
+    const driving_license = body.driving_license !== undefined ? Boolean(body.driving_license) : Boolean(existing.driving_license);
+    const passport = body.passport !== undefined ? Boolean(body.passport) : Boolean(existing.passport);
+    const relocation_willingness = body.relocation_willingness !== undefined ? Boolean(body.relocation_willingness) : Boolean(existing.relocation_willingness);
+    const family_business = body.family_business !== undefined ? body.family_business : (existing.family_business || null);
+    const financial_background = body.financial_background !== undefined ? body.financial_background : (existing.financial_background || null);
+    const faculty_mentor_id = body.faculty_mentor_id !== undefined ? body.faculty_mentor_id : (existing.faculty_mentor_id || null);
+    const photo_url = body.photo_url !== undefined ? body.photo_url : (existing.photo_url || null);
+    const resume_url = body.resume_url !== undefined ? body.resume_url : (existing.resume_url || null);
+    const linkedin_url = body.linkedin_url !== undefined ? body.linkedin_url : (existing.linkedin_url || null);
+    const cgpa = body.cgpa !== undefined && body.cgpa !== null && body.cgpa !== '' ? Number(body.cgpa) : (existing.cgpa || 0);
+
+    let result;
+    if (existingRes.rows.length === 0) {
+      result = await db.query(
+        `INSERT INTO students (roll_number, name, email, year, phone, address, native_place, department, batch, section, hostel_day_scholar, driving_license, passport, relocation_willingness, family_business, financial_background, faculty_mentor_id, photo_url, resume_url, linkedin_url, cgpa)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+         RETURNING *`,
+        [studentId, name, email, year, phone, address, native_place, department, batch, section, hostel_day_scholar, driving_license, passport, relocation_willingness, family_business, financial_background, faculty_mentor_id, photo_url, resume_url, linkedin_url, cgpa]
+      );
+    } else {
+      result = await db.query(
+        `UPDATE students SET name=$1, email=$2, year=$3, phone=$4, address=$5, native_place=$6,
+         department=$7, batch=$8, section=$9, hostel_day_scholar=$10, driving_license=$11,
+         passport=$12, relocation_willingness=$13, family_business=$14, financial_background=$15,
+         faculty_mentor_id=$16, photo_url=$17, resume_url=$18, linkedin_url=$19, cgpa=$20, updated_at=CURRENT_TIMESTAMP
+         WHERE UPPER(roll_number) = $21 RETURNING *`,
+        [name, email, year, phone, address, native_place, department, batch, section, hostel_day_scholar, driving_license, passport, relocation_willingness, family_business, financial_background, faculty_mentor_id, photo_url, resume_url, linkedin_url, cgpa, studentId]
+      );
     }
+
+    // Also update academics table if cgpa is updated
+    if (body.cgpa !== undefined && body.cgpa !== null && body.cgpa !== '' && Number(body.cgpa) > 0) {
+      await db.query(
+        `INSERT INTO academics (student_id, semester, semester_gpa, attendance_pct)
+         VALUES ($1, 1, $2, 95.0)
+         ON CONFLICT (student_id, semester) DO UPDATE SET semester_gpa = EXCLUDED.semester_gpa`,
+        [studentId, Number(body.cgpa)]
+      ).catch(() => {});
+    }
+
     res.json({ message: 'Profile updated successfully', student: result.rows[0] });
   } catch (err: any) {
-    res.status(400).json({ error: err.message || err });
+    res.status(500).json({ error: err.message || err });
   }
 });
 

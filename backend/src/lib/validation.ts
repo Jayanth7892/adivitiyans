@@ -51,27 +51,31 @@ export const facultySignUpSchema = z.object({
   path: ["confirmPassword"],
 });
 
+const yearEnum = z.enum(['1st Year', '2nd Year', '3rd Year', '4th Year']);
+const hostelEnum = z.enum(['Hostel', 'Day Scholar']);
+
 export const studentProfileSchema = z.object({
-  name: z.string().min(2).max(100),
-  roll_number: registrationNumberSchema,
-  email: emailSchema,
-  year: z.enum(['1st Year', '2nd Year', '3rd Year', '4th Year']),
+  name: z.string().optional().nullable(),
+  roll_number: z.string().optional().nullable(),
+  email: z.string().optional().nullable(),
+  year: z.union([yearEnum, z.literal(''), z.null()]).optional().transform((v) => (v === '' ? undefined : v)),
   phone: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
   native_place: z.string().optional().nullable(),
-  department: z.string().optional().default(''),
-  batch: z.string().optional().default(''),
-  section: z.string().optional().default(''),
-  hostel_day_scholar: z.enum(['Hostel', 'Day Scholar']).optional().nullable(),
-  driving_license: z.boolean().optional().default(false),
-  passport: z.boolean().optional().default(false),
-  relocation_willingness: z.boolean().optional().default(false),
+  department: z.string().optional().nullable(),
+  batch: z.string().optional().nullable(),
+  section: z.string().optional().nullable(),
+  hostel_day_scholar: z.union([hostelEnum, z.literal(''), z.null()]).optional().transform((v) => (v === '' ? undefined : v)),
+  driving_license: z.boolean().optional(),
+  passport: z.boolean().optional(),
+  relocation_willingness: z.boolean().optional(),
   family_business: z.string().optional().nullable(),
   financial_background: z.string().optional().nullable(),
   faculty_mentor_id: z.string().optional().nullable(),
-  photo_url: z.string().url().optional().nullable(),
-  resume_url: z.string().url().optional().nullable(),
-  linkedin_url: z.string().url().optional().nullable(),
+  photo_url: z.string().optional().nullable(),
+  resume_url: z.string().optional().nullable(),
+  linkedin_url: z.string().optional().nullable(),
+  cgpa: z.union([z.number(), z.string().transform((v) => parseFloat(v) || 0)]).optional().nullable(),
 });
 
 export const academicSchema = z.object({

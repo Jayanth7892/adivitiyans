@@ -45,34 +45,49 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
   const activeName = student?.name || user?.name || 'Student';
   const activeEmail = student?.email || user?.email || 'student@rgmcet.edu.in';
 
-  const { register, handleSubmit } = useForm<StudentProfile & { cgpa?: number }>({
-    defaultValues: {
+  const { register, handleSubmit, reset } = useForm<StudentProfile & { cgpa?: number }>();
+
+  React.useEffect(() => {
+    reset({
       ...student,
-      name: activeName,
-      roll_number: activeRoll,
-      email: activeEmail,
-      year: (student?.year as any) || '',
+      name: student?.name || activeName,
+      roll_number: student?.roll_number || activeRoll,
+      email: student?.email || activeEmail,
+      year: (student?.year as any) || '3rd Year',
       phone: student?.phone || '',
       address: student?.address || '',
       native_place: student?.native_place || '',
-      department: student?.department || '',
-      batch: student?.batch || '',
-      section: student?.section || '',
-      hostel_day_scholar: (student?.hostel_day_scholar as any) || '',
-      driving_license: student?.driving_license ?? false,
-      passport: student?.passport ?? false,
-      relocation_willingness: student?.relocation_willingness ?? false,
+      department: student?.department || 'CSE',
+      batch: student?.batch || '2023-2027',
+      section: student?.section || 'A',
+      hostel_day_scholar: (student?.hostel_day_scholar as any) || 'Day Scholar',
+      driving_license: Boolean(student?.driving_license),
+      passport: Boolean(student?.passport),
+      relocation_willingness: Boolean(student?.relocation_willingness),
       family_business: student?.family_business || '',
       financial_background: student?.financial_background || '',
       linkedin_url: student?.linkedin_url || '',
-      cgpa: (student as any)?.cgpa || 0.0,
-    },
-  });
+      cgpa: (student as any)?.cgpa ? Number((student as any).cgpa) : 0,
+    });
+  }, [student, activeName, activeRoll, activeEmail, reset]);
 
   const onSubmit = async (data: any) => {
     setSaving(true);
     try {
-      await api.updateStudentProfile(data.roll_number || activeRoll, data);
+      const payload: any = {
+        ...student,
+        ...data,
+        name: data.name || student?.name || activeName,
+        roll_number: data.roll_number || student?.roll_number || activeRoll,
+        email: data.email || student?.email || activeEmail,
+        year: data.year && data.year !== '' ? data.year : (student?.year || '3rd Year'),
+        department: data.department && data.department !== '' ? data.department : (student?.department || 'CSE'),
+        batch: data.batch && data.batch !== '' ? data.batch : (student?.batch || '2023-2027'),
+        section: data.section && data.section !== '' ? data.section : (student?.section || 'A'),
+        hostel_day_scholar: data.hostel_day_scholar && data.hostel_day_scholar !== '' ? data.hostel_day_scholar : (student?.hostel_day_scholar || 'Day Scholar'),
+        cgpa: data.cgpa !== undefined && data.cgpa !== null && data.cgpa !== '' ? Number(data.cgpa) : (student as any)?.cgpa || 0,
+      };
+      await api.updateStudentProfile(data.roll_number || activeRoll, payload);
       setIsEditing(false);
       onRefresh();
     } catch (e: any) {
