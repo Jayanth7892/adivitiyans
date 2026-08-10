@@ -155,11 +155,11 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
       earnedAt: b.creationDate ? new Date(b.creationDate).toISOString().slice(0, 10) : undefined,
     })),
     topicAnalysis: topicAnalysis.length > 0 ? topicAnalysis : [
-      { label: 'Arrays', count: Math.max(1, Math.round(easySolved * 0.4)) },
-      { label: 'Strings', count: Math.max(1, Math.round(easySolved * 0.3)) },
-      { label: 'Dynamic Programming', count: Math.max(1, Math.round(mediumSolved * 0.4)) },
-      { label: 'Trees & Graphs', count: Math.max(1, Math.round(mediumSolved * 0.3)) },
-      { label: 'Math', count: Math.max(1, Math.round(easySolved * 0.2)) },
+      { label: 'Arrays (Est.)', count: Math.max(1, Math.round(easySolved * 0.4)) },
+      { label: 'Strings (Est.)', count: Math.max(1, Math.round(easySolved * 0.3)) },
+      { label: 'DP (Est.)', count: Math.max(1, Math.round(mediumSolved * 0.4)) },
+      { label: 'Trees & Graphs (Est.)', count: Math.max(1, Math.round(mediumSolved * 0.3)) },
+      { label: 'Math (Est.)', count: Math.max(1, Math.round(easySolved * 0.2)) },
     ],
     activity: recentActivities,
     heatmap: calendarObj,
@@ -373,7 +373,16 @@ export async function fetchLiveGeeksforGeeks(handle: string): Promise<PlatformSt
     if (res.status === 404) {
       throw new Error(`GeeksforGeeks user "${cleanHandle}" not found.`);
     }
-    if (res.ok) {
+    // GFG returns 400 (not 404) for missing users — read body to check
+    if (res.status === 400) {
+      const errData = await res.json().catch(() => ({}));
+      const msg = errData?.error || '';
+      // Only throw "not found" if the API explicitly says so
+      if (msg.toLowerCase().includes('does not exist')) {
+        throw new Error(`GeeksforGeeks user "${cleanHandle}" not found.`);
+      }
+      // Otherwise (e.g. 0 problems solved) fall through and show 0 data
+    } else if (res.ok) {
       const data = await res.json();
       if (data?.error) {
         throw new Error(`GeeksforGeeks user "${cleanHandle}" not found.`);
@@ -465,13 +474,15 @@ export async function fetchLiveGeeksforGeeks(handle: string): Promise<PlatformSt
 export async function fetchLiveCodeChef(handle: string): Promise<PlatformStatsSnapshot> {
   const cleanHandle = handle.replace(/^@/, '').trim();
 
-  const CC_URL = `https://www.codechef.com/users/${encodeURIComponent(cleanHandle)}`;
+  // CodeChef.com has no CORS headers — browsers cannot fetch it directly.
+  // Route through corsproxy.io which adds the required CORS headers.
+  // Note: User-Agent is a forbidden browser header and cannot be set manually.
+  const CC_DIRECT = `https://www.codechef.com/users/${encodeURIComponent(cleanHandle)}`;
+  const CC_URL = `https://corsproxy.io/?${encodeURIComponent(CC_DIRECT)}`;
 
   let html = '';
   try {
-    const res = await fetch(CC_URL, {
-      headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'text/html' },
-    });
+    const res = await fetch(CC_URL);
     if (res.status === 404) {
       throw new Error(`CodeChef user "${cleanHandle}" not found.`);
     }
@@ -512,8 +523,9 @@ export async function fetchLiveCodeChef(handle: string): Promise<PlatformStatsSn
   const currentRating = ratingHistory.length > 0
     ? ratingHistory[ratingHistory.length - 1].rating
     : 0;
+  // Use reduce instead of Math.max(...array) to avoid stack overflow on large arrays
   const highestRating = ratingHistory.length > 0
-    ? Math.max(...ratingHistory.map((r) => r.rating))
+    ? ratingHistory.reduce((max, r) => (r.rating > max ? r.rating : max), 0)
     : 0;
 
   // Stars follow CodeChef's official rating tier thresholds
@@ -580,9 +592,9 @@ export async function fetchLiveHackerRank(handle: string): Promise<PlatformStats
     ]);
 
     if (profileRes.status === 'fulfilled') {
-      if (profileRes.value.status === 404) {
-        throw new Error(`HackerRank user "${cleanHandle}" not found.`);
-      }
+      // Do NOT throw on 404 — HackerRank's CORS block also returns 404,
+      // so we cannot distinguish "user not found" from "CORS blocked".
+      // Gracefully degrade to 0 data instead.
       if (profileRes.value.ok) {
         const data = await profileRes.value.json();
         profileData = data?.model || null;

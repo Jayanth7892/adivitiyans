@@ -35,18 +35,20 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
 
   const weeks: Array<Array<{ dateStr: string; count: number; date: Date }>> = [];
   let curr = new Date(adjustedStart);
+  const MAX_WEEKS = 54;
 
-  while (curr <= endDate || weeks.length < 52) {
+  while (weeks.length < MAX_WEEKS) {
     const week: Array<{ dateStr: string; count: number; date: Date }> = [];
     for (let d = 0; d < 7; d++) {
       const dateStr = curr.toISOString().slice(0, 10);
       const isTargetYear = curr.getFullYear() === selectedYear;
-      const count = isTargetYear ? heatmapData[dateStr] || 0 : 0;
+      const count = isTargetYear ? (heatmapData[dateStr] || 0) : 0;
       week.push({ dateStr, count, date: new Date(curr) });
       curr.setDate(curr.getDate() + 1);
     }
     weeks.push(week);
-    if (weeks.length >= 53) break;
+    // Stop once we've passed the end of the year and have at least 52 weeks
+    if (curr > endDate && weeks.length >= 52) break;
   }
 
   const maxCount = Math.max(1, ...Object.values(heatmapData));
