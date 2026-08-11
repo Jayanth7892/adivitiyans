@@ -180,6 +180,12 @@ export const api = {
     });
   },
 
+  deleteCertification: async (id: string, certId: string): Promise<Certification[]> => {
+    return fetchWithAuth(`/students/${id}/certifications/${certId}`, {
+      method: 'DELETE',
+    });
+  },
+
   getSoftSkills: async (id: string = '23091A3251'): Promise<SoftSkill[]> => {
     return fetchWithAuth(`/students/${id}/soft-skills`);
   },

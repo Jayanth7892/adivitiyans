@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Award, UploadCloud, CheckCircle2, Sparkles, ExternalLink, Edit2 } from 'lucide-react';
+import { Plus, Award, CheckCircle2, Sparkles, ExternalLink, Edit2, Trash2 } from 'lucide-react';
 import { Certification } from '../../../types';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
@@ -132,6 +132,17 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
     }
   };
 
+  const handleDeleteCert = async (cert: Certification) => {
+    if (readOnly || !cert.id) return;
+    if (!window.confirm(`Delete "${cert.title}"? This cannot be undone.`)) return;
+    try {
+      await api.deleteCertification(activeRollNo, cert.id);
+      onRefresh();
+    } catch (e: any) {
+      alert('Failed to delete certification: ' + e.message);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -163,13 +174,22 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
                   <span className="text-xs text-textSecondary">{formatDate(cert.date_completed)}</span>
                 </div>
                 {!readOnly && (
-                  <button
-                    onClick={() => openEditModal(cert)}
-                    className="p-1.5 rounded-lg text-textSecondary hover:text-brand-primary hover:bg-brand-soft/50 transition-all"
-                    title="Edit certification"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openEditModal(cert)}
+                      className="p-1.5 rounded-lg text-textSecondary hover:text-brand-primary hover:bg-brand-soft/50 transition-all"
+                      title="Edit certification"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCert(cert)}
+                      className="p-1.5 rounded-lg text-textSecondary hover:text-red-500 hover:bg-red-50 transition-all"
+                      title="Delete certification"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 )}
               </div>
               <h4 className="text-sm font-bold text-textPrimary mt-1.5">{cert.title}</h4>

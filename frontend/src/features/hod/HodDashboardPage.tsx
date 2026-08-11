@@ -164,6 +164,10 @@ export const HodDashboardPage: React.FC = () => {
   const [inspectStudent, setInspectStudent] = useState<HodStudentEntry | null>(null);
   const [inspectTab, setInspectTab] = useState('academics-graph');
 
+  // Full student profile fetched from API when HOD opens a student's personal-info tab
+  const [inspectStudentFullProfile, setInspectStudentFullProfile] = useState<any>(null);
+  const [inspectProfileLoading, setInspectProfileLoading] = useState(false);
+
   const location = useLocation();
 
   useEffect(() => {
@@ -173,6 +177,21 @@ export const HodDashboardPage: React.FC = () => {
       setActiveTab(tab as any);
     }
   }, [location.search]);
+
+  // Fetch full student profile from the API whenever a student is opened for inspection
+  useEffect(() => {
+    if (!inspectStudent) {
+      setInspectStudentFullProfile(null);
+      return;
+    }
+    let cancelled = false;
+    setInspectProfileLoading(true);
+    api.getStudentProfile(inspectStudent.regNo)
+      .then((profile) => { if (!cancelled) setInspectStudentFullProfile(profile); })
+      .catch(() => { if (!cancelled) setInspectStudentFullProfile(null); })
+      .finally(() => { if (!cancelled) setInspectProfileLoading(false); });
+    return () => { cancelled = true; };
+  }, [inspectStudent]);
 
   const { data: students = [], refetch } = useQuery({
     queryKey: ['hodStudents'],
@@ -977,23 +996,32 @@ export const HodDashboardPage: React.FC = () => {
               )}
 
               {inspectTab === 'personal-info' && (
-                <PersonalInfoTab
-                  readOnly={true}
-                  student={{
-                    roll_number: inspectStudent.regNo,
-                    name: inspectStudent.name,
-                    email: inspectStudent.email,
-                    year: inspectStudent.year as any,
-                    department: 'CSE',
-                    batch: '2023-2027',
-                    section: inspectStudent.section,
-                    hostel_day_scholar: 'Day Scholar',
-                    driving_license: true,
-                    passport: true,
-                    relocation_willingness: true,
-                  }}
-                  onRefresh={() => {}}
-                />
+                inspectProfileLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-8 h-8 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
+                      <p className="text-xs text-textSecondary">Loading profile data...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <PersonalInfoTab
+                    readOnly={true}
+                    student={inspectStudentFullProfile || {
+                      roll_number: inspectStudent.regNo,
+                      name: inspectStudent.name,
+                      email: inspectStudent.email,
+                      year: inspectStudent.year as any,
+                      department: 'CSE (Data Science)',
+                      batch: '',
+                      section: inspectStudent.section,
+                      hostel_day_scholar: 'Day Scholar' as any,
+                      driving_license: false,
+                      passport: false,
+                      relocation_willingness: false,
+                    }}
+                    onRefresh={() => {}}
+                  />
+                )
               )}
 
               {inspectTab === 'coding-profiles' && (

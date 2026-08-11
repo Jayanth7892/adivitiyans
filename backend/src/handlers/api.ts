@@ -1152,6 +1152,33 @@ app.put('/students/:id/certifications/:certId', async (req: Request, res: Respon
   }
 });
 
+app.delete('/students/:id/certifications/:certId', async (req: Request, res: Response) => {
+  try {
+    const studentId = req.params.id.toUpperCase();
+    const certId = req.params.certId;
+
+    if (db.isMock) {
+      const existing = db.mockStore.certifications.get(studentId) || [];
+      const updated = existing.filter((c: any) => c.id !== certId);
+      db.mockStore.certifications.set(studentId, updated);
+      return res.json({ message: 'Certification deleted', certifications: updated });
+    }
+
+    await db.query(
+      'DELETE FROM certifications WHERE id = $1 AND student_id = $2',
+      [certId, studentId]
+    );
+
+    const result = await db.query(
+      'SELECT * FROM certifications WHERE student_id = $1 ORDER BY date_completed DESC NULLS LAST',
+      [studentId]
+    );
+    res.json({ message: 'Certification deleted', certifications: result.rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============================================================================
 // Soft Skills
 // ============================================================================
