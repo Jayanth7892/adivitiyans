@@ -100,6 +100,44 @@ app.get('/db-init', async (_req: Request, res: Response) => {
   }
 });
 
+// ============================================================================
+// DB Migrate — Run incremental migrations without needing schema.sql
+// Runs all ALTER/CREATE IF NOT EXISTS statements that are safe to re-run.
+// ============================================================================
+app.get('/db-migrate', async (_req: Request, res: Response) => {
+  if (db.isMock) {
+    return res.json({ status: 'ok', message: 'Mock mode — migrations skipped' });
+  }
+  try {
+    const results: string[] = [];
+
+    // Migration 1: user_sessions table for single-session enforcement
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        email VARCHAR(100) PRIMARY KEY,
+        session_token VARCHAR(255) NOT NULL,
+        role VARCHAR(20) NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
+      );
+    `);
+    results.push('user_sessions table ensured');
+
+    // Migration 2: coding_profiles extra columns
+    await db.query(`
+      ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS easy_count INT DEFAULT 0;
+      ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS medium_count INT DEFAULT 0;
+      ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS hard_count INT DEFAULT 0;
+      ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS contest_rating INT DEFAULT 0;
+    `).catch(() => results.push('coding_profiles columns already exist'));
+
+    return res.json({ status: 'ok', migrations: results });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 function sendIndexHtml(res: Response) {
   const indexPath = path.join(publicDir, 'index.html');
   if (fs.existsSync(indexPath)) {
