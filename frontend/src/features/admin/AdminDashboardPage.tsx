@@ -37,6 +37,8 @@ import { PlacementPreferencesTab } from '../profile/tabs/PlacementPreferencesTab
 import { BulkImportModal } from './components/BulkImportModal';
 import { PlacementEligibilitySection } from '../hod/components/PlacementEligibilitySection';
 
+import { fetchLivePlatformSnapshot } from '../coding/liveFetchers';
+
 const DEPARTMENTS = ['CSE (Data Science)', 'CSE', 'Data Science', 'IT', 'ECE', 'EEE', 'Mechanical', 'Civil', 'AI & ML', 'Cyber Security', 'MBA', 'MCA'];
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'] as const;
 
@@ -50,6 +52,9 @@ export const AdminDashboardPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const activeTab = searchParams.get('tab') || 'students';
+
+  // Live platform snapshot state for student coding counts
+  const [liveSnapshots, setLiveSnapshots] = useState<Record<string, number>>({});
 
   // Student Directory state
   const [searchQuery, setSearchQuery] = useState('');
@@ -121,11 +126,58 @@ export const AdminDashboardPage: React.FC = () => {
     enabled: Boolean(inspectId),
   });
 
-  // Top performers data dynamically mapped from real API students
+  // Dynamically fetch live LeetCode problem counts for students with linked handles
+  React.useEffect(() => {
+    let isMounted = true;
+    async function loadLiveLeetCodeStats() {
+      if (students.length === 0) return;
+      const snapshotMap: Record<string, number> = {};
+
+      await Promise.allSettled(
+        students.map(async (s: any) => {
+          const lcHandle = s.leetcode_handle;
+          const isValidHandle = Boolean(lcHandle) && lcHandle !== 'Not Linked' && String(lcHandle).trim() !== '';
+          if (isValidHandle) {
+            try {
+              const cleanHandle = String(lcHandle).replace(/^@/, '').trim();
+              const snapshot = await fetchLivePlatformSnapshot('leetcode', cleanHandle);
+              const total = typeof snapshot.kpis[0]?.value === 'number' ? snapshot.kpis[0].value : 0;
+              snapshotMap[s.roll_number] = total;
+
+              // Auto-sync live total back to backend database if positive
+              if (total > 0) {
+                api.saveCodingProfile(s.roll_number, {
+                  platform: 'LeetCode' as any,
+                  handle: cleanHandle,
+                  score_rating: total,
+                  streak: 0,
+                  repositories_count: 0,
+                  commits_count: 0,
+                  prs_merged: 0,
+                } as any).catch(() => {});
+              }
+            } catch (e) {
+              console.warn(`[Admin Dashboard] Live fetch error for ${s.roll_number}:`, e);
+            }
+          }
+        })
+      );
+
+      if (isMounted) {
+        setLiveSnapshots(snapshotMap);
+      }
+    }
+    loadLiveLeetCodeStats();
+    return () => { isMounted = false; };
+  }, [students]);
+
+  // Top performers data dynamically mapped from real API students & live snapshot data
   const performersData = [...students]
     .map((s, idx) => {
       const cgpa = (s as any).cgpa !== undefined ? Number((s as any).cgpa) : 9.0;
-      const leetcodePts = (s as any).leetcode_solved !== undefined ? Number((s as any).leetcode_solved) : 0;
+      const dbSolved = (s as any).leetcode_solved !== undefined ? Number((s as any).leetcode_solved) : 0;
+      const liveSolved = liveSnapshots[s.roll_number];
+      const leetcodePts = liveSolved !== undefined ? liveSolved : dbSolved;
       const status = (s as any).standing || (cgpa >= 9.0 ? 'Distinction' : 'First Class');
       return {
         rank: idx + 1,

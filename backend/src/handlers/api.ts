@@ -447,7 +447,7 @@ app.get('/students', async (req: Request, res: Response) => {
         s.*,
         COALESCE(ROUND(AVG(a.semester_gpa), 2), 0.00) AS cgpa,
         MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.handle END) AS leetcode_handle,
-        COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.score_rating END), 0) AS leetcode_solved,
+        COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN GREATEST(c.score_rating, (c.easy_count + c.medium_count + c.hard_count)) END), 0) AS leetcode_solved,
         COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.easy_count END), 0) AS leetcode_easy,
         COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.medium_count END), 0) AS leetcode_medium,
         COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.hard_count END), 0) AS leetcode_hard,
