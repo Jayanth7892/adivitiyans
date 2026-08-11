@@ -25,7 +25,7 @@ export const AuthPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const { login } = useAuth();
+  const { login, registerSession, sessionKickedOut } = useAuth();
   const navigate = useNavigate();
 
   // Student Sign Up Form
@@ -268,6 +268,7 @@ export const AuthPage: React.FC = () => {
         }
 
         login(ADMIN_MASTER_EMAIL, 'admin', 'ADMIN_MASTER', 'System Administrator', jwtToken);
+        await registerSession(ADMIN_MASTER_EMAIL, 'admin');
         navigate('/admin/dashboard');
         return;
       }
@@ -315,6 +316,7 @@ export const AuthPage: React.FC = () => {
         rollNo = 'HOD_CSEDS';
         displayName = hod ? `${hod.name} (HOD ${hod.department})` : 'Dr. HOD (CSE & Data Science)';
         login(HOD_MASTER_EMAIL, 'hod', rollNo, displayName, jwtToken);
+        await registerSession(HOD_MASTER_EMAIL, 'hod');
         navigate('/hod/dashboard');
         return;
       }
@@ -430,6 +432,7 @@ export const AuthPage: React.FC = () => {
       }
 
       login(data.email, activeTab, rollNo, displayName, jwtToken);
+      await registerSession(data.email, activeTab);
       if ((activeTab as string) === 'admin') {
         navigate('/admin/dashboard');
       } else if (activeTab === 'faculty') {
@@ -451,6 +454,34 @@ export const AuthPage: React.FC = () => {
         <h2 className="text-3xl font-extrabold text-textPrimary tracking-tight">Advitiyans</h2>
         <p className="mt-1.5 text-sm text-textSecondary">Student 360°, Faculty & Placement Cell Platform</p>
       </div>
+
+      {/* ── Session Kicked-Out Banner ── */}
+      {sessionKickedOut && (
+        <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-lg">
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)',
+              border: '1px solid #ef4444',
+              borderRadius: '12px',
+              padding: '14px 18px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+              boxShadow: '0 4px 20px rgba(239,68,68,0.25)',
+            }}
+          >
+            <span style={{ fontSize: '20px', flexShrink: 0 }}>⚠️</span>
+            <div>
+              <p style={{ color: '#fecaca', fontWeight: 700, margin: 0, fontSize: '14px' }}>
+                Session ended — another device signed in
+              </p>
+              <p style={{ color: '#fca5a5', margin: '4px 0 0', fontSize: '13px' }}>
+                Your account was accessed from a different browser or device. For security, only one active session is allowed. Please log in again.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg">
         <div className="bg-surface py-8 px-6 shadow-sm border border-borderLine sm:rounded-2xl sm:px-10">

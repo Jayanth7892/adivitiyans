@@ -51,6 +51,34 @@ export const api = {
     return fetchWithAuth(`/auth/check-availability?type=${type}&value=${encodeURIComponent(value)}`);
   },
 
+  // Single-Session Enforcement
+  // Called immediately after login to register the session token with the backend.
+  // This overwrites any existing session for this email, kicking out other devices.
+  registerSession: async (email: string, sessionToken: string, role: string): Promise<{ success: boolean }> => {
+    try {
+      return await fetchWithAuth('/auth/session', {
+        method: 'POST',
+        body: JSON.stringify({ email, session_token: sessionToken, role }),
+      });
+    } catch {
+      return { success: false };
+    }
+  },
+
+  // Check whether this session_token is still the active session for the given email.
+  // Returns { valid: true } if OK, { valid: false, reason: string } if superseded/expired.
+  validateSession: async (email: string, sessionToken: string): Promise<{ valid: boolean; reason?: string }> => {
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/auth/validate-session?email=${encodeURIComponent(email)}&session_token=${encodeURIComponent(sessionToken)}`
+      );
+      if (!res.ok) return { valid: true }; // network errors: be lenient, don't kick out
+      return await res.json();
+    } catch {
+      return { valid: true }; // network errors: be lenient, don't kick out
+    }
+  },
+
   // Student Directory CRUD (Admin & Faculty)
   getAllStudents: async (params?: { department?: string; batch?: string; section?: string; search?: string }): Promise<StudentProfile[]> => {
     const query = new URLSearchParams(params as any).toString();

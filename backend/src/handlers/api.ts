@@ -79,7 +79,20 @@ app.get('/db-init', async (_req: Request, res: Response) => {
         ON CONFLICT (student_id, platform) DO NOTHING;
       `).catch(() => {/* ignore */});
 
-      return res.json({ status: 'ok', message: 'Database cleaned: Dummy users removed and real student profiles synced.' });
+      // Migration: add user_sessions table for single-session enforcement
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS user_sessions (
+          email VARCHAR(100) PRIMARY KEY,
+          session_token VARCHAR(255) NOT NULL,
+          role VARCHAR(20) NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          expires_at TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
+        );
+      `).catch(() => {/* ignore if already exists */});
+
+      return res.json({ status: 'ok', message: 'Database cleaned: Dummy users removed, real student profiles synced, user_sessions table ensured.' });
+
     }
     res.status(404).json({ error: 'schema.sql file not found in asset' });
   } catch (err: any) {
@@ -162,7 +175,93 @@ app.get('/auth/check-availability', async (req: Request, res: Response) => {
 });
 
 // ============================================================================
+// Auth: Single-Session Enforcement
+// ============================================================================
+
+// POST /auth/session — Register a new session (overwrites any existing one for this email)
+// Called by the frontend immediately after a successful Cognito sign-in.
+app.post('/auth/session', async (req: Request, res: Response) => {
+  try {
+    const { email, session_token, role } = req.body;
+    if (!email || !session_token || !role) {
+      return res.status(400).json({ error: 'email, session_token, and role are required' });
+    }
+
+    const emailLower = email.toLowerCase();
+
+    if (db.isMock) {
+      // In mock mode just accept without DB
+      return res.json({ success: true, message: 'Session registered (mock mode)' });
+    }
+
+    // UPSERT: one row per email. Replaces any existing session — old sessions become invalid.
+    await db.query(`
+      INSERT INTO user_sessions (email, session_token, role, created_at, last_seen, expires_at)
+      VALUES ($1, $2, $3, NOW(), NOW(), NOW() + INTERVAL '24 hours')
+      ON CONFLICT (email) DO UPDATE
+        SET session_token = EXCLUDED.session_token,
+            role          = EXCLUDED.role,
+            created_at    = NOW(),
+            last_seen     = NOW(),
+            expires_at    = NOW() + INTERVAL '24 hours'
+    `, [emailLower, session_token, role]);
+
+    return res.json({ success: true, message: 'Session registered. Previous sessions (if any) have been invalidated.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /auth/validate-session — Check if a session token is still the active one for this email
+// Returns { valid: true } if token matches, { valid: false, reason: '...' } otherwise.
+// Frontend polls this every ~30s; if invalid, force-logout with a friendly message.
+app.get('/auth/validate-session', async (req: Request, res: Response) => {
+  try {
+    const { email, session_token } = req.query as { email: string; session_token: string };
+    if (!email || !session_token) {
+      return res.status(400).json({ error: 'email and session_token query params are required' });
+    }
+
+    const emailLower = email.toLowerCase();
+
+    if (db.isMock) {
+      return res.json({ valid: true });
+    }
+
+    const result = await db.query(
+      `SELECT session_token, expires_at FROM user_sessions WHERE email = $1`,
+      [emailLower]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ valid: false, reason: 'no_session' });
+    }
+
+    const row = result.rows[0];
+
+    if (new Date(row.expires_at) < new Date()) {
+      return res.json({ valid: false, reason: 'session_expired' });
+    }
+
+    if (row.session_token !== session_token) {
+      return res.json({ valid: false, reason: 'session_superseded' });
+    }
+
+    // Update last_seen heartbeat
+    await db.query(
+      `UPDATE user_sessions SET last_seen = NOW() WHERE email = $1`,
+      [emailLower]
+    ).catch(() => {/* non-critical */});
+
+    return res.json({ valid: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
 // Students CRUD
+
 // ============================================================================
 
 // GET /students — List/Search/Filter (Guarantees DISTINCT ON roll_number)

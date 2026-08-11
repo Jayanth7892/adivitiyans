@@ -161,6 +161,19 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 12. User Sessions Table (Single-Session Enforcement)
+-- Stores exactly ONE active session token per user email.
+-- When a user logs in from a new device/browser, this row is UPSERTED,
+-- overwriting any previous session_token — invalidating all other sessions.
+CREATE TABLE IF NOT EXISTS user_sessions (
+    email VARCHAR(100) PRIMARY KEY,
+    session_token VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_students_dept_batch ON students(department, batch);
 CREATE INDEX IF NOT EXISTS idx_students_email ON students(email);
