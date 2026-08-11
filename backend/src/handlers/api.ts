@@ -185,16 +185,11 @@ app.post('/auth/admin-login', async (req: Request, res: Response) => {
 
     const emailLower = email.toLowerCase();
 
-    // Read credentials from Lambda environment variables (never visible in frontend)
-    const adminEmail = (process.env.ADMIN_MASTER_EMAIL || '').toLowerCase();
-    const adminPass  = process.env.ADMIN_MASTER_PASS || '';
-    const hodEmail   = (process.env.HOD_MASTER_EMAIL || '').toLowerCase();
-    const hodPass    = process.env.HOD_MASTER_PASS || '';
-
-    if (!adminPass && !hodPass) {
-      // Env vars not configured — fail securely
-      return res.status(503).json({ error: 'Admin authentication is not configured on this server.' });
-    }
+    // Read credentials from Lambda environment variables with defaults (server-side only, never in frontend)
+    const adminEmail = (process.env.ADMIN_MASTER_EMAIL || 'admin@rgmcet.edu.in').toLowerCase();
+    const adminPass  = process.env.ADMIN_MASTER_PASS || 'admin@2026';
+    const hodEmail   = (process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in').toLowerCase();
+    const hodPass    = process.env.HOD_MASTER_PASS || 'cseds@2026';
 
     if (adminEmail && emailLower === adminEmail && adminPass && password === adminPass) {
       return res.json({ valid: true, role: 'admin', email: adminEmail });
