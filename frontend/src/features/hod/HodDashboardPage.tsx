@@ -282,6 +282,96 @@ export const HodDashboardPage: React.FC = () => {
     return { count: total, avgCgpa, avgLeetCode, distinctionRatio };
   }, [filteredDataset]);
 
+  const yearCgpaSummary = useMemo(() => {
+    const yearsList = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+    return yearsList.map((yr) => {
+      const yrDigit = yr.slice(0, 1);
+      const yearStudents = mergedStudentDataset.filter(
+        (s) => s.year === yr || s.year?.startsWith(yrDigit)
+      );
+      const totalStudents = yearStudents.length;
+      const validCgpaStudents = yearStudents.filter((s) => s.cgpa > 0);
+      const avgCgpaVal = validCgpaStudents.length > 0
+        ? (validCgpaStudents.reduce((sum, s) => sum + s.cgpa, 0) / validCgpaStudents.length)
+        : 0;
+
+      const distinction = yearStudents.filter(
+        (s) => s.cgpa >= 9.0 || s.standing?.includes('Distinction')
+      ).length;
+
+      const firstClass = yearStudents.filter(
+        (s) => (s.cgpa >= 8.0 && s.cgpa < 9.0) || s.standing?.includes('First')
+      ).length;
+
+      const secondClass = yearStudents.filter(
+        (s) => (s.cgpa >= 7.0 && s.cgpa < 8.0) || s.standing?.includes('Second') || (s.cgpa > 0 && s.cgpa < 8.0)
+      ).length;
+
+      return {
+        year: yr,
+        students: totalStudents,
+        avgCgpa: avgCgpaVal > 0 ? avgCgpaVal.toFixed(2) : '0.00',
+        distinction,
+        firstClass,
+        secondClass,
+      };
+    });
+  }, [mergedStudentDataset]);
+
+  const sectionCgpaSummary = useMemo(() => {
+    const sectionsList = ['Section A', 'Section B', 'Section C'];
+    return sectionsList.map((sec) => {
+      const secLetter = sec.slice(-1);
+      const secStudents = mergedStudentDataset.filter(
+        (s) => s.section.includes(secLetter) || s.section === sec
+      );
+      const totalStudents = secStudents.length;
+      const validCgpaStudents = secStudents.filter((s) => s.cgpa > 0);
+      const avgCgpaVal = validCgpaStudents.length > 0
+        ? Number((validCgpaStudents.reduce((sum, s) => sum + s.cgpa, 0) / validCgpaStudents.length).toFixed(2))
+        : 0;
+
+      const distinction = secStudents.filter(
+        (s) => s.cgpa >= 9.0 || s.standing?.includes('Distinction')
+      ).length;
+
+      const firstClass = secStudents.filter(
+        (s) => (s.cgpa >= 8.0 && s.cgpa < 9.0) || s.standing?.includes('First')
+      ).length;
+
+      return {
+        section: sec,
+        avgCgpa: avgCgpaVal,
+        students: totalStudents,
+        distinction,
+        firstClass,
+      };
+    });
+  }, [mergedStudentDataset]);
+
+  const semesterProgressionData = useMemo(() => {
+    const semesters = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6', 'Sem 7'];
+    const yearsList = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+
+    return semesters.map((sem, sIdx) => {
+      const entry: Record<string, any> = { semester: sem };
+      yearsList.forEach((yr, yIdx) => {
+        const key = `Year${4 - yIdx}`;
+        const yrDigit = yr.slice(0, 1);
+        const yearStuds = mergedStudentDataset.filter(
+          (s) => (s.year === yr || s.year?.startsWith(yrDigit)) && s.semGpas && s.semGpas[sIdx] !== undefined
+        );
+        if (yearStuds.length > 0) {
+          const avg = yearStuds.reduce((acc, curr) => acc + (curr.semGpas[sIdx] || curr.cgpa || 0), 0) / yearStuds.length;
+          entry[key] = Number(avg.toFixed(2));
+        } else {
+          entry[key] = null;
+        }
+      });
+      return entry;
+    });
+  }, [mergedStudentDataset]);
+
   const isFiltered = slicerYear !== 'All' || slicerSection !== 'All' || slicerStanding !== 'All' || slicerCoding !== 'All' || searchQuery !== '';
 
   const resetAllFilters = () => {
@@ -527,7 +617,7 @@ export const HodDashboardPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-borderLine text-sm">
-                  {YEAR_CGPA_SUMMARY.map((y) => (
+                  {yearCgpaSummary.map((y) => (
                     <tr key={y.year} className="hover:bg-background/50 transition-colors">
                       <td className="py-3.5 px-4 font-bold text-textPrimary">{y.year}</td>
                       <td className="py-3.5 px-4 text-textSecondary">{y.students} Students</td>
@@ -564,7 +654,7 @@ export const HodDashboardPage: React.FC = () => {
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={SEMESTER_PROGRESSION_DATA} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <LineChart data={semesterProgressionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="semester" stroke="#6b7280" fontSize={11} />
                     <YAxis domain={[8.0, 9.5]} stroke="#6b7280" fontSize={11} />
@@ -587,7 +677,7 @@ export const HodDashboardPage: React.FC = () => {
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={SECTION_CGPA_SUMMARY} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <BarChart data={sectionCgpaSummary} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="section" stroke="#6b7280" fontSize={11} />
                     <YAxis domain={[8.0, 10.0]} stroke="#6b7280" fontSize={11} />
