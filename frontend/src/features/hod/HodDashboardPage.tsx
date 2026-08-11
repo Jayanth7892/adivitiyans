@@ -174,6 +174,11 @@ export const HodDashboardPage: React.FC = () => {
   const [inspectStudentAchievements, setInspectStudentAchievements] = useState<Achievement[]>([]);
   const [inspectStudentPlacement, setInspectStudentPlacement] = useState<PlacementProfile | null>(null);
 
+  // Analytics Tab — real semester-wise CGPA progression per selected year batch
+  const [progressionYear, setProgressionYear] = useState('3rd Year');
+  const [progressionCache, setProgressionCache] = useState<Record<string, { semester: string; avg: number }[]>>({});
+  const [progressionLoading, setProgressionLoading] = useState(false);
+
   const location = useLocation();
 
   useEffect(() => {
@@ -445,6 +450,53 @@ export const HodDashboardPage: React.FC = () => {
       return entry;
     });
   }, [mergedStudentDataset]);
+
+  // Fetch real academic records for the selected year batch (Analytics tab)
+  useEffect(() => {
+    if (activeTab !== 'analytics') return;
+    if (progressionCache[progressionYear] !== undefined) return; // already fetched
+    if (mergedStudentDataset.length === 0) return; // wait for student list
+
+    const yr = progressionYear; // capture for async closure
+    const yrDigit = yr.slice(0, 1);
+    const studentsInYear = mergedStudentDataset
+      .filter((s) => s.year === yr || s.year?.startsWith(yrDigit))
+      .slice(0, 60); // cap at 60 to avoid overwhelming the API
+
+    // Set sentinel immediately to block concurrent fetches
+    setProgressionCache((prev) => ({ ...prev, [yr]: [] }));
+    setProgressionLoading(true);
+
+    if (studentsInYear.length === 0) {
+      setProgressionLoading(false);
+      return;
+    }
+
+    Promise.allSettled(studentsInYear.map((s) => api.getAcademics(s.regNo)))
+      .then((results) => {
+        const allRecords: AcademicRecord[] = [];
+        results.forEach((r) => {
+          if (r.status === 'fulfilled') allRecords.push(...r.value);
+        });
+
+        // Average GPA per semester number
+        const semMap: Record<number, number[]> = {};
+        allRecords.forEach((rec) => {
+          if (!semMap[rec.semester]) semMap[rec.semester] = [];
+          semMap[rec.semester].push(Number(rec.semester_gpa));
+        });
+
+        const data = Object.entries(semMap)
+          .sort(([a], [b]) => Number(a) - Number(b))
+          .map(([sem, gpas]) => ({
+            semester: `Sem ${sem}`,
+            avg: Number((gpas.reduce((s, g) => s + g, 0) / gpas.length).toFixed(2)),
+          }));
+
+        setProgressionCache((prev) => ({ ...prev, [yr]: data }));
+        setProgressionLoading(false);
+      });
+  }, [progressionYear, activeTab, mergedStudentDataset]);
 
   const isFiltered = slicerYear !== 'All' || slicerSection !== 'All' || slicerStanding !== 'All' || slicerCoding !== 'All' || searchQuery !== '';
 
@@ -728,26 +780,75 @@ export const HodDashboardPage: React.FC = () => {
       {activeTab === 'analytics' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Semester Progression Chart */}
+            {/* Semester-Wise CGPA Progression — Year Selector */}
             <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm">
               <div className="mb-4">
-                <h3 className="text-sm font-bold text-textPrimary">Semester-by-Semester GPA Progression</h3>
-                <p className="text-xs text-textSecondary">Batch GPA trajectory from Sem 1 through Sem 7</p>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-textPrimary">Semester-Wise CGPA Progression</h3>
+                    <p className="text-xs text-textSecondary">Avg GPA per semester for the selected year batch</p>
+                  </div>
+                  {progressionLoading && (
+                    <RefreshCw className="w-4 h-4 text-brand-primary animate-spin shrink-0" />
+                  )}
+                </div>
+                {/* Year Tab Pills */}
+                <div className="flex gap-1.5 flex-wrap">
+                  {['1st Year', '2nd Year', '3rd Year', '4th Year'].map((yr) => (
+                    <button
+                      key={yr}
+                      onClick={() => setProgressionYear(yr)}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                        progressionYear === yr
+                          ? 'bg-brand-primary text-white shadow-sm'
+                          : 'bg-background border border-borderLine text-textSecondary hover:text-textPrimary'
+                      }`}
+                    >
+                      {yr}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={semesterProgressionData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="semester" stroke="#6b7280" fontSize={11} />
-                    <YAxis domain={[8.0, 9.5]} stroke="#6b7280" fontSize={11} />
-                    <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
-                    <Legend />
-                    <Line type="monotone" dataKey="Year4" name="4th Year" stroke="#4F46E5" strokeWidth={2.5} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="Year3" name="3rd Year" stroke="#10B981" strokeWidth={2.5} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="Year2" name="2nd Year" stroke="#F59E0B" strokeWidth={2.5} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="Year1" name="1st Year" stroke="#8B5CF6" strokeWidth={2.5} dot={{ r: 4 }} />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div className="h-52 w-full">
+                {progressionLoading ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-6 h-6 border-2 border-brand-primary border-t-transparent rounded-full animate-spin" />
+                      <p className="text-xs text-textSecondary">Fetching academic records for {progressionYear}...</p>
+                    </div>
+                  </div>
+                ) : (progressionCache[progressionYear]?.length ?? 0) === 0 ? (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-xs text-textSecondary">No academic records found for {progressionYear}. Students can add semester GPAs in their Academic profile.</p>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={progressionCache[progressionYear]} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="progGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#4F46E5" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="semester" stroke="#6b7280" fontSize={11} />
+                      <YAxis domain={['auto', 'auto']} stroke="#6b7280" fontSize={11} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }}
+                        formatter={(value: any) => [`${value} GPA`, `${progressionYear} Avg`]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="avg"
+                        name="Avg GPA"
+                        stroke="#4F46E5"
+                        strokeWidth={2.5}
+                        fill="url(#progGradient)"
+                        dot={{ r: 5, fill: '#4F46E5', stroke: '#fff', strokeWidth: 2 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
 
