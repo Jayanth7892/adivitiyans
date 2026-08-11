@@ -173,6 +173,13 @@ export const api = {
     });
   },
 
+  updateCertification: async (id: string, certId: string, data: Certification): Promise<Certification[]> => {
+    return fetchWithAuth(`/students/${id}/certifications/${certId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
   getSoftSkills: async (id: string = '23091A3251'): Promise<SoftSkill[]> => {
     return fetchWithAuth(`/students/${id}/soft-skills`);
   },

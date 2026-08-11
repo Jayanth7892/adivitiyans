@@ -675,15 +675,20 @@ app.put('/students/:id', async (req: Request, res: Response) => {
       );
     }
 
-    // Also update academics table if cgpa is updated
-    if (body.cgpa !== undefined && body.cgpa !== null && body.cgpa !== '' && Number(body.cgpa) > 0) {
-      await db.query(
-        `INSERT INTO academics (student_id, semester, semester_gpa, attendance_pct)
-         VALUES ($1, 1, $2, 95.0)
-         ON CONFLICT (student_id, semester) DO UPDATE SET semester_gpa = EXCLUDED.semester_gpa`,
-        [studentId, Number(body.cgpa)]
-      ).catch(() => {});
-    }
+    // Recalculate CGPA from all semester records in academics table
+    try {
+      const acadRes = await db.query(
+        'SELECT semester_gpa FROM academics WHERE student_id = $1',
+        [studentId]
+      );
+      if (acadRes.rows.length > 0) {
+        const avgCgpa = acadRes.rows.reduce((sum: number, r: any) => sum + Number(r.semester_gpa), 0) / acadRes.rows.length;
+        await db.query(
+          'UPDATE students SET cgpa = $1 WHERE UPPER(roll_number) = $2',
+          [Number(avgCgpa.toFixed(2)), studentId]
+        );
+      }
+    } catch { /* ignore cgpa recalc errors */ }
 
     res.json({ message: 'Profile updated successfully', student: result.rows[0] });
   } catch (err: any) {
@@ -1073,6 +1078,37 @@ app.post('/students/:id/certifications', async (req: Request, res: Response) => 
       [studentId]
     );
     res.json({ message: 'Certification added', certifications: result.rows });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put('/students/:id/certifications/:certId', async (req: Request, res: Response) => {
+  try {
+    const studentId = req.params.id.toUpperCase();
+    const certId = req.params.certId;
+    const validated = certificationSchema.parse(req.body);
+
+    if (db.isMock) {
+      const existing = db.mockStore.certifications.get(studentId) || [];
+      const idx = existing.findIndex((c: any) => c.id === certId);
+      if (idx >= 0) existing[idx] = { ...existing[idx], ...validated };
+      db.mockStore.certifications.set(studentId, existing);
+      return res.json({ message: 'Certification updated', certifications: existing });
+    }
+
+    await db.query(
+      `UPDATE certifications SET provider = $1, title = $2, date_completed = $3, certificate_file_url = $4, suggested = $5
+       WHERE id = $6 AND student_id = $7`,
+      [validated.provider, validated.title, validated.date_completed || null,
+       validated.certificate_file_url || null, validated.suggested, certId, studentId]
+    );
+
+    const result = await db.query(
+      'SELECT * FROM certifications WHERE student_id = $1 ORDER BY date_completed DESC NULLS LAST',
+      [studentId]
+    );
+    res.json({ message: 'Certification updated', certifications: result.rows });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }

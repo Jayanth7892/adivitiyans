@@ -137,7 +137,7 @@ export const ProfilePage: React.FC = () => {
 
       {/* Render Active Tab Content */}
       <div className="pt-2">
-        {currentTab === 'personal-info' && <PersonalInfoTab student={student} onRefresh={handleRefreshAll} />}
+        {currentTab === 'personal-info' && <PersonalInfoTab student={student} academics={academics} onRefresh={handleRefreshAll} />}
         {currentTab === 'academics' && <AcademicsTab academics={academics} onRefresh={handleRefreshAll} />}
         {currentTab === 'tech-skills' && <TechSkillsTab skills={techSkills} onRefresh={handleRefreshAll} />}
         {currentTab === 'certifications' && <CertificationsTab certifications={certifications} onRefresh={handleRefreshAll} />}

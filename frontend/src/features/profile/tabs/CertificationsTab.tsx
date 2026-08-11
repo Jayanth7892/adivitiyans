@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Award, UploadCloud, CheckCircle2, Sparkles, ExternalLink } from 'lucide-react';
+import { Plus, Award, UploadCloud, CheckCircle2, Sparkles, ExternalLink, Edit2 } from 'lucide-react';
 import { Certification } from '../../../types';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
@@ -34,6 +34,7 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
   const [dateCompleted, setDateCompleted] = useState('2024-03-15');
   const [uploading, setUploading] = useState(false);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [editingCert, setEditingCert] = useState<Certification | null>(null);
   const { user } = useAuth();
   const activeRollNo = user?.rollNumber || '23091A3251';
 
@@ -87,17 +88,43 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
     }
   };
 
+  const openEditModal = (cert: Certification) => {
+    setEditingCert(cert);
+    setProvider(cert.provider);
+    setTitle(cert.title);
+    setDateCompleted(cert.date_completed ? cert.date_completed.slice(0, 10) : '2024-03-15');
+    setFileUrl(cert.certificate_file_url || null);
+    setShowModal(true);
+  };
+
+  const openAddModal = () => {
+    setEditingCert(null);
+    setProvider('AWS');
+    setTitle('');
+    setDateCompleted('2024-03-15');
+    setFileUrl(null);
+    setShowModal(true);
+  };
+
   const handleSaveCert = async () => {
     if (!title.trim() || readOnly) return;
     try {
-      await api.saveCertification(activeRollNo, {
+      const certData = {
         provider,
         title: title.trim(),
         date_completed: dateCompleted,
         certificate_file_url: fileUrl || undefined,
         suggested: false,
-      });
+      };
+
+      if (editingCert && editingCert.id) {
+        await api.updateCertification(activeRollNo, editingCert.id, certData);
+      } else {
+        await api.saveCertification(activeRollNo, certData);
+      }
+
       setShowModal(false);
+      setEditingCert(null);
       setTitle('');
       onRefresh();
     } catch (e: any) {
@@ -114,7 +141,7 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
           <p className="text-xs text-textSecondary">Upload verified technical certifications & cloud credentials</p>
         </div>
         {!readOnly && (
-          <PillButton variant="primary" size="sm" onClick={() => setShowModal(true)} icon={<Plus className="w-3.5 h-3.5" />}>
+          <PillButton variant="primary" size="sm" onClick={openAddModal} icon={<Plus className="w-3.5 h-3.5" />}>
             Add Certification
           </PillButton>
         )}
@@ -128,11 +155,22 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
               <Award className="w-6 h-6" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-primary text-white">
-                  {cert.provider}
-                </span>
-                <span className="text-xs text-textSecondary">{formatDate(cert.date_completed)}</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-primary text-white">
+                    {cert.provider}
+                  </span>
+                  <span className="text-xs text-textSecondary">{formatDate(cert.date_completed)}</span>
+                </div>
+                {!readOnly && (
+                  <button
+                    onClick={() => openEditModal(cert)}
+                    className="p-1.5 rounded-lg text-textSecondary hover:text-brand-primary hover:bg-brand-soft/50 transition-all"
+                    title="Edit certification"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
               <h4 className="text-sm font-bold text-textPrimary mt-1.5">{cert.title}</h4>
               {cert.certificate_file_url && (
@@ -178,6 +216,7 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
                   variant="outline"
                   size="sm"
                   onClick={() => {
+                    setEditingCert(null);
                     setProvider(sc.provider);
                     setTitle(sc.title);
                     setShowModal(true);
@@ -195,7 +234,9 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
       {showModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-borderLine rounded-2xl p-6 max-w-md w-full shadow-xl">
-            <h3 className="text-base font-bold text-textPrimary mb-4">Add Certification</h3>
+            <h3 className="text-base font-bold text-textPrimary mb-4">
+              {editingCert ? 'Edit Certification' : 'Add Certification'}
+            </h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-textPrimary mb-1">Provider</label>
@@ -236,8 +277,10 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
-                <PillButton variant="outline" size="sm" onClick={() => setShowModal(false)}>Cancel</PillButton>
-                <PillButton variant="primary" size="sm" onClick={handleSaveCert}>Save Certificate</PillButton>
+                <PillButton variant="outline" size="sm" onClick={() => { setShowModal(false); setEditingCert(null); }}>Cancel</PillButton>
+                <PillButton variant="primary" size="sm" onClick={handleSaveCert}>
+                  {editingCert ? 'Update Certificate' : 'Save Certificate'}
+                </PillButton>
               </div>
             </div>
           </div>

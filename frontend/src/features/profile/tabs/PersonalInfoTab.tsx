@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Edit2, Save, X, ExternalLink, GraduationCap } from 'lucide-react';
-import { StudentProfile } from '../../../types';
+import { StudentProfile, AcademicRecord } from '../../../types';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
 import { PillButton } from '../../../components/common/PillButton';
 
 interface PersonalInfoTabProps {
   student?: StudentProfile | null;
+  academics?: AcademicRecord[];
   readOnly?: boolean;
   onRefresh: () => void;
 }
@@ -38,7 +39,7 @@ const FINANCIAL_BACKGROUNDS = [
   'Upper Class',
 ];
 
-export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readOnly = false, onRefresh }) => {
+export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, academics = [], readOnly = false, onRefresh }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const { user } = useAuth();
@@ -46,7 +47,7 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
   const activeName = student?.name || user?.name || 'Student';
   const activeEmail = student?.email || user?.email || 'student@rgmcet.edu.in';
 
-  const { register, handleSubmit, reset } = useForm<StudentProfile & { cgpa?: number }>();
+  const { register, handleSubmit, reset } = useForm<StudentProfile>();
 
   React.useEffect(() => {
     reset({
@@ -68,7 +69,6 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
       family_business: student?.family_business || '',
       financial_background: student?.financial_background || '',
       linkedin_url: student?.linkedin_url || '',
-      cgpa: (student as any)?.cgpa ? Number((student as any).cgpa) : 0,
     });
   }, [student, activeName, activeRoll, activeEmail, reset]);
 
@@ -86,7 +86,6 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
         batch: data.batch && data.batch !== '' ? data.batch : (student?.batch || '2023-2027'),
         section: data.section && data.section !== '' ? data.section : (student?.section || 'A'),
         hostel_day_scholar: data.hostel_day_scholar && data.hostel_day_scholar !== '' ? data.hostel_day_scholar : (student?.hostel_day_scholar || 'Day Scholar'),
-        cgpa: data.cgpa !== undefined && data.cgpa !== null && data.cgpa !== '' ? Number(data.cgpa) : (student as any)?.cgpa || 0,
       };
       await api.updateStudentProfile(data.roll_number || activeRoll, payload);
       setIsEditing(false);
@@ -140,27 +139,17 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, readO
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Overall CGPA (0.00 – 10.00)</label>
-            {isEditing ? (
-              <input
-                {...register('cgpa')}
-                type="number"
-                step="0.01"
-                min={0}
-                max={10}
-                placeholder="e.g. 9.16"
-                className="w-full px-3 py-2 text-sm font-bold text-green-600 rounded-lg border border-borderLine bg-background"
-              />
-            ) : (
+            <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Overall CGPA</label>
               <div className="flex items-center gap-1.5">
                 <GraduationCap className="w-4 h-4 text-green-600 shrink-0" />
                 <p className="text-sm font-black text-green-600">
-                  {(student as any)?.cgpa !== undefined && (student as any)?.cgpa !== null && Number((student as any).cgpa) > 0
-                    ? `${Number((student as any).cgpa).toFixed(2)} / 10.00 CGPA`
-                    : 'Not provided'}
+                  {academics.length > 0
+                    ? `${(academics.reduce((sum, a) => sum + Number(a.semester_gpa), 0) / academics.length).toFixed(2)} / 10.00 CGPA`
+                    : ((student as any)?.cgpa !== undefined && (student as any)?.cgpa !== null && Number((student as any).cgpa) > 0
+                      ? `${Number((student as any).cgpa).toFixed(2)} / 10.00 CGPA`
+                      : 'Not provided')}
                 </p>
               </div>
-            )}
           </div>
 
           <div>
