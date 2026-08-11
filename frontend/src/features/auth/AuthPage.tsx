@@ -780,7 +780,7 @@ export const AuthPage: React.FC = () => {
                 <input
                   {...registerFacultySignUp('securityKey')}
                   type="password"
-                  placeholder="Enter Secret Security Passcode (e.g. RGMCET_FACULTY_2026)"
+                  placeholder="Enter Secret Security Passcode"
                   className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary font-mono text-xs"
                 />
                 {facultySignUpErrors.securityKey && (
