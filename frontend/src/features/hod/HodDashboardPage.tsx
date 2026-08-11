@@ -27,10 +27,10 @@ import {
   Legend,
 } from 'recharts';
 import { api } from '../../lib/api';
+import type { AcademicRecord, TechSkill, Certification, SoftSkill, Achievement, PlacementProfile } from '../../types';
 import { fetchLivePlatformSnapshot } from '../coding/liveFetchers';
 import { StatCard } from '../../components/common/StatCard';
 import { PersonalInfoTab } from '../profile/tabs/PersonalInfoTab';
-import { AcademicsTab } from '../profile/tabs/AcademicsTab';
 import { CodingProfilesTab } from '../profile/tabs/CodingProfilesTab';
 import { TechSkillsTab } from '../profile/tabs/TechSkillsTab';
 import { CertificationsTab } from '../profile/tabs/CertificationsTab';
@@ -164,9 +164,15 @@ export const HodDashboardPage: React.FC = () => {
   const [inspectStudent, setInspectStudent] = useState<HodStudentEntry | null>(null);
   const [inspectTab, setInspectTab] = useState('academics-graph');
 
-  // Full student profile fetched from API when HOD opens a student's personal-info tab
+  // Full student data fetched from API whenever the HOD opens a student for inspection
   const [inspectStudentFullProfile, setInspectStudentFullProfile] = useState<any>(null);
   const [inspectProfileLoading, setInspectProfileLoading] = useState(false);
+  const [inspectStudentAcademics, setInspectStudentAcademics] = useState<AcademicRecord[]>([]);
+  const [inspectStudentTechSkills, setInspectStudentTechSkills] = useState<TechSkill[]>([]);
+  const [inspectStudentCerts, setInspectStudentCerts] = useState<Certification[]>([]);
+  const [inspectStudentSoftSkills, setInspectStudentSoftSkills] = useState<SoftSkill[]>([]);
+  const [inspectStudentAchievements, setInspectStudentAchievements] = useState<Achievement[]>([]);
+  const [inspectStudentPlacement, setInspectStudentPlacement] = useState<PlacementProfile | null>(null);
 
   const location = useLocation();
 
@@ -178,18 +184,42 @@ export const HodDashboardPage: React.FC = () => {
     }
   }, [location.search]);
 
-  // Fetch full student profile from the API whenever a student is opened for inspection
+  // Fetch ALL student sub-data in parallel whenever a student is opened for inspection
   useEffect(() => {
     if (!inspectStudent) {
       setInspectStudentFullProfile(null);
+      setInspectStudentAcademics([]);
+      setInspectStudentTechSkills([]);
+      setInspectStudentCerts([]);
+      setInspectStudentSoftSkills([]);
+      setInspectStudentAchievements([]);
+      setInspectStudentPlacement(null);
       return;
     }
     let cancelled = false;
+    const regNo = inspectStudent.regNo;
     setInspectProfileLoading(true);
-    api.getStudentProfile(inspectStudent.regNo)
-      .then((profile) => { if (!cancelled) setInspectStudentFullProfile(profile); })
-      .catch(() => { if (!cancelled) setInspectStudentFullProfile(null); })
-      .finally(() => { if (!cancelled) setInspectProfileLoading(false); });
+
+    Promise.allSettled([
+      api.getStudentProfile(regNo),
+      api.getAcademics(regNo),
+      api.getTechSkills(regNo),
+      api.getCertifications(regNo),
+      api.getSoftSkills(regNo),
+      api.getAchievements(regNo),
+      api.getPlacementProfile(regNo),
+    ]).then(([profileRes, academicsRes, techRes, certsRes, softRes, achRes, placementRes]) => {
+      if (cancelled) return;
+      setInspectStudentFullProfile(profileRes.status === 'fulfilled' ? profileRes.value : null);
+      setInspectStudentAcademics(academicsRes.status === 'fulfilled' ? academicsRes.value : []);
+      setInspectStudentTechSkills(techRes.status === 'fulfilled' ? techRes.value : []);
+      setInspectStudentCerts(certsRes.status === 'fulfilled' ? certsRes.value : []);
+      setInspectStudentSoftSkills(softRes.status === 'fulfilled' ? softRes.value : []);
+      setInspectStudentAchievements(achRes.status === 'fulfilled' ? achRes.value : []);
+      setInspectStudentPlacement(placementRes.status === 'fulfilled' ? placementRes.value : null);
+      setInspectProfileLoading(false);
+    });
+
     return () => { cancelled = true; };
   }, [inspectStudent]);
 
@@ -368,6 +398,31 @@ export const HodDashboardPage: React.FC = () => {
     });
   }, [mergedStudentDataset]);
 
+  // Year-Wise LeetCode Problems Solved — avg and top solver per year batch
+  const yearLeetCodeData = useMemo(() => {
+    const yearsList = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+    return yearsList.map((yr) => {
+      const yrDigit = yr.slice(0, 1);
+      const yearStudents = mergedStudentDataset.filter(
+        (s) => s.year === yr || s.year?.startsWith(yrDigit)
+      );
+      const linked = yearStudents.filter((s) => s.isLcLinked && s.leetcode > 0);
+      const avgSolved = linked.length > 0
+        ? Math.round(linked.reduce((sum, s) => sum + s.leetcode, 0) / linked.length)
+        : 0;
+      const topSolver = linked.length > 0
+        ? linked.reduce((best, s) => s.leetcode > best.leetcode ? s : best, linked[0]).leetcode
+        : 0;
+      return {
+        year: yr.replace(' Year', ''),
+        avgSolved,
+        topSolver,
+        linked: linked.length,
+        total: yearStudents.length,
+      };
+    });
+  }, [mergedStudentDataset]);
+
   const semesterProgressionData = useMemo(() => {
     const semesters = ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Sem 5', 'Sem 6', 'Sem 7'];
     const yearsList = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
@@ -403,21 +458,29 @@ export const HodDashboardPage: React.FC = () => {
 
   const studentGraphData = useMemo(() => {
     if (!inspectStudent) return [];
-    const semGpas = inspectStudent.semGpas || [8.80, 8.95, 9.15, 9.30, 9.45];
-    return semGpas.map((gpa, idx) => {
-      const prevGpa = idx > 0 ? semGpas[idx - 1] : null;
-      const delta = prevGpa !== null ? Number((gpa - prevGpa).toFixed(2)) : 0;
-      return {
-        semester: `Sem ${idx + 1}`,
-        gpa: gpa,
-        delta: delta,
-        attendance: 94 + (idx % 3),
-      };
-    });
-  }, [inspectStudent]);
+    // Use real academic records sorted by semester number
+    if (inspectStudentAcademics.length > 0) {
+      const sorted = [...inspectStudentAcademics].sort((a, b) => a.semester - b.semester);
+      return sorted.map((rec, idx) => {
+        const prevGpa = idx > 0 ? sorted[idx - 1].semester_gpa : null;
+        const delta = prevGpa !== null ? Number((rec.semester_gpa - prevGpa).toFixed(2)) : 0;
+        return {
+          semester: `Sem ${rec.semester}`,
+          gpa: Number(rec.semester_gpa),
+          delta,
+          attendance: Number(rec.attendance_pct ?? 0),
+        };
+      });
+    }
+    // No academic records saved yet — show empty chart
+    const fallbackGpa = inspectStudent.cgpa > 0 ? inspectStudent.cgpa : 0;
+    return fallbackGpa > 0
+      ? [{ semester: 'Sem 1', gpa: fallbackGpa, delta: 0, attendance: 0 }]
+      : [];
+  }, [inspectStudent, inspectStudentAcademics]);
 
   const studentGrowthMetrics = useMemo(() => {
-    if (!inspectStudent || studentGraphData.length === 0) return { firstSem: 8.8, latestSem: 9.45, growth: +0.65 };
+    if (!inspectStudent || studentGraphData.length === 0) return { firstSem: 0, latestSem: 0, growth: 0 };
     const first = studentGraphData[0].gpa;
     const latest = studentGraphData[studentGraphData.length - 1].gpa;
     const growth = Number((latest - first).toFixed(2));
@@ -688,20 +751,26 @@ export const HodDashboardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Section Breakdown Chart */}
+            {/* Year-Wise LeetCode Problems Solved */}
             <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm">
               <div className="mb-4">
-                <h3 className="text-sm font-bold text-textPrimary">Section-Wise Average CGPA</h3>
-                <p className="text-xs text-textSecondary">Comparison across Section A, Section B, and Section C</p>
+                <h3 className="text-sm font-bold text-textPrimary">Year-Wise LeetCode Problems Solved</h3>
+                <p className="text-xs text-textSecondary">Average solved vs top solver per academic year (linked students only)</p>
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={sectionCgpaSummary} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <BarChart data={yearLeetCodeData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="section" stroke="#6b7280" fontSize={11} />
-                    <YAxis domain={[8.0, 10.0]} stroke="#6b7280" fontSize={11} />
-                    <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
-                    <Bar dataKey="avgCgpa" name="Avg CGPA" fill="#4F46E5" radius={[6, 6, 0, 0]} />
+                    <XAxis dataKey="year" stroke="#6b7280" fontSize={11} />
+                    <YAxis stroke="#6b7280" fontSize={11} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }}
+                      formatter={(value: any, name: string) => [value + ' problems', name]}
+                      labelFormatter={(label) => `${label} Year`}
+                    />
+                    <Legend />
+                    <Bar dataKey="avgSolved" name="Avg Solved" fill="#FFA116" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="topSolver" name="Top Solver" fill="#4F46E5" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -902,8 +971,12 @@ export const HodDashboardPage: React.FC = () => {
             <div className="bg-background border border-borderLine rounded-2xl p-4 mb-6">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-xs font-bold text-textPrimary uppercase tracking-wider">Semester GPA Growth Trajectory</h4>
-                <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                  <ArrowUpRight className="w-4 h-4" /> Growth: +{studentGrowthMetrics.growth} GPA
+                <span className={`text-xs font-bold flex items-center gap-1 ${studentGrowthMetrics.growth >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {studentGrowthMetrics.growth >= 0
+                    ? <ArrowUpRight className="w-4 h-4" />
+                    : <ArrowDownRight className="w-4 h-4" />
+                  }
+                  {studentGrowthMetrics.growth >= 0 ? '+' : ''}{studentGrowthMetrics.growth} GPA
                 </span>
               </div>
               <div className="h-48 w-full">
@@ -985,7 +1058,9 @@ export const HodDashboardPage: React.FC = () => {
                             </td>
                             <td className="py-3 px-3 text-textSecondary">{row.attendance}%</td>
                             <td className="py-3 px-3">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700">Passed</span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${row.gpa >= 5.0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                                {row.gpa >= 5.0 ? 'Passed' : 'Failed'}
+                              </span>
                             </td>
                           </tr>
                         ))}
@@ -1034,11 +1109,11 @@ export const HodDashboardPage: React.FC = () => {
                 />
               )}
 
-              {inspectTab === 'tech-skills' && <TechSkillsTab readOnly={true} skills={[]} onRefresh={() => {}} />}
-              {inspectTab === 'certifications' && <CertificationsTab readOnly={true} certifications={[]} onRefresh={() => {}} />}
-              {inspectTab === 'soft-skills' && <SoftSkillsTab softSkills={[]} onRefresh={() => {}} />}
-              {inspectTab === 'achievements' && <AchievementsTab readOnly={true} achievements={[]} onRefresh={() => {}} />}
-              {inspectTab === 'academic-goals' && <PlacementPreferencesTab readOnly={true} placement={null} scoreData={null} onRefresh={() => {}} />}
+              {inspectTab === 'tech-skills' && <TechSkillsTab readOnly={true} skills={inspectStudentTechSkills} onRefresh={() => {}} />}
+              {inspectTab === 'certifications' && <CertificationsTab readOnly={true} certifications={inspectStudentCerts} onRefresh={() => {}} />}
+              {inspectTab === 'soft-skills' && <SoftSkillsTab readOnly={true} softSkills={inspectStudentSoftSkills} onRefresh={() => {}} />}
+              {inspectTab === 'achievements' && <AchievementsTab readOnly={true} achievements={inspectStudentAchievements} onRefresh={() => {}} />}
+              {inspectTab === 'academic-goals' && <PlacementPreferencesTab readOnly={true} placement={inspectStudentPlacement} scoreData={null} onRefresh={() => {}} />}
             </div>
           </div>
         </div>
