@@ -10,11 +10,10 @@ import { useAuth } from '../../context/AuthContext';
 import { PillButton } from '../../components/common/PillButton';
 import { UserRole } from '../../types';
 
-const HOD_MASTER_EMAIL = 'hodcseds@rgmcet.edu.in';
-const HOD_MASTER_PASS = 'cseds@2026';
-
+// Note: email constants are used only for display/routing.
+// Passwords are NEVER stored here — validated server-side via POST /auth/admin-login.
+const HOD_MASTER_EMAIL   = 'hodcseds@rgmcet.edu.in';
 const ADMIN_MASTER_EMAIL = 'admin@rgmcet.edu.in';
-const ADMIN_MASTER_PASS = 'admin@2026';
 
 export const AuthPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<UserRole>('student');
@@ -263,8 +262,10 @@ export const AuthPage: React.FC = () => {
 
       // ── MASTER ADMIN LOGIN HANDLER ──
       if (activeTab === 'admin' || data.email.toLowerCase() === ADMIN_MASTER_EMAIL) {
-        if (data.password !== ADMIN_MASTER_PASS && data.password !== HOD_MASTER_PASS) {
-          throw new Error('Incorrect password. Please enter valid admin credentials.');
+        // Validate credentials on the backend — passwords are in Lambda env vars, not this bundle
+        const authResult = await api.adminLogin(data.email, data.password);
+        if (!authResult.valid) {
+          throw new Error(authResult.error || 'Incorrect password. Please enter valid admin credentials.');
         }
 
         login(ADMIN_MASTER_EMAIL, 'admin', 'ADMIN_MASTER', 'System Administrator', jwtToken);
@@ -275,29 +276,19 @@ export const AuthPage: React.FC = () => {
 
       // ── MASTER HOD LOGIN HANDLER ──
       if (activeTab === 'hod' || data.email.toLowerCase() === HOD_MASTER_EMAIL) {
-        if (data.password !== HOD_MASTER_PASS) {
-          throw new Error('Incorrect password. Please enter the valid HOD password.');
+        // Validate credentials on the backend — passwords are in Lambda env vars, not this bundle
+        const hodAuthResult = await api.adminLogin(data.email, data.password);
+        if (!hodAuthResult.valid || hodAuthResult.role !== 'hod') {
+          throw new Error(hodAuthResult.error || 'Incorrect password. Please enter the valid HOD password.');
         }
 
-        // Attempt Cognito sign in
+        // Attempt Cognito sign in for JWT (best-effort; HOD works without JWT if Cognito fails)
         try {
-          const authResult = await cognitoSignIn(HOD_MASTER_EMAIL, HOD_MASTER_PASS);
-          jwtToken = authResult.idToken;
+          const cognitoResult = await cognitoSignIn(HOD_MASTER_EMAIL, data.password);
+          jwtToken = cognitoResult.idToken;
         } catch (cognitoErr: any) {
-          // Auto-register in Cognito if missing or reset
-          try {
-            await cognitoSignUp({
-              email: HOD_MASTER_EMAIL,
-              password: HOD_MASTER_PASS,
-              regNo: 'HOD_CSEDS',
-              year: 'HOD',
-              role: 'hod',
-            });
-            const authResult = await cognitoSignIn(HOD_MASTER_EMAIL, HOD_MASTER_PASS);
-            jwtToken = authResult.idToken;
-          } catch (signUpErr: any) {
-            console.warn('[HOD Cognito Sync Notice]:', signUpErr.message);
-          }
+          // Cognito sign-in failed — HOD account may not exist in Cognito yet
+          console.warn('[HOD Cognito Notice]:', cognitoErr.message);
         }
 
         // Auto-provision HOD record in Postgres DB

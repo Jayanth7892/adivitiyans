@@ -81,8 +81,22 @@ export const api = {
       return { valid: true }; // network errors: be lenient, don't kick out
     }
   },
+  // Admin & HOD Login — credentials validated server-side (never stored in frontend)
+  // Backend reads from Lambda env vars: ADMIN_MASTER_EMAIL, ADMIN_MASTER_PASS, HOD_MASTER_EMAIL, HOD_MASTER_PASS
+  adminLogin: async (email: string, password: string): Promise<{ valid: boolean; role?: 'admin' | 'hod'; error?: string }> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/admin-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      return await res.json();
+    } catch {
+      return { valid: false, error: 'Could not reach authentication server. Please check your connection.' };
+    }
+  },
 
-  // Student Directory CRUD (Admin & Faculty)
+
   getAllStudents: async (params?: { department?: string; batch?: string; section?: string; search?: string }): Promise<StudentProfile[]> => {
     const query = new URLSearchParams(params as any).toString();
     return fetchWithAuth(`/students${query ? `?${query}` : ''}`);

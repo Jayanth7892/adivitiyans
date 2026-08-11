@@ -17,6 +17,12 @@ echo "☁️ Step 2: Deploying Infrastructure with AWS CDK..."
 cd infra
 npm install
 npm run build
+# Admin credential secrets are passed from GitHub Secrets → CDK → Lambda env vars
+ADMIN_MASTER_EMAIL="${ADMIN_MASTER_EMAIL:-admin@rgmcet.edu.in}" \
+ADMIN_MASTER_PASS="${ADMIN_MASTER_PASS:-}" \
+HOD_MASTER_EMAIL="${HOD_MASTER_EMAIL:-hodcseds@rgmcet.edu.in}" \
+HOD_MASTER_PASS="${HOD_MASTER_PASS:-}" \
+ADMIN_SECRET="${ADMIN_SECRET:-}" \
 npm run cdk -- deploy --require-approval never --outputs-file ../cdk-outputs.json
 cd ..
 

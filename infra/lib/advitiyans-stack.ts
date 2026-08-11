@@ -253,8 +253,14 @@ export class AdvitiyansStack extends cdk.Stack {
         COGNITO_USER_POOL_ID: userPool.userPoolId,
         UPLOADS_BUCKET_NAME: uploadsBucket.bucketName,
         USE_MOCK: 'false',
-        // Forced update timestamp to ensure CDK redeploys Lambda with latest code
-        BUILD_TIMESTAMP: '2026-08-09T22:45:00',
+        // Admin/HOD credentials — sourced from GitHub Secrets, never hardcoded in frontend
+        ADMIN_MASTER_EMAIL: process.env.ADMIN_MASTER_EMAIL || 'admin@rgmcet.edu.in',
+        ADMIN_MASTER_PASS:  process.env.ADMIN_MASTER_PASS  || '',
+        HOD_MASTER_EMAIL:   process.env.HOD_MASTER_EMAIL   || 'hodcseds@rgmcet.edu.in',
+        HOD_MASTER_PASS:    process.env.HOD_MASTER_PASS    || '',
+        // Secret for protecting /db-init and /db-migrate endpoints
+        ADMIN_SECRET: process.env.ADMIN_SECRET || '',
+        BUILD_TIMESTAMP: new Date().toISOString(),
       },
     });
     dbSecret.grantRead(apiLambda);

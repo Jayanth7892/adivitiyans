@@ -46,7 +46,12 @@ app.get('/health', async (_req: Request, res: Response) => {
 });
 
 // Database Initialization Endpoint
-app.get('/db-init', async (_req: Request, res: Response) => {
+// Protected: requires X-Admin-Secret header matching ADMIN_SECRET env var
+app.get('/db-init', async (req: Request, res: Response) => {
+  const adminSecret = process.env.ADMIN_SECRET || '';
+  if (!adminSecret || req.headers['x-admin-secret'] !== adminSecret) {
+    return res.status(403).json({ error: 'Forbidden: missing or invalid X-Admin-Secret header' });
+  }
   try {
     const schemaPath = path.resolve(__dirname, '../schema.sql');
     if (fs.existsSync(schemaPath)) {
@@ -102,9 +107,14 @@ app.get('/db-init', async (_req: Request, res: Response) => {
 
 // ============================================================================
 // DB Migrate — Run incremental migrations without needing schema.sql
+// Protected: requires X-Admin-Secret header matching ADMIN_SECRET env var
 // Runs all ALTER/CREATE IF NOT EXISTS statements that are safe to re-run.
 // ============================================================================
-app.get('/db-migrate', async (_req: Request, res: Response) => {
+app.get('/db-migrate', async (req: Request, res: Response) => {
+  const adminSecret = process.env.ADMIN_SECRET || '';
+  if (!adminSecret || req.headers['x-admin-secret'] !== adminSecret) {
+    return res.status(403).json({ error: 'Forbidden: missing or invalid X-Admin-Secret header' });
+  }
   if (db.isMock) {
     return res.json({ status: 'ok', message: 'Mock mode — migrations skipped' });
   }
@@ -159,6 +169,47 @@ function sendIndexHtml(res: Response) {
 // Root & Web UI SPA Fallback Route (Serves frontend index.html over HTTPS)
 app.get('/', (_req: Request, res: Response) => {
   return sendIndexHtml(res);
+});
+
+// ============================================================================
+// Auth: Admin & HOD Login — Server-Side Credential Validation
+// Passwords are stored in Lambda env vars (not in frontend code).
+// Frontend calls this instead of checking credentials locally.
+// ============================================================================
+app.post('/auth/admin-login', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'email and password are required' });
+    }
+
+    const emailLower = email.toLowerCase();
+
+    // Read credentials from Lambda environment variables (never visible in frontend)
+    const adminEmail = (process.env.ADMIN_MASTER_EMAIL || '').toLowerCase();
+    const adminPass  = process.env.ADMIN_MASTER_PASS || '';
+    const hodEmail   = (process.env.HOD_MASTER_EMAIL || '').toLowerCase();
+    const hodPass    = process.env.HOD_MASTER_PASS || '';
+
+    if (!adminPass && !hodPass) {
+      // Env vars not configured — fail securely
+      return res.status(503).json({ error: 'Admin authentication is not configured on this server.' });
+    }
+
+    if (adminEmail && emailLower === adminEmail && adminPass && password === adminPass) {
+      return res.json({ valid: true, role: 'admin', email: adminEmail });
+    }
+
+    if (hodEmail && emailLower === hodEmail && hodPass && password === hodPass) {
+      return res.json({ valid: true, role: 'hod', email: hodEmail });
+    }
+
+    // Small artificial delay to slow brute-force attempts
+    await new Promise(resolve => setTimeout(resolve, 600));
+    return res.status(401).json({ valid: false, error: 'Invalid email or password.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 // ============================================================================
