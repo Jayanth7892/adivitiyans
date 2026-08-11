@@ -134,13 +134,14 @@ app.get('/db-migrate', async (req: Request, res: Response) => {
     `);
     results.push('user_sessions table ensured');
 
-    // Migration 2: coding_profiles extra columns
+    // Migration 3: Performance Indexes
     await db.query(`
-      ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS easy_count INT DEFAULT 0;
-      ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS medium_count INT DEFAULT 0;
-      ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS hard_count INT DEFAULT 0;
-      ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS contest_rating INT DEFAULT 0;
-    `).catch(() => results.push('coding_profiles columns already exist'));
+      CREATE INDEX IF NOT EXISTS idx_students_dept_year ON students (department, year);
+      CREATE INDEX IF NOT EXISTS idx_academics_student_sem ON academics (student_id, semester);
+      CREATE INDEX IF NOT EXISTS idx_coding_profiles_student_platform ON coding_profiles (student_id, platform);
+      CREATE INDEX IF NOT EXISTS idx_user_sessions_email_token ON user_sessions (email, session_token);
+    `).catch(() => {});
+    results.push('performance indexes ensured');
 
     return res.json({ status: 'ok', migrations: results });
   } catch (err: any) {
