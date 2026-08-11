@@ -20,6 +20,7 @@ export const AuthPage: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [regNoStatus, setRegNoStatus] = useState<{ loading: boolean; available?: boolean; message?: string }>({ loading: false });
   const [emailStatus, setEmailStatus] = useState<{ loading: boolean; available?: boolean; message?: string }>({ loading: false });
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -118,6 +119,7 @@ export const AuthPage: React.FC = () => {
   }, [watchedEmail, watchedRegNo]);
 
   const onSignUp = async (data: StudentSignUpInput) => {
+    setErrorMessage(null);
     try {
       const regNo = data.registrationNumber.toUpperCase();
       let jwtToken: string | undefined;
@@ -137,7 +139,7 @@ export const AuthPage: React.FC = () => {
             const authRes = await cognitoSignIn(data.email, data.password);
             jwtToken = authRes.idToken;
           } catch {
-            throw new Error('An account with this email already exists in Cognito. Please log in using your password.');
+            throw new Error('An account with this email already exists. Please log in using your password.');
           }
         } else {
           throw cognitoErr;
@@ -162,17 +164,19 @@ export const AuthPage: React.FC = () => {
         console.warn('[DB Student Create Notice]:', dbErr.message);
       });
 
-      // 3. Log in to app context
+      // 3. Log in to app context and navigate immediately (session registration is non-blocking)
       login(data.email, 'student', regNo, data.fullName, jwtToken);
+      registerSession(data.email, 'student');
       navigate('/dashboard');
     } catch (err: any) {
-      alert(err.message || 'Sign up failed');
+      setErrorMessage(err.message || 'Sign up failed. Please try again.');
     }
   };
 
   const FACULTY_SECRET_KEY = 'RGMCET_FACULTY_2026';
 
   const onFacultySignUp = async (data: FacultySignUpInput) => {
+    setErrorMessage(null);
     try {
       if (data.securityKey !== FACULTY_SECRET_KEY) {
         throw new Error(`Invalid Faculty Secret Passcode. Authorized security key is required for ${data.department} Faculty registration.`);
@@ -201,13 +205,15 @@ export const AuthPage: React.FC = () => {
       });
 
       login(data.email, 'faculty', generatedFacId, data.fullName, jwtToken);
+      registerSession(data.email, 'faculty');
       navigate('/faculty/dashboard');
     } catch (err: any) {
-      alert(err.message || 'Faculty sign up failed');
+      setErrorMessage(err.message || 'Faculty sign up failed. Please try again.');
     }
   };
 
   const onHodSignUp = async (data: FacultySignUpInput) => {
+    setErrorMessage(null);
     try {
       if (data.securityKey !== FACULTY_SECRET_KEY) {
         throw new Error(`Invalid Faculty Secret Passcode. Authorized security key is required for HOD registration.`);
@@ -236,9 +242,10 @@ export const AuthPage: React.FC = () => {
       });
 
       login(data.email, 'hod', generatedHodId, `${data.fullName} (HOD ${data.department})`, jwtToken);
+      registerSession(data.email, 'hod');
       navigate('/hod/dashboard');
     } catch (err: any) {
-      alert(err.message || 'HOD sign up failed');
+      setErrorMessage(err.message || 'HOD sign up failed. Please try again.');
     }
   };
 
@@ -255,6 +262,7 @@ export const AuthPage: React.FC = () => {
   };
 
   const onLogin = async (data: LoginInput) => {
+    setErrorMessage(null);
     try {
       let displayName: string | undefined;
       let rollNo: string | undefined;
@@ -269,7 +277,7 @@ export const AuthPage: React.FC = () => {
         }
 
         login(ADMIN_MASTER_EMAIL, 'admin', 'ADMIN_MASTER', 'System Administrator', jwtToken);
-        await registerSession(ADMIN_MASTER_EMAIL, 'admin');
+        registerSession(ADMIN_MASTER_EMAIL, 'admin'); // non-blocking
         navigate('/admin/dashboard');
         return;
       }
@@ -307,29 +315,40 @@ export const AuthPage: React.FC = () => {
         rollNo = 'HOD_CSEDS';
         displayName = hod ? `${hod.name} (HOD ${hod.department})` : 'Dr. HOD (CSE & Data Science)';
         login(HOD_MASTER_EMAIL, 'hod', rollNo, displayName, jwtToken);
-        await registerSession(HOD_MASTER_EMAIL, 'hod');
+        registerSession(HOD_MASTER_EMAIL, 'hod'); // non-blocking
         navigate('/hod/dashboard');
         return;
       }
 
-      // Step 1: Attempt authentication via Cognito (Student, Faculty, Admin)
-      try {
-        const authResult = await cognitoSignIn(data.email, data.password);
-        jwtToken = authResult.idToken;
-      } catch (cognitoErr: any) {
-        const msg = cognitoErr.message || '';
+      // Step 1: Run Cognito authentication & DB profile lookup in parallel for fast response
+      const [cognitoRes, dbRes] = await Promise.allSettled([
+        cognitoSignIn(data.email, data.password),
+        activeTab === 'student'
+          ? api.getStudentByEmail(data.email)
+          : api.getFacultyByEmail(data.email).catch(() => null),
+      ]);
+
+      let preFetchedDbUser = dbRes.status === 'fulfilled' ? dbRes.value : null;
+
+      if (cognitoRes.status === 'fulfilled') {
+        jwtToken = cognitoRes.value.idToken;
+      } else {
+        const cognitoErr: any = cognitoRes.reason;
+        const msg = cognitoErr?.message || '';
 
         if (msg.includes('Incorrect username or password') || msg.includes('NotAuthorizedException')) {
           throw new Error('Incorrect password. Please check your credentials and try again.');
         }
 
         if (msg.includes('User does not exist') || msg.includes('UserNotFoundException')) {
-          let dbUser: any = null;
+          let dbUser: any = preFetchedDbUser;
 
-          if (activeTab === 'student') {
-            dbUser = await api.getStudentByEmail(data.email);
-          } else if (activeTab === 'faculty') {
-            dbUser = await api.getFacultyByEmail(data.email).catch(() => null);
+          if (!dbUser) {
+            if (activeTab === 'student') {
+              dbUser = await api.getStudentByEmail(data.email);
+            } else if (activeTab === 'faculty') {
+              dbUser = await api.getFacultyByEmail(data.email).catch(() => null);
+            }
           }
 
           if (!dbUser) {
@@ -375,9 +394,12 @@ export const AuthPage: React.FC = () => {
         }
       }
 
-      // Step 3: Fetch DB profile to get displayName and rollNo
+      // Step 3: Extract DB profile info (using pre-fetched DB user if available)
       if (activeTab === 'student') {
-        let student = await api.getStudentByEmail(data.email);
+        let student = preFetchedDbUser;
+        if (!student) {
+          student = await api.getStudentByEmail(data.email);
+        }
         if (!student) {
           const derivedRollNo = data.email.split('@')[0].toUpperCase();
           const derivedName = derivedRollNo.startsWith('23091A')
@@ -423,7 +445,7 @@ export const AuthPage: React.FC = () => {
       }
 
       login(data.email, activeTab, rollNo, displayName, jwtToken);
-      await registerSession(data.email, activeTab);
+      registerSession(data.email, activeTab); // non-blocking — navigate immediately
       if ((activeTab as string) === 'admin') {
         navigate('/admin/dashboard');
       } else if (activeTab === 'faculty') {
@@ -432,7 +454,7 @@ export const AuthPage: React.FC = () => {
         navigate('/dashboard');
       }
     } catch (err: any) {
-      alert(err.message || 'Login failed');
+      setErrorMessage(err.message || 'Login failed. Please check your credentials and try again.');
     }
   };
 
@@ -476,6 +498,23 @@ export const AuthPage: React.FC = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg">
         <div className="bg-surface py-8 px-6 shadow-sm border border-borderLine sm:rounded-2xl sm:px-10">
+          {/* Inline Error Banner */}
+          {errorMessage && (
+            <div className="mb-6 flex items-start gap-3 bg-red-950/60 border border-red-500/50 rounded-xl px-4 py-3 text-sm animate-pulse-once">
+              <span className="text-red-400 text-base mt-0.5 flex-shrink-0">✕</span>
+              <div>
+                <p className="font-semibold text-red-300 leading-snug">{errorMessage}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setErrorMessage(null)}
+                className="ml-auto text-red-400 hover:text-red-200 flex-shrink-0 transition-colors"
+                aria-label="Dismiss error"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           {/* Role Switcher Pill Tabs */}
           <div className="grid grid-cols-4 gap-1 bg-background p-1 rounded-xl border border-borderLine mb-8">
             <button

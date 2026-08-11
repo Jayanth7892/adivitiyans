@@ -80,8 +80,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const registerSession = useCallback(async (email: string, userRole: UserRole) => {
     const token = `sess_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     sessionStorage.setItem(SESSION_TOKEN_KEY, token);
-    await api.registerSession(email, token, userRole);
     startPolling(email, token);
+    // Fire-and-forget session registration call to backend in background (non-blocking)
+    api.registerSession(email, token, userRole).catch((err) => {
+      console.warn('[Session] Background registration notice:', err);
+    });
   }, [startPolling]);
 
   // ── Restore session on mount (reads from this tab's sessionStorage) ────────

@@ -1,17 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthPage } from './features/auth/AuthPage';
-import { DashboardPage } from './features/dashboard/DashboardPage';
-import { ProfilePage } from './features/profile/ProfilePage';
-import { FacultyDashboardPage } from './features/faculty/FacultyDashboardPage';
-import { AdminDashboardPage } from './features/admin/AdminDashboardPage';
-import { HodDashboardPage } from './features/hod/HodDashboardPage';
-import { CodingAnalyticsPage } from './features/coding/CodingAnalyticsPage';
-import { PlatformStatsRedirect } from './features/coding/PlatformStatsRedirect';
 import { Sidebar } from './components/layout/Sidebar';
 import { TopBar } from './components/layout/TopBar';
+import { DashboardSkeleton } from './components/layout/DashboardSkeleton';
+
+// Lazy load feature dashboard pages on-demand for fast initial page load
+const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const ProfilePage = lazy(() => import('./features/profile/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const FacultyDashboardPage = lazy(() => import('./features/faculty/FacultyDashboardPage').then(m => ({ default: m.FacultyDashboardPage })));
+const AdminDashboardPage = lazy(() => import('./features/admin/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
+const HodDashboardPage = lazy(() => import('./features/hod/HodDashboardPage').then(m => ({ default: m.HodDashboardPage })));
+const CodingAnalyticsPage = lazy(() => import('./features/coding/CodingAnalyticsPage').then(m => ({ default: m.CodingAnalyticsPage })));
+const PlatformStatsRedirect = lazy(() => import('./features/coding/PlatformStatsRedirect').then(m => ({ default: m.PlatformStatsRedirect })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,7 +64,9 @@ const MainLayout: React.FC = () => {
       <div className="flex-1 flex flex-col lg:pl-[260px] min-w-0">
         <TopBar onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
         <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto">
-          <Outlet />
+          <Suspense fallback={<DashboardSkeleton />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>
