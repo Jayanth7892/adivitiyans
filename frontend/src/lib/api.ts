@@ -14,13 +14,16 @@ import { getIdToken } from './cognitoAuth';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://w8tlnuswea.execute-api.ap-south-1.amazonaws.com/prod';
 
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
-  // Prefer Cognito JWT, fallback to localStorage token
+  // Prefer per-tab sessionStorage JWT (set by AuthContext on login, tab-isolated)
+  // Falls back to Cognito session if sessionStorage token is missing (e.g. fresh page load)
   let token: string | null = null;
   try {
     token = await getIdToken();
   } catch { /* ignore */ }
-  if (!token) {
-    token = localStorage.getItem('advitiyans_jwt_token');
+  // Override with sessionStorage token — it's tab-specific and more reliable
+  const sessionToken = sessionStorage.getItem('advitiyans_jwt_token');
+  if (sessionToken) {
+    token = sessionToken;
   }
 
   const headers = {
