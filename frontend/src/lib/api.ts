@@ -85,13 +85,20 @@ export const api = {
   // Backend reads from Lambda env vars: ADMIN_MASTER_EMAIL, ADMIN_MASTER_PASS, HOD_MASTER_EMAIL, HOD_MASTER_PASS
   adminLogin: async (email: string, password: string): Promise<{ valid: boolean; role?: 'admin' | 'hod'; error?: string }> => {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s max
       const res = await fetch(`${API_BASE_URL}/auth/admin-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       return await res.json();
-    } catch {
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        return { valid: false, error: 'Login timed out. Please try again — Lambda may be warming up.' };
+      }
       return { valid: false, error: 'Could not reach authentication server. Please check your connection.' };
     }
   },

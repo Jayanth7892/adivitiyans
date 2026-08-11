@@ -95,36 +95,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (saved) {
           try {
             const savedUser = JSON.parse(saved);
+            // ⚡ Optimistic restore: set user IMMEDIATELY from sessionStorage so
+            // the app renders instantly without waiting for any network call.
             setUser(savedUser);
             setRole(savedUser.role);
+            setIsLoading(false); // unblock UI right away
 
-            // Resume polling with the existing session token
+            // Then validate session in the background (non-blocking)
             const savedToken = sessionStorage.getItem(SESSION_TOKEN_KEY);
             if (savedToken && savedUser.email) {
-              const result = await api.validateSession(savedUser.email, savedToken);
-              if (!result.valid) {
-                forceLogout(result.reason || 'invalid');
-                return;
-              }
-              startPolling(savedUser.email, savedToken);
+              api.validateSession(savedUser.email, savedToken).then((result) => {
+                if (!result.valid) {
+                  forceLogout(result.reason || 'invalid');
+                } else {
+                  startPolling(savedUser.email, savedToken);
+                }
+              }).catch(() => {
+                // Network error: be lenient, keep session alive
+                startPolling(savedUser.email, savedToken!);
+              });
             }
-          } catch { /* corrupted data — ignore */ }
-        }
 
-        // Silently refresh the Cognito JWT in background
-        try {
-          const cognitoSession = await getCurrentSession();
-          if (cognitoSession) {
-            sessionStorage.setItem(JWT_TOKEN_KEY, cognitoSession.idToken);
-          }
-        } catch {
-          console.warn('[Auth] Cognito session refresh failed, using cached session');
+            // Silently refresh Cognito JWT in background
+            getCurrentSession().then((cognitoSession) => {
+              if (cognitoSession) {
+                sessionStorage.setItem(JWT_TOKEN_KEY, cognitoSession.idToken);
+              }
+            }).catch(() => { /* ignore */ });
+
+            return; // early return — UI is already unblocked
+          } catch { /* corrupted data — fall through to setIsLoading(false) */ }
         }
       } catch (e) {
         console.warn('[Auth] Session restore failed:', e);
-      } finally {
-        setIsLoading(false);
       }
+      // No valid saved session — unblock UI immediately
+      setIsLoading(false);
     };
 
     restoreSession();
