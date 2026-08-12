@@ -488,6 +488,16 @@ export const HodDashboardPage: React.FC = () => {
 
         const data = Object.entries(semMap)
           .sort(([a], [b]) => Number(a) - Number(b))
+          .filter(([sem]) => {
+            // Only show semesters valid for the selected year
+            const maxSemByYear: Record<string, number> = {
+              '1st Year': 2,
+              '2nd Year': 4,
+              '3rd Year': 6,
+              '4th Year': 8,
+            };
+            return Number(sem) <= (maxSemByYear[yr] ?? 8);
+          })
           .map(([sem, gpas]) => ({
             semester: `Sem ${sem}`,
             avg: Number((gpas.reduce((s, g) => s + g, 0) / gpas.length).toFixed(2)),
