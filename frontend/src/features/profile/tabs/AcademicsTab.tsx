@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Plus, Award, GraduationCap, TrendingUp, ArrowUpRight, ArrowDownRight, Edit2, Calendar, CheckCircle2, Lock } from 'lucide-react';
+import { Plus, Award, GraduationCap, TrendingUp, ArrowUpRight, ArrowDownRight, Edit2, CheckCircle2, Lock } from 'lucide-react';
 import { AcademicRecord } from '../../../types';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
@@ -78,6 +78,11 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
   const highestSemGpa = sortedAcademics.length > 0 ? Math.max(...sortedAcademics.map((a) => Number(a.semester_gpa))) : 0;
 
   const onSaveSemester = async (data: AcademicRecord) => {
+    // BUG-02 fix: reject if the semester number exceeds what HOD has unlocked
+    if (!readOnly && !editingSemester && Number(data.semester) > maxAllowedSemester) {
+      alert(`Semester ${data.semester} is not yet unlocked. HOD has unlocked up to Semester ${maxAllowedSemester}.`);
+      return;
+    }
     setSaving(true);
     try {
       await api.saveAcademicRecord(activeRollNo, {
@@ -258,7 +263,9 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
 
       {/* 3. Semester Cards Grid (Sem 1 to Sem 8) */}
       <div className="space-y-4">
-        <h3 className="text-base font-bold text-textPrimary">Semester Performance Breakdown (Click any semester to enter/edit)</h3>
+        <h3 className="text-base font-bold text-textPrimary">
+          Semester Performance Breakdown{!readOnly && ' (Click any semester to enter/edit)'}
+        </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((semNum) => {
@@ -270,30 +277,42 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
             const delta = currGpa !== null && prevGpa !== null ? Number((currGpa - prevGpa).toFixed(2)) : null;
 
             if (!record) {
+              // BUG-01 fix: check HOD lock before showing the enter button
+              const isLocked = !readOnly && !unlockLoading && semNum > maxAllowedSemester;
               return (
-                <div key={semNum} className="bg-surface border border-dashed border-borderLine rounded-2xl p-5 text-center flex flex-col justify-between space-y-3 hover:border-[#5B4FE9] transition-all">
+                <div key={semNum} className={`bg-surface border border-dashed rounded-2xl p-5 text-center flex flex-col justify-between space-y-3 transition-all ${isLocked ? 'border-amber-200 opacity-70' : 'border-borderLine hover:border-[#5B4FE9]'}`}>
                   <div className="flex items-center justify-between text-xs text-textSecondary">
                     <span className="font-bold text-textPrimary">Semester {semNum}</span>
-                    <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded font-semibold">Not Entered</span>
+                    <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded font-semibold">
+                      {isLocked ? 'Locked' : 'Not Entered'}
+                    </span>
                   </div>
-                  <p className="text-xs text-textSecondary italic py-2">Click below to enter Sem {semNum} GPA</p>
-                  <button
-                    onClick={() => {
-                      setEditingSemester(null);
-                      reset({
-                        semester: semNum,
-                        semester_gpa: 9.0,
-                        programming_grade: 'O',
-                        attendance_pct: 95.0,
-                        theory_grade: 'A+',
-                        remarks: '',
-                      });
-                      setShowAddModal(true);
-                    }}
-                    className="w-full py-2 rounded-xl bg-[#5B4FE9]/10 text-[#5B4FE9] text-xs font-bold hover:bg-[#5B4FE9] hover:text-white transition-all flex items-center justify-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Enter Sem {semNum} GPA
-                  </button>
+                  <p className="text-xs text-textSecondary italic py-2">
+                    {isLocked ? 'HOD has not yet unlocked this semester.' : `Click below to enter Sem ${semNum} GPA`}
+                  </p>
+                  {isLocked ? (
+                    <div className="w-full py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 text-xs font-semibold flex items-center justify-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5" /> Locked by HOD
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingSemester(null);
+                        reset({
+                          semester: semNum,
+                          semester_gpa: 9.0,
+                          programming_grade: 'O',
+                          attendance_pct: 95.0,
+                          theory_grade: 'A+',
+                          remarks: '',
+                        });
+                        setShowAddModal(true);
+                      }}
+                      className="w-full py-2 rounded-xl bg-[#5B4FE9]/10 text-[#5B4FE9] text-xs font-bold hover:bg-[#5B4FE9] hover:text-white transition-all flex items-center justify-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Enter Sem {semNum} GPA
+                    </button>
+                  )}
                 </div>
               );
             }
@@ -344,8 +363,9 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
             </h3>
             <form onSubmit={handleSubmit(onSaveSemester)} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-textPrimary mb-1">Semester Number (1 to 8) *</label>
-                <input {...register('semester')} type="number" min={1} max={8} className="w-full px-3 py-2 text-sm rounded-xl border border-borderLine bg-background font-bold text-textPrimary" />
+                <label className="block text-xs font-semibold text-textPrimary mb-1">Semester Number</label>
+                {/* readOnly — pre-filled from card; prevents bypass via manual edit (BUG-02) */}
+                <input {...register('semester')} type="number" min={1} max={8} readOnly className="w-full px-3 py-2 text-sm rounded-xl border border-borderLine bg-background/50 font-bold text-textPrimary cursor-not-allowed" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-textPrimary mb-1">Semester GPA (0.00 - 10.00) *</label>

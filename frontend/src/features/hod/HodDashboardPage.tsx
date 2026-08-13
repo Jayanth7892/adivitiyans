@@ -137,7 +137,7 @@ function mapStudentToHodEntry(student: any, index: number, liveSolved?: number):
     section,
     year: student.year || '3rd Year',
     cgpa,
-    semGpas: [cgpa, cgpa, cgpa, cgpa, cgpa],
+    semGpas: [], // real per-sem data only available when inspecting individual students
     leetcode,
     leetcodeHandle: isLcLinked ? rawLcHandle : null,
     isLcLinked: isLcLinked || leetcode > 0,
@@ -191,7 +191,6 @@ export const HodDashboardPage: React.FC = () => {
   }, [location.search]);
 
   // HOD Account Settings state
-  const [settingsCurrentPassword, setSettingsCurrentPassword] = useState('');
   const [settingsNewEmail, setSettingsNewEmail] = useState('');
   const [settingsNewPassword, setSettingsNewPassword] = useState('');
   const [settingsConfirmPassword, setSettingsConfirmPassword] = useState('');
@@ -281,7 +280,7 @@ export const HodDashboardPage: React.FC = () => {
       if (students.length === 0) return;
       const snapshotMap: Record<string, number> = {};
 
-      await Promise.all(
+      await Promise.allSettled(
         students.map(async (s: any) => {
           const lcHandle = s.leetcode_handle;
           const isValidHandle = Boolean(lcHandle) && lcHandle !== 'Not Linked' && String(lcHandle).trim() !== '';
@@ -332,7 +331,7 @@ export const HodDashboardPage: React.FC = () => {
     return mergedStudentDataset.filter((s) => {
       const matchesSearch = !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.regNo.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesYear = slicerYear === 'All' || s.year === slicerYear;
-      const matchesSection = slicerSection === 'All' || s.section.includes(slicerSection.replace('Section ', 'Sec '));
+      const matchesSection = slicerSection === 'All' || s.section === slicerSection.replace('Section ', 'Sec ');
       const matchesStanding = slicerStanding === 'All' || s.standing === slicerStanding;
       const matchesCoding =
         slicerCoding === 'All' ||
@@ -464,11 +463,14 @@ export const HodDashboardPage: React.FC = () => {
       yearsList.forEach((yr, yIdx) => {
         const key = `Year${4 - yIdx}`;
         const yrDigit = yr.slice(0, 1);
+        // BUG-04 fix: semGpas is now [] for real students; fall back to cgpa when no per-sem data
         const yearStuds = mergedStudentDataset.filter(
-          (s) => (s.year === yr || s.year?.startsWith(yrDigit)) && s.semGpas && s.semGpas[sIdx] !== undefined
+          (s) => s.year === yr || s.year?.startsWith(yrDigit)
         );
         if (yearStuds.length > 0) {
-          const avg = yearStuds.reduce((acc, curr) => acc + (curr.semGpas[sIdx] || curr.cgpa || 0), 0) / yearStuds.length;
+          const avg = yearStuds.reduce((acc, curr) =>
+            acc + (curr.semGpas[sIdx] !== undefined ? curr.semGpas[sIdx] : curr.cgpa ?? 0), 0
+          ) / yearStuds.length;
           entry[key] = Number(avg.toFixed(2));
         } else {
           entry[key] = null;
