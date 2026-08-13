@@ -283,6 +283,13 @@ export const AdminDashboardPage: React.FC = () => {
     return matchesYear;
   });
 
+  // CGPA band counts — computed from real student data for the performance tab stat cards
+  const total = students.length || 1; // avoid division by zero
+  const cgpaAbove9  = students.filter(s => Number((s as any).cgpa ?? 0) > 9.0).length;
+  const cgpa8to9    = students.filter(s => { const c = Number((s as any).cgpa ?? 0); return c >= 8.0 && c <= 9.0; }).length;
+  const cgpa7to8    = students.filter(s => { const c = Number((s as any).cgpa ?? 0); return c >= 7.0 && c < 8.0; }).length;
+  const cgpaBelow7  = students.filter(s => Number((s as any).cgpa ?? 0) < 7.0 && (s as any).cgpa !== undefined && (s as any).cgpa !== null).length;
+
   // Student CRUD handlers
   const openAddModal = () => {
     setFormName(''); setFormRegNo(''); setFormEmail(''); setFormYear('3rd Year');
@@ -451,16 +458,16 @@ export const AdminDashboardPage: React.FC = () => {
                   setHodCredsLoading(false);
                 }).catch(() => setHodCredsLoading(false));
               }
-              // Fetch student passwords when that tab is opened
-              if (t.key === 'student-passwords') {
+              // Fetch student passwords on first open only; Refresh button handles manual re-fetch
+              if (t.key === 'student-passwords' && pwdStudents.length === 0) {
                 setPwdLoading(true);
                 api.getStudentPasswords().then((rows) => {
                   setPwdStudents(rows);
                   setPwdLoading(false);
                 }).catch(() => setPwdLoading(false));
               }
-              // Fetch regular admin list when Admin Management tab is opened
-              if (t.key === 'admin-management' && isSuperAdmin && user?.email) {
+              // Fetch regular admin list on first open only; Refresh button handles manual re-fetch
+              if (t.key === 'admin-management' && isSuperAdmin && user?.email && adminList.length === 0) {
                 setAdminListLoading(true);
                 api.getSuperAdminAdmins(user.email).then((rows) => {
                   setAdminList(rows);
@@ -623,13 +630,24 @@ export const AdminDashboardPage: React.FC = () => {
                     <td className="py-3.5 px-4 font-bold text-brand-primary text-xs">{s.roll_number}</td>
                     <td className="py-3.5 px-4 text-xs font-medium">{s.department} • {s.year}</td>
                     <td className="py-3.5 px-4 font-black text-green-600">
-                      {[9.45, 9.30, 9.10, 8.90, 8.70][i % 5]} / 10.0
+                      {(s as any).cgpa !== undefined && (s as any).cgpa !== null
+                        ? `${Number((s as any).cgpa).toFixed(2)} / 10.0`
+                        : <span className="text-textSecondary font-normal text-xs">N/A</span>}
                     </td>
                     <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FFA116]/10 text-[#FFA116]">LeetCode</span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-800">GitHub</span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-600">Codeforces</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {(s as any).leetcode_handle && (s as any).leetcode_handle !== 'Not Linked' && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FFA116]/10 text-[#FFA116]">LeetCode</span>
+                        )}
+                        {(s as any).github_handle && (s as any).github_handle !== 'Not Linked' && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-800">GitHub</span>
+                        )}
+                        {(s as any).codeforces_handle && (s as any).codeforces_handle !== 'Not Linked' && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-600">Codeforces</span>
+                        )}
+                        {!(s as any).leetcode_handle && !(s as any).github_handle && !(s as any).codeforces_handle && (
+                          <span className="text-xs text-textSecondary italic">None linked</span>
+                        )}
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-xs">{s.batch} • Sec {s.section}</td>
@@ -663,10 +681,10 @@ export const AdminDashboardPage: React.FC = () => {
           {/* CGPA Band Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             {[
-              { label: 'CGPA > 9.0 (Distinction)', count: '3', color: 'text-brand-primary', pct: '60%' },
-              { label: 'CGPA 8.0–9.0 (First Class)', count: '2', color: 'text-success', pct: '40%' },
-              { label: 'CGPA 7.0–8.0', count: '0', color: 'text-indigo-600', pct: '0%' },
-              { label: 'CGPA < 7.0 (Needs Support)', count: '0', color: 'text-alert', pct: '0%' },
+              { label: 'CGPA > 9.0 (Distinction)',      count: cgpaAbove9,  color: 'text-brand-primary', pct: `${Math.round((cgpaAbove9  / total) * 100)}%` },
+              { label: 'CGPA 8.0–9.0 (First Class)',    count: cgpa8to9,    color: 'text-success',       pct: `${Math.round((cgpa8to9   / total) * 100)}%` },
+              { label: 'CGPA 7.0–8.0',                  count: cgpa7to8,    color: 'text-indigo-600',    pct: `${Math.round((cgpa7to8   / total) * 100)}%` },
+              { label: 'CGPA < 7.0 (Needs Support)',    count: cgpaBelow7,  color: 'text-alert',         pct: `${Math.round((cgpaBelow7 / total) * 100)}%` },
             ].map((band) => (
               <div key={band.label} className="p-4 rounded-xl bg-surface border border-borderLine shadow-sm">
                 <p className="text-xs font-bold text-textSecondary uppercase leading-tight mb-2">{band.label}</p>
@@ -1398,7 +1416,11 @@ export const AdminDashboardPage: React.FC = () => {
                   <RefreshCw className={`w-3.5 h-3.5 ${adminListLoading ? 'animate-spin' : ''}`} /> Refresh
                 </button>
                 <button
-                  onClick={() => setShowAddAdmin((v) => !v)}
+                  onClick={() => {
+                    // Clear any stale toast from previous Add Admin session
+                    if (!showAddAdmin) setAdminMsg(null);
+                    setShowAddAdmin((v) => !v);
+                  }}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-brand-primary text-white hover:bg-brand-primary/90 transition-all"
                 >
                   <UserPlus className="w-3.5 h-3.5" /> Add Admin
