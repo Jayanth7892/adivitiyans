@@ -300,4 +300,26 @@ export const api = {
       method: 'POST',
     });
   },
+
+  // HOD Credential Management
+  // Fetch current HOD email (admin-facing — shows DB override or env default)
+  getHodCredentials: async (): Promise<{ email: string; source: string; updated_at: string | null }> => {
+    return fetchWithAuth('/auth/hod-credentials');
+  },
+
+  // HOD updates their own email/password — requires current password for verification
+  updateHodCredentials: async (currentPassword: string, newEmail?: string, newPassword?: string): Promise<{ success: boolean; message: string; email: string }> => {
+    return fetchWithAuth('/auth/hod-credentials', {
+      method: 'PUT',
+      body: JSON.stringify({ current_password: currentPassword, new_email: newEmail || undefined, new_password: newPassword || undefined }),
+    });
+  },
+
+  // Admin resets HOD credentials without needing the current password
+  adminResetHodCredentials: async (newEmail?: string, newPassword?: string): Promise<{ success: boolean; message: string; email: string }> => {
+    return fetchWithAuth('/auth/hod-credentials/admin-reset', {
+      method: 'POST',
+      body: JSON.stringify({ new_email: newEmail || undefined, new_password: newPassword || undefined }),
+    });
+  },
 };

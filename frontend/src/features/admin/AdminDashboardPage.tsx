@@ -12,6 +12,7 @@ import {
   Award,
   ShieldCheck,
   Eye,
+  EyeOff,
   X,
   BookOpen,
   Trophy,
@@ -21,6 +22,12 @@ import {
   Github,
   ExternalLink,
   Upload,
+  KeyRound,
+  Mail,
+  Lock,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { StudentProfile } from '../../types';
@@ -55,6 +62,16 @@ export const AdminDashboardPage: React.FC = () => {
 
   // Live platform snapshot state for student coding counts
   const [liveSnapshots, setLiveSnapshots] = useState<Record<string, number>>({});
+
+  // HOD Credentials panel state
+  const [hodCreds, setHodCreds] = useState<{ email: string; source: string; updated_at: string | null } | null>(null);
+  const [hodCredsLoading, setHodCredsLoading] = useState(false);
+  const [adminResetEmail, setAdminResetEmail] = useState('');
+  const [adminResetPassword, setAdminResetPassword] = useState('');
+  const [adminResetConfirm, setAdminResetConfirm] = useState('');
+  const [showAdminResetPwd, setShowAdminResetPwd] = useState(false);
+  const [adminResetSaving, setAdminResetSaving] = useState(false);
+  const [adminResetMessage, setAdminResetMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Student Directory state
   const [searchQuery, setSearchQuery] = useState('');
@@ -341,10 +358,21 @@ export const AdminDashboardPage: React.FC = () => {
           { key: 'students', label: 'Student Directory (CRUD)' },
           { key: 'performance', label: 'CGPA & Coding Rankings' },
           { key: 'faculty', label: 'Faculty & Mentor Assignments' },
+          { key: 'hod-credentials', label: '🔑 HOD Credentials' },
         ].map((t) => (
           <button
             key={t.key}
-            onClick={() => setSearchParams({ tab: t.key })}
+            onClick={() => {
+              setSearchParams({ tab: t.key });
+              // Fetch HOD credentials when that tab is opened
+              if (t.key === 'hod-credentials' && !hodCreds) {
+                setHodCredsLoading(true);
+                api.getHodCredentials().then((data) => {
+                  setHodCreds(data);
+                  setHodCredsLoading(false);
+                }).catch(() => setHodCredsLoading(false));
+              }
+            }}
             className={`pb-3 transition-colors ${activeTab === t.key ? 'border-b-2 border-brand-primary text-brand-primary' : 'text-textSecondary hover:text-textPrimary'}`}
           >
             {t.label}
@@ -796,6 +824,203 @@ export const AdminDashboardPage: React.FC = () => {
         onClose={() => setShowBulkImportModal(false)}
         onSuccess={refetch}
       />
+
+      {/* ── TAB: HOD Credentials ── */}
+      {activeTab === 'hod-credentials' && (
+        <div className="space-y-6">
+          {/* Current Credentials Card */}
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center shrink-0">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-textPrimary">Current HOD Login Credentials</h3>
+                  <p className="text-xs text-textSecondary">Active credentials used to authenticate the HOD account</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setHodCredsLoading(true);
+                  api.getHodCredentials().then((data) => {
+                    setHodCreds(data);
+                    setHodCredsLoading(false);
+                  }).catch(() => setHodCredsLoading(false));
+                }}
+                className="p-2 rounded-xl border border-borderLine hover:bg-background transition-colors text-textSecondary"
+                title="Refresh"
+              >
+                <RefreshCw className={`w-4 h-4 ${hodCredsLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+
+            {hodCredsLoading ? (
+              <div className="flex items-center gap-2 text-xs text-textSecondary py-4">
+                <RefreshCw className="w-4 h-4 animate-spin text-brand-primary" /> Loading credentials...
+              </div>
+            ) : hodCreds ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-background border border-borderLine">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Mail className="w-4 h-4 text-brand-primary" />
+                    <span className="text-xs font-semibold text-textSecondary uppercase tracking-wider">HOD Login Email</span>
+                  </div>
+                  <p className="text-sm font-bold text-textPrimary break-all">{hodCreds.email}</p>
+                </div>
+                <div className="p-4 rounded-xl bg-background border border-borderLine">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Lock className="w-4 h-4 text-amber-500" />
+                    <span className="text-xs font-semibold text-textSecondary uppercase tracking-wider">Password</span>
+                  </div>
+                  <p className="text-sm font-bold text-textPrimary">●●●●●●●●</p>
+                  <p className="text-[10px] text-textSecondary mt-0.5">Use Admin Reset below to change</p>
+                </div>
+                <div className="p-4 rounded-xl bg-background border border-borderLine sm:col-span-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                    <span className="text-xs font-semibold text-textSecondary uppercase tracking-wider">Source</span>
+                  </div>
+                  <p className="text-sm text-textPrimary">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                      hodCreds.source === 'database' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                    }`}>
+                      {hodCreds.source === 'database' ? '✓ Custom (DB Override)' : '⚠ Default (Env Var)'}
+                    </span>
+                    {hodCreds.updated_at && (
+                      <span className="text-xs text-textSecondary ml-2">
+                        Last changed: {new Date(hodCreds.updated_at).toLocaleString()}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-textSecondary py-4">Click refresh to load current HOD credentials.</p>
+            )}
+          </div>
+
+          {/* Admin Force Reset Card */}
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm max-w-lg">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-textPrimary">Admin: Force Reset HOD Credentials</h3>
+                <p className="text-xs text-textSecondary">Override HOD email and/or password without requiring their current password.</p>
+              </div>
+            </div>
+
+            {adminResetMessage && (
+              <div className={`mb-4 flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm ${
+                adminResetMessage.type === 'success'
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : 'bg-red-50 border border-red-200 text-red-700'
+              }`}>
+                {adminResetMessage.type === 'success'
+                  ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                  : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                }
+                <span className="font-medium">{adminResetMessage.text}</span>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1.5">
+                  <Mail className="w-3.5 h-3.5 inline mr-1 text-brand-primary" />
+                  New HOD Email <span className="text-textSecondary font-normal">(leave blank to keep current)</span>
+                </label>
+                <input
+                  type="email"
+                  value={adminResetEmail}
+                  onChange={(e) => setAdminResetEmail(e.target.value)}
+                  placeholder="e.g. newhod@rgmcet.edu.in"
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1.5">
+                  <Lock className="w-3.5 h-3.5 inline mr-1 text-brand-primary" />
+                  New HOD Password <span className="text-textSecondary font-normal">(leave blank to keep current)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showAdminResetPwd ? 'text' : 'password'}
+                    value={adminResetPassword}
+                    onChange={(e) => setAdminResetPassword(e.target.value)}
+                    placeholder="Set a new password for the HOD"
+                    className="w-full px-3.5 py-2 pr-10 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  />
+                  <button type="button" onClick={() => setShowAdminResetPwd(!showAdminResetPwd)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary">
+                    {showAdminResetPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {adminResetPassword && (
+                <div>
+                  <label className="block text-xs font-semibold text-textPrimary mb-1.5">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={adminResetConfirm}
+                    onChange={(e) => setAdminResetConfirm(e.target.value)}
+                    placeholder="Re-enter new password"
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  />
+                  {adminResetConfirm && adminResetPassword !== adminResetConfirm && (
+                    <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={async () => {
+                  setAdminResetMessage(null);
+                  if (!adminResetEmail && !adminResetPassword) {
+                    setAdminResetMessage({ type: 'error', text: 'Enter a new email or new password to reset.' });
+                    return;
+                  }
+                  if (adminResetPassword && adminResetPassword !== adminResetConfirm) {
+                    setAdminResetMessage({ type: 'error', text: 'Passwords do not match.' });
+                    return;
+                  }
+                  if (!window.confirm('Are you sure you want to override the HOD credentials? The HOD will need to use the new email/password to log in.')) return;
+                  setAdminResetSaving(true);
+                  try {
+                    const result = await api.adminResetHodCredentials(
+                      adminResetEmail || undefined,
+                      adminResetPassword || undefined,
+                    );
+                    setAdminResetMessage({ type: 'success', text: `HOD credentials reset! New email: ${result.email}` });
+                    setAdminResetEmail('');
+                    setAdminResetPassword('');
+                    setAdminResetConfirm('');
+                    // Refresh credentials display
+                    const updated = await api.getHodCredentials().catch(() => null);
+                    if (updated) setHodCreds(updated);
+                  } catch (err: any) {
+                    setAdminResetMessage({ type: 'error', text: err.message || 'Reset failed.' });
+                  } finally {
+                    setAdminResetSaving(false);
+                  }
+                }}
+                disabled={adminResetSaving}
+                className="w-full py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-60"
+              >
+                {adminResetSaving ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Resetting...</>
+                ) : (
+                  <><KeyRound className="w-4 h-4" /> Force Reset HOD Credentials</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

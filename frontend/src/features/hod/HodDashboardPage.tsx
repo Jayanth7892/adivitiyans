@@ -6,6 +6,7 @@ import {
   Award, ExternalLink, BookOpen, Code2, BarChart2, Building2,
   Download, Filter, ArrowUpRight, ArrowDownRight,
   CheckCircle2, Sparkles, AlertCircle, Sliders, Activity, RefreshCw, Upload,
+  Settings, KeyRound, Mail, Lock, ShieldCheck,
 } from 'lucide-react';
 import { PlacementEligibilitySection } from './components/PlacementEligibilitySection';
 import { BulkImportModal } from '../admin/components/BulkImportModal';
@@ -149,7 +150,7 @@ function mapStudentToHodEntry(student: any, index: number, liveSolved?: number):
 }
 
 export const HodDashboardPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'students' | 'rankings' | 'placement'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'students' | 'rankings' | 'placement' | 'settings'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Interactive Filter Slicers
@@ -184,10 +185,20 @@ export const HodDashboardPage: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
-    if (tab === 'overview' || tab === 'analytics' || tab === 'students' || tab === 'rankings' || tab === 'placement') {
+    if (tab === 'overview' || tab === 'analytics' || tab === 'students' || tab === 'rankings' || tab === 'placement' || tab === 'settings') {
       setActiveTab(tab as any);
     }
   }, [location.search]);
+
+  // HOD Account Settings state
+  const [settingsCurrentPassword, setSettingsCurrentPassword] = useState('');
+  const [settingsNewEmail, setSettingsNewEmail] = useState('');
+  const [settingsNewPassword, setSettingsNewPassword] = useState('');
+  const [settingsConfirmPassword, setSettingsConfirmPassword] = useState('');
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showSettingsPwd, setShowSettingsPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
 
   // Fetch ALL student sub-data in parallel whenever a student is opened for inspection
   useEffect(() => {
@@ -722,6 +733,7 @@ export const HodDashboardPage: React.FC = () => {
           { key: 'placement', label: '🎯 Placement Eligibility Engine (T&P)' },
           { key: 'students', label: '👨‍🎓 Student Directory & Inspection' },
           { key: 'rankings', label: '🏆 Department Leaderboard' },
+          { key: 'settings', label: '⚙️ Account Settings' },
         ].map((t) => (
           <button
             key={t.key}
@@ -1235,6 +1247,162 @@ export const HodDashboardPage: React.FC = () => {
         onClose={() => setShowBulkImportModal(false)}
         onSuccess={refetch}
       />
+
+      {/* ── TAB: Account Settings ── */}
+      {activeTab === 'settings' && (
+        <div className="space-y-6">
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm max-w-lg">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-textPrimary">HOD Account Settings</h3>
+                <p className="text-xs text-textSecondary">Update your login email and/or password. Your current password is required to save changes.</p>
+              </div>
+            </div>
+
+            {/* Inline feedback */}
+            {settingsMessage && (
+              <div className={`mb-5 flex items-start gap-2.5 rounded-xl px-4 py-3 text-sm ${
+                settingsMessage.type === 'success'
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : 'bg-red-50 border border-red-200 text-red-700'
+              }`}>
+                {settingsMessage.type === 'success'
+                  ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                  : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                }
+                <span className="font-medium">{settingsMessage.text}</span>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              {/* New Email */}
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1.5">
+                  <Mail className="w-3.5 h-3.5 inline mr-1 text-brand-primary" />
+                  New Login Email <span className="text-textSecondary font-normal">(leave blank to keep current)</span>
+                </label>
+                <input
+                  type="email"
+                  value={settingsNewEmail}
+                  onChange={(e) => setSettingsNewEmail(e.target.value)}
+                  placeholder="e.g. newhod@rgmcet.edu.in"
+                  className="w-full px-3.5 py-2 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                />
+              </div>
+
+              {/* New Password */}
+              <div>
+                <label className="block text-xs font-semibold text-textPrimary mb-1.5">
+                  <Lock className="w-3.5 h-3.5 inline mr-1 text-brand-primary" />
+                  New Password <span className="text-textSecondary font-normal">(leave blank to keep current)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPwd ? 'text' : 'password'}
+                    value={settingsNewPassword}
+                    onChange={(e) => setSettingsNewPassword(e.target.value)}
+                    placeholder="Min 6 characters"
+                    className="w-full px-3.5 py-2 pr-10 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  />
+                  <button type="button" onClick={() => setShowNewPwd(!showNewPwd)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary">
+                    {showNewPwd ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm New Password */}
+              {settingsNewPassword && (
+                <div>
+                  <label className="block text-xs font-semibold text-textPrimary mb-1.5">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={settingsConfirmPassword}
+                    onChange={(e) => setSettingsConfirmPassword(e.target.value)}
+                    placeholder="Re-enter new password"
+                    className="w-full px-3.5 py-2 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  />
+                  {settingsConfirmPassword && settingsNewPassword !== settingsConfirmPassword && (
+                    <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                  )}
+                </div>
+              )}
+
+              {/* Divider */}
+              <div className="border-t border-borderLine pt-4">
+                <label className="block text-xs font-semibold text-textPrimary mb-1.5">
+                  <KeyRound className="w-3.5 h-3.5 inline mr-1 text-amber-500" />
+                  Current Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSettingsPwd ? 'text' : 'password'}
+                    value={settingsCurrentPassword}
+                    onChange={(e) => setSettingsCurrentPassword(e.target.value)}
+                    placeholder="Enter your current password to confirm"
+                    className="w-full px-3.5 py-2 pr-10 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  />
+                  <button type="button" onClick={() => setShowSettingsPwd(!showSettingsPwd)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary">
+                    {showSettingsPwd ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <button
+                onClick={async () => {
+                  setSettingsMessage(null);
+                  if (!settingsCurrentPassword) {
+                    setSettingsMessage({ type: 'error', text: 'Current password is required.' });
+                    return;
+                  }
+                  if (!settingsNewEmail && !settingsNewPassword) {
+                    setSettingsMessage({ type: 'error', text: 'Please enter a new email or new password to update.' });
+                    return;
+                  }
+                  if (settingsNewPassword && settingsNewPassword !== settingsConfirmPassword) {
+                    setSettingsMessage({ type: 'error', text: 'New passwords do not match.' });
+                    return;
+                  }
+                  if (settingsNewPassword && settingsNewPassword.length < 6) {
+                    setSettingsMessage({ type: 'error', text: 'New password must be at least 6 characters.' });
+                    return;
+                  }
+                  setSettingsSaving(true);
+                  try {
+                    const result = await api.updateHodCredentials(
+                      settingsCurrentPassword,
+                      settingsNewEmail || undefined,
+                      settingsNewPassword || undefined,
+                    );
+                    setSettingsMessage({ type: 'success', text: `Credentials updated! New login email: ${result.email}` });
+                    setSettingsCurrentPassword('');
+                    setSettingsNewEmail('');
+                    setSettingsNewPassword('');
+                    setSettingsConfirmPassword('');
+                  } catch (err: any) {
+                    setSettingsMessage({ type: 'error', text: err.message || 'Failed to update credentials.' });
+                  } finally {
+                    setSettingsSaving(false);
+                  }
+                }}
+                disabled={settingsSaving}
+                className="w-full py-2.5 rounded-xl bg-brand-primary text-white text-sm font-bold hover:bg-brand-primary/90 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-60"
+              >
+                {settingsSaving ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Saving...</>
+                ) : (
+                  <><Settings className="w-4 h-4" /> Save Credential Changes</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

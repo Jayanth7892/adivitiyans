@@ -299,23 +299,28 @@ export const AuthPage: React.FC = () => {
           console.warn('[HOD Cognito Notice]:', cognitoErr.message);
         }
 
-        // Auto-provision HOD record in Postgres DB
-        let hod = await api.getFacultyByEmail(HOD_MASTER_EMAIL).catch(() => null);
+        // Auto-provision HOD record in Postgres DB using the email they logged in with
+        const hodLoginEmail = data.email;
+        let hod = await api.getFacultyByEmail(hodLoginEmail).catch(() => null);
+        if (!hod) {
+          // Also try legacy email in case of first login after credential update
+          hod = await api.getFacultyByEmail(HOD_MASTER_EMAIL).catch(() => null);
+        }
         if (!hod) {
           await api.createFaculty({
             faculty_id: 'HOD_CSEDS',
             name: 'Dr. HOD (CSE & Data Science)',
-            email: HOD_MASTER_EMAIL,
+            email: hodLoginEmail,
             department: 'Data Science',
             role: 'hod',
           }).catch((dbErr: any) => console.warn('[DB HOD Create Notice]:', dbErr.message));
-          hod = await api.getFacultyByEmail(HOD_MASTER_EMAIL).catch(() => null);
+          hod = await api.getFacultyByEmail(hodLoginEmail).catch(() => null);
         }
 
         rollNo = 'HOD_CSEDS';
         displayName = hod ? `${hod.name} (HOD ${hod.department})` : 'Dr. HOD (CSE & Data Science)';
-        login(HOD_MASTER_EMAIL, 'hod', rollNo, displayName, jwtToken);
-        registerSession(HOD_MASTER_EMAIL, 'hod'); // non-blocking
+        login(hodLoginEmail, 'hod', rollNo, displayName, jwtToken);
+        registerSession(hodLoginEmail, 'hod'); // non-blocking
         navigate('/hod/dashboard');
         return;
       }

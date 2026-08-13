@@ -1,6 +1,6 @@
-import React, { useState, Suspense, lazy } from 'react';
+import React, { useState, Suspense, lazy, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthPage } from './features/auth/AuthPage';
 import { Sidebar } from './components/layout/Sidebar';
@@ -42,6 +42,15 @@ const RoleDashboardRedirect: React.FC = () => {
 const MainLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { isAuthenticated, isLoading } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Clear all cached queries whenever a user logs out to prevent
+  // stale data from one role (HOD/Admin/Student) bleeding into another.
+  useEffect(() => {
+    if (!isAuthenticated && !isLoading) {
+      queryClient.clear();
+    }
+  }, [isAuthenticated, isLoading, queryClient]);
 
   if (isLoading) {
     return (

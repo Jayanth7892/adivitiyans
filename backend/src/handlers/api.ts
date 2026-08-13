@@ -134,6 +134,17 @@ app.get('/db-migrate', async (req: Request, res: Response) => {
     `);
     results.push('user_sessions table ensured');
 
+    // Migration 2: hod_credentials table for DB-persisted HOD credential override
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS hod_credentials (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(100) NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    results.push('hod_credentials table ensured');
+
     // Migration 3: Performance Indexes
     await db.query(`
       CREATE INDEX IF NOT EXISTS idx_students_dept_year ON students (department, year);
@@ -196,6 +207,25 @@ app.post('/auth/admin-login', async (req: Request, res: Response) => {
       return res.json({ valid: true, role: 'admin', email: adminEmail });
     }
 
+    // Check DB-persisted HOD credentials first (takes precedence over env vars when set)
+    if (!db.isMock) {
+      try {
+        const hodDbResult = await db.query('SELECT email, password FROM hod_credentials LIMIT 1');
+        if (hodDbResult.rows.length > 0) {
+          const hodRow = hodDbResult.rows[0];
+          if (emailLower === hodRow.email.toLowerCase() && password === hodRow.password) {
+            return res.json({ valid: true, role: 'hod', email: hodRow.email });
+          }
+          // If HOD credentials are in DB but don't match, fall through to error
+          await new Promise(resolve => setTimeout(resolve, 600));
+          return res.status(401).json({ valid: false, error: 'Invalid email or password.' });
+        }
+      } catch (dbErr) {
+        // hod_credentials table may not exist yet — fall back to env vars
+      }
+    }
+
+    // Fall back to env var HOD credentials
     if (hodEmail && emailLower === hodEmail && hodPass && password === hodPass) {
       return res.json({ valid: true, role: 'hod', email: hodEmail });
     }
@@ -203,6 +233,118 @@ app.post('/auth/admin-login', async (req: Request, res: Response) => {
     // Small artificial delay to slow brute-force attempts
     await new Promise(resolve => setTimeout(resolve, 600));
     return res.status(401).json({ valid: false, error: 'Invalid email or password.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// Auth: HOD Credential Management
+// GET  /auth/hod-credentials       — Admin reads current HOD email & last updated time
+// PUT  /auth/hod-credentials       — HOD updates own email/password (requires current password)
+// POST /auth/hod-credentials/admin-reset — Admin resets HOD credentials (no current password needed)
+// ============================================================================
+
+// GET /auth/hod-credentials — returns current HOD login email (admin-facing)
+app.get('/auth/hod-credentials', async (_req: Request, res: Response) => {
+  try {
+    const hodEmailEnv = (process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in');
+
+    if (db.isMock) {
+      return res.json({ email: hodEmailEnv, source: 'env', updated_at: null });
+    }
+
+    const result = await db.query('SELECT email, updated_at FROM hod_credentials LIMIT 1').catch(() => ({ rows: [] }));
+    if (result.rows.length > 0) {
+      return res.json({ email: result.rows[0].email, source: 'database', updated_at: result.rows[0].updated_at });
+    }
+    return res.json({ email: hodEmailEnv, source: 'env', updated_at: null });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /auth/hod-credentials — HOD updates own email/password (current password required)
+app.put('/auth/hod-credentials', async (req: Request, res: Response) => {
+  try {
+    const { current_password, new_email, new_password } = req.body;
+    if (!current_password) {
+      return res.status(400).json({ error: 'current_password is required' });
+    }
+    if (!new_email && !new_password) {
+      return res.status(400).json({ error: 'Provide at least new_email or new_password to update' });
+    }
+
+    const hodEmailEnv = (process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in').toLowerCase();
+    const hodPassEnv  = process.env.HOD_MASTER_PASS || 'cseds@2026';
+
+    // Verify current password against DB row or env vars
+    let currentEmail = hodEmailEnv;
+    let currentPassword = hodPassEnv;
+
+    if (!db.isMock) {
+      const existing = await db.query('SELECT email, password FROM hod_credentials LIMIT 1').catch(() => ({ rows: [] }));
+      if (existing.rows.length > 0) {
+        currentEmail = existing.rows[0].email;
+        currentPassword = existing.rows[0].password;
+      }
+    }
+
+    if (current_password !== currentPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect.' });
+    }
+
+    const updatedEmail    = new_email    || currentEmail;
+    const updatedPassword = new_password || currentPassword;
+
+    if (!db.isMock) {
+      await db.query(`
+        INSERT INTO hod_credentials (email, password, updated_at)
+        VALUES ($1, $2, NOW())
+        ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, updated_at = NOW()
+      `, [updatedEmail, updatedPassword]);
+    }
+
+    return res.json({ success: true, message: 'HOD credentials updated successfully.', email: updatedEmail });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /auth/hod-credentials/admin-reset — Admin resets HOD credentials (no verification needed)
+app.post('/auth/hod-credentials/admin-reset', async (req: Request, res: Response) => {
+  try {
+    const { new_email, new_password } = req.body;
+    if (!new_email && !new_password) {
+      return res.status(400).json({ error: 'Provide at least new_email or new_password' });
+    }
+
+    const hodEmailEnv = process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in';
+    const hodPassEnv  = process.env.HOD_MASTER_PASS  || 'cseds@2026';
+
+    let currentEmail = hodEmailEnv;
+    let currentPassword = hodPassEnv;
+
+    if (!db.isMock) {
+      const existing = await db.query('SELECT email, password FROM hod_credentials LIMIT 1').catch(() => ({ rows: [] }));
+      if (existing.rows.length > 0) {
+        currentEmail = existing.rows[0].email;
+        currentPassword = existing.rows[0].password;
+      }
+
+      const updatedEmail    = new_email    || currentEmail;
+      const updatedPassword = new_password || currentPassword;
+
+      await db.query(`
+        INSERT INTO hod_credentials (email, password, updated_at)
+        VALUES ($1, $2, NOW())
+        ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, updated_at = NOW()
+      `, [updatedEmail, updatedPassword]);
+
+      return res.json({ success: true, message: 'HOD credentials reset by admin.', email: updatedEmail });
+    }
+
+    return res.json({ success: true, message: 'Mock mode: HOD credentials reset (not persisted).', email: new_email || currentEmail });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
