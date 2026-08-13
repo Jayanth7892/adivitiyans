@@ -265,13 +265,10 @@ app.get('/auth/hod-credentials', async (_req: Request, res: Response) => {
   }
 });
 
-// PUT /auth/hod-credentials — HOD updates own email/password (current password required)
+// PUT /auth/hod-credentials — HOD updates own email/password (no current password required)
 app.put('/auth/hod-credentials', async (req: Request, res: Response) => {
   try {
-    const { current_password, new_email, new_password } = req.body;
-    if (!current_password) {
-      return res.status(400).json({ error: 'current_password is required' });
-    }
+    const { new_email, new_password } = req.body;
     if (!new_email && !new_password) {
       return res.status(400).json({ error: 'Provide at least new_email or new_password to update' });
     }
@@ -279,32 +276,24 @@ app.put('/auth/hod-credentials', async (req: Request, res: Response) => {
     const hodEmailEnv = (process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in').toLowerCase();
     const hodPassEnv  = process.env.HOD_MASTER_PASS || 'cseds@2026';
 
-    // Verify current password against DB row or env vars
-    let currentEmail = hodEmailEnv;
-    let currentPassword = hodPassEnv;
-
-    if (!db.isMock) {
-      const existing = await db.query('SELECT email, password FROM hod_credentials LIMIT 1').catch(() => ({ rows: [] }));
-      if (existing.rows.length > 0) {
-        currentEmail = existing.rows[0].email;
-        currentPassword = existing.rows[0].password;
-      }
+    if (db.isMock) {
+      return res.json({ success: true, message: 'HOD credentials updated.', email: new_email || hodEmailEnv });
     }
 
-    if (current_password !== currentPassword) {
-      return res.status(401).json({ error: 'Current password is incorrect.' });
-    }
+    // Get existing row so we preserve whichever field isn't being changed
+    const existing = await db.query('SELECT email, password FROM hod_credentials WHERE id = 1').catch(() => ({ rows: [] }));
+    const currentEmail    = existing.rows[0]?.email    || hodEmailEnv;
+    const currentPassword = existing.rows[0]?.password || hodPassEnv;
 
     const updatedEmail    = new_email    || currentEmail;
     const updatedPassword = new_password || currentPassword;
 
-    if (!db.isMock) {
-      await db.query(`
-        INSERT INTO hod_credentials (email, password, updated_at)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, updated_at = NOW()
-      `, [updatedEmail, updatedPassword]);
-    }
+    // Use explicit id=1 so ON CONFLICT always hits the single HOD row
+    await db.query(`
+      INSERT INTO hod_credentials (id, email, password, updated_at)
+      VALUES (1, $1, $2, NOW())
+      ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, updated_at = NOW()
+    `, [updatedEmail, updatedPassword]);
 
     return res.json({ success: true, message: 'HOD credentials updated successfully.', email: updatedEmail });
   } catch (err: any) {
@@ -323,29 +312,24 @@ app.post('/auth/hod-credentials/admin-reset', async (req: Request, res: Response
     const hodEmailEnv = process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in';
     const hodPassEnv  = process.env.HOD_MASTER_PASS  || 'cseds@2026';
 
-    let currentEmail = hodEmailEnv;
-    let currentPassword = hodPassEnv;
-
-    if (!db.isMock) {
-      const existing = await db.query('SELECT email, password FROM hod_credentials LIMIT 1').catch(() => ({ rows: [] }));
-      if (existing.rows.length > 0) {
-        currentEmail = existing.rows[0].email;
-        currentPassword = existing.rows[0].password;
-      }
-
-      const updatedEmail    = new_email    || currentEmail;
-      const updatedPassword = new_password || currentPassword;
-
-      await db.query(`
-        INSERT INTO hod_credentials (email, password, updated_at)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, updated_at = NOW()
-      `, [updatedEmail, updatedPassword]);
-
-      return res.json({ success: true, message: 'HOD credentials reset by admin.', email: updatedEmail });
+    if (db.isMock) {
+      return res.json({ success: true, message: 'Mock mode: HOD credentials reset.', email: new_email || hodEmailEnv });
     }
 
-    return res.json({ success: true, message: 'Mock mode: HOD credentials reset (not persisted).', email: new_email || currentEmail });
+    const existing = await db.query('SELECT email, password FROM hod_credentials WHERE id = 1').catch(() => ({ rows: [] }));
+    const currentEmail    = existing.rows[0]?.email    || hodEmailEnv;
+    const currentPassword = existing.rows[0]?.password || hodPassEnv;
+
+    const updatedEmail    = new_email    || currentEmail;
+    const updatedPassword = new_password || currentPassword;
+
+    await db.query(`
+      INSERT INTO hod_credentials (id, email, password, updated_at)
+      VALUES (1, $1, $2, NOW())
+      ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, updated_at = NOW()
+    `, [updatedEmail, updatedPassword]);
+
+    return res.json({ success: true, message: 'HOD credentials reset by admin.', email: updatedEmail });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

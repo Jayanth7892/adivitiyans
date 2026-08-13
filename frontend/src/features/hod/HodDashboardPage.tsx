@@ -1424,35 +1424,10 @@ export const HodDashboardPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Divider */}
-              <div className="border-t border-borderLine pt-4">
-                <label className="block text-xs font-semibold text-textPrimary mb-1.5">
-                  <KeyRound className="w-3.5 h-3.5 inline mr-1 text-amber-500" />
-                  Current Password <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type={showSettingsPwd ? 'text' : 'password'}
-                    value={settingsCurrentPassword}
-                    onChange={(e) => setSettingsCurrentPassword(e.target.value)}
-                    placeholder="Enter your current password to confirm"
-                    className="w-full px-3.5 py-2 pr-10 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                  />
-                  <button type="button" onClick={() => setShowSettingsPwd(!showSettingsPwd)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary">
-                    {showSettingsPwd ? '🙈' : '👁️'}
-                  </button>
-                </div>
-              </div>
-
               {/* Save Button */}
               <button
                 onClick={async () => {
                   setSettingsMessage(null);
-                  if (!settingsCurrentPassword) {
-                    setSettingsMessage({ type: 'error', text: 'Current password is required.' });
-                    return;
-                  }
                   if (!settingsNewEmail && !settingsNewPassword) {
                     setSettingsMessage({ type: 'error', text: 'Please enter a new email or new password to update.' });
                     return;
@@ -1468,12 +1443,10 @@ export const HodDashboardPage: React.FC = () => {
                   setSettingsSaving(true);
                   try {
                     const result = await api.updateHodCredentials(
-                      settingsCurrentPassword,
                       settingsNewEmail || undefined,
                       settingsNewPassword || undefined,
                     );
                     setSettingsMessage({ type: 'success', text: `Credentials updated! New login email: ${result.email}` });
-                    setSettingsCurrentPassword('');
                     setSettingsNewEmail('');
                     setSettingsNewPassword('');
                     setSettingsConfirmPassword('');

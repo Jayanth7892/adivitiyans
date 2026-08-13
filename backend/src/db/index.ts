@@ -275,9 +275,9 @@ async function ensureSchema(p: Pool) {
     );`,
 
     // Seed HOD credentials with env defaults if no row exists yet
-    `INSERT INTO hod_credentials (email, password)
-     SELECT 'hodcseds@rgmcet.edu.in', 'cseds@2026'
-     WHERE NOT EXISTS (SELECT 1 FROM hod_credentials LIMIT 1);`,
+    `INSERT INTO hod_credentials (id, email, password)
+     VALUES (1, 'hodcseds@rgmcet.edu.in', 'cseds@2026')
+     ON CONFLICT (id) DO NOTHING;`,
 
     // Semester unlock settings — HOD/Admin controls which semesters students can fill
     `CREATE TABLE IF NOT EXISTS semester_unlock_settings (
