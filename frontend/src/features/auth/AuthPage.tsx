@@ -465,7 +465,8 @@ export const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="flex-1 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-primary text-white font-black text-2xl shadow-lg shadow-brand-primary/30 mb-4">
           A
@@ -1028,9 +1029,8 @@ export const AuthPage: React.FC = () => {
           )}
         </div>
       </div>
-      <div className="w-full mt-auto">
-        <Footer />
       </div>
+      <Footer />
     </div>
   );
 };

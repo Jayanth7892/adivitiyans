@@ -2,26 +2,21 @@ import React from 'react';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="w-full py-5 px-4 border-t border-borderLine bg-surface/80 backdrop-blur-md mt-auto">
-      <div className="max-w-7xl mx-auto flex flex-col items-center justify-center gap-1.5 text-center">
-        {/* Quote */}
-        <p className="text-sm font-semibold tracking-wide text-brand-primary italic" style={{ fontFamily: 'Georgia, serif' }}>
+    <footer className="w-full py-3 px-4 border-t border-borderLine bg-background">
+      <div className="max-w-7xl mx-auto flex flex-col items-center gap-0.5 text-center">
+        <p
+          className="text-xs font-semibold tracking-wider text-brand-primary"
+          style={{ fontFamily: 'Georgia, serif', fontStyle: 'italic' }}
+        >
           "Code. Create. Elevate."
         </p>
-
-        {/* Developers */}
-        <p className="text-xs text-textSecondary font-medium leading-relaxed">
-          Handcrafted with{' '}
-          <span className="text-red-500 inline-block animate-pulse">❤️</span>{' '}
-          by{' '}
+        <p className="text-[11px] text-textSecondary">
+          Handcrafted with <span className="text-red-500">❤️</span> by{' '}
           <span className="text-textPrimary font-semibold">Jaya Krushna</span>,{' '}
-          <span className="text-textPrimary font-semibold">Dinesh Kumar</span>, and{' '}
+          <span className="text-textPrimary font-semibold">Dinesh Kumar</span> &amp;{' '}
           <span className="text-textPrimary font-semibold">Jayanth Kumar Naidu</span>
-        </p>
-
-        {/* Guidance */}
-        <p className="text-[11px] text-textSecondary leading-relaxed">
-          Under the guidance of{' '}
+          <span className="mx-1.5 text-borderLine">|</span>
+          Guided by{' '}
           <span className="text-textPrimary font-semibold">Mr. Y.P Srinath Reddy</span>
         </p>
       </div>
