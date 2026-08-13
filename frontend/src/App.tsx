@@ -6,6 +6,7 @@ import { AuthPage } from './features/auth/AuthPage';
 import { Sidebar } from './components/layout/Sidebar';
 import { TopBar } from './components/layout/TopBar';
 import { DashboardSkeleton } from './components/layout/DashboardSkeleton';
+import { Footer } from './components/layout/Footer';
 
 // Lazy load feature dashboard pages on-demand for fast initial page load
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })));
@@ -84,13 +85,14 @@ const MainLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col lg:pl-[260px] min-w-0">
+      <div className="flex-1 flex flex-col lg:pl-[260px] min-w-0 min-h-screen">
         <TopBar onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
         <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto">
           <Suspense fallback={<DashboardSkeleton />}>
             <Outlet />
           </Suspense>
         </main>
+        <Footer />
       </div>
     </div>
   );

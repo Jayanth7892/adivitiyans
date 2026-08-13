@@ -8,6 +8,7 @@ import { api } from '../../lib/api';
 import { cognitoSignUp, cognitoSignIn } from '../../lib/cognitoAuth';
 import { useAuth } from '../../context/AuthContext';
 import { PillButton } from '../../components/common/PillButton';
+import { Footer } from '../../components/layout/Footer';
 import { UserRole } from '../../types';
 
 // Note: email constants are used only for display/routing.
@@ -1026,6 +1027,9 @@ export const AuthPage: React.FC = () => {
             </div>
           )}
         </div>
+      </div>
+      <div className="w-full mt-auto">
+        <Footer />
       </div>
     </div>
   );
