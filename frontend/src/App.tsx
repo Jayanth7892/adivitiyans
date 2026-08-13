@@ -83,14 +83,16 @@ const MainLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="h-screen bg-background flex overflow-hidden">
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col lg:pl-[260px] min-w-0 min-h-screen">
+      <div className="flex-1 flex flex-col lg:pl-[260px] min-w-0">
         <TopBar onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
-        <main className="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto">
-          <Suspense fallback={<DashboardSkeleton />}>
-            <Outlet />
-          </Suspense>
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+          <div className="max-w-7xl w-full mx-auto">
+            <Suspense fallback={<DashboardSkeleton />}>
+              <Outlet />
+            </Suspense>
+          </div>
         </main>
         <Footer />
       </div>
