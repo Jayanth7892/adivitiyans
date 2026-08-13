@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../context/AuthContext';
 import {
   Users,
   Search,
@@ -28,6 +29,8 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
+  Crown,
+  UserPlus,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { StudentProfile } from '../../types';
@@ -55,10 +58,21 @@ const INITIAL_FACULTY = [
   { id: 'FAC002', name: 'Prof. M. Ramesh', email: 'mramesh@rgmcet.edu.in', department: 'ECE', designation: 'Mentor', menteesCount: 2 },
 ];
 
+// The 3 fixed super admin emails — used to derive isSuperAdmin flag from user.email
+const SUPER_ADMIN_EMAILS = [
+  'jayakrushna1622@gmail.com',
+  'dineshkumarpathipati@gmail.com',
+  'jayanthkumarnaidu777@gmail.com',
+];
+
 export const AdminDashboardPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const activeTab = searchParams.get('tab') || 'students';
+  const { user } = useAuth();
+
+  // Detect super admin from user email — zero AuthContext changes needed
+  const isSuperAdmin = user?.role === 'admin' && SUPER_ADMIN_EMAILS.includes(user?.email ?? '');
 
   // Live platform snapshot state for student coding counts
   const [liveSnapshots, setLiveSnapshots] = useState<Record<string, number>>({});
@@ -104,6 +118,26 @@ export const AdminDashboardPage: React.FC = () => {
   const [pwdSaving, setPwdSaving] = useState(false);
   const [pwdMessage, setPwdMessage] = useState<{ rollNo: string; type: 'success' | 'error'; text: string } | null>(null);
   const [showPwdMap, setShowPwdMap] = useState<Record<string, boolean>>({});
+
+  // Admin Management panel state (super admin only)
+  type AdminRow = { email: string; name: string; password: string; created_by: string; created_at: string };
+  const [adminList, setAdminList] = useState<AdminRow[]>([]);
+  const [adminListLoading, setAdminListLoading] = useState(false);
+  const [showAdminPwdMap, setShowAdminPwdMap] = useState<Record<string, boolean>>({});
+  const [adminPwdEditId, setAdminPwdEditId] = useState<string | null>(null);
+  const [adminPwdEditValue, setAdminPwdEditValue] = useState('');
+  const [adminPwdSaving, setAdminPwdSaving] = useState(false);
+  const [adminMsg, setAdminMsg] = useState<{ key: string; type: 'success' | 'error'; text: string } | null>(null);
+  const [showAddAdmin, setShowAddAdmin] = useState(false);
+  const [newAdminName, setNewAdminName] = useState('');
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [newAdminSaving, setNewAdminSaving] = useState(false);
+  // Change my password (super admin self-service)
+  const [myNewPwd, setMyNewPwd] = useState('');
+  const [myNewPwdConfirm, setMyNewPwdConfirm] = useState('');
+  const [myPwdSaving, setMyPwdSaving] = useState(false);
+  const [myPwdMsg, setMyPwdMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Add/Edit form state
   const [formName, setFormName] = useState('');
@@ -403,6 +437,7 @@ export const AdminDashboardPage: React.FC = () => {
           { key: 'faculty', label: 'Faculty & Mentor Assignments' },
           { key: 'hod-credentials', label: '🔑 HOD Credentials' },
           { key: 'student-passwords', label: '🔒 Student Passwords' },
+          ...(isSuperAdmin ? [{ key: 'admin-management', label: '👑 Admin Management' }] : []),
         ].map((t) => (
           <button
             key={t.key}
@@ -423,6 +458,14 @@ export const AdminDashboardPage: React.FC = () => {
                   setPwdStudents(rows);
                   setPwdLoading(false);
                 }).catch(() => setPwdLoading(false));
+              }
+              // Fetch regular admin list when Admin Management tab is opened
+              if (t.key === 'admin-management' && isSuperAdmin && user?.email) {
+                setAdminListLoading(true);
+                api.getSuperAdminAdmins(user.email).then((rows) => {
+                  setAdminList(rows);
+                  setAdminListLoading(false);
+                }).catch(() => setAdminListLoading(false));
               }
             }}
             className={`pb-3 transition-colors ${activeTab === t.key ? 'border-b-2 border-brand-primary text-brand-primary' : 'text-textSecondary hover:text-textPrimary'}`}
@@ -1327,6 +1370,232 @@ export const AdminDashboardPage: React.FC = () => {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── TAB 6: Admin Management (super admin only) ── */}
+      {activeTab === 'admin-management' && isSuperAdmin && user?.email && (
+        <div className="space-y-6">
+          {/* ——— Section A: Regular Admin List ——— */}
+          <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <h3 className="text-base font-bold text-textPrimary flex items-center gap-2">
+                  <Crown className="w-5 h-5 text-amber-500" /> Admin Account Management
+                </h3>
+                <p className="text-xs text-textSecondary mt-0.5">
+                  Add, delete or reset passwords of regular admins. Super admin accounts cannot be deleted.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setAdminListLoading(true);
+                    api.getSuperAdminAdmins(user!.email).then((rows) => { setAdminList(rows); setAdminListLoading(false); }).catch(() => setAdminListLoading(false));
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-borderLine hover:bg-background transition-all"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${adminListLoading ? 'animate-spin' : ''}`} /> Refresh
+                </button>
+                <button
+                  onClick={() => setShowAddAdmin((v) => !v)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-brand-primary text-white hover:bg-brand-primary/90 transition-all"
+                >
+                  <UserPlus className="w-3.5 h-3.5" /> Add Admin
+                </button>
+              </div>
+            </div>
+
+            {/* Add Admin Inline Form */}
+            {showAddAdmin && (
+              <div className="mb-5 p-4 rounded-xl border border-brand-primary/30 bg-brand-soft/10 space-y-3">
+                <p className="text-xs font-bold text-brand-primary">New Regular Admin</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <input type="text" placeholder="Full name" value={newAdminName} onChange={(e) => setNewAdminName(e.target.value)}
+                    className="px-3 py-2 text-xs rounded-lg border border-borderLine bg-background focus:outline-none focus:border-brand-primary" />
+                  <input type="email" placeholder="Email address" value={newAdminEmail} onChange={(e) => setNewAdminEmail(e.target.value)}
+                    className="px-3 py-2 text-xs rounded-lg border border-borderLine bg-background focus:outline-none focus:border-brand-primary" />
+                  <input type="text" placeholder="Password (min 4 chars)" value={newAdminPassword} onChange={(e) => setNewAdminPassword(e.target.value)}
+                    className="px-3 py-2 text-xs rounded-lg border border-borderLine bg-background focus:outline-none focus:border-brand-primary font-mono" />
+                </div>
+                {adminMsg?.key === 'add' && (
+                  <p className={`text-[10px] font-semibold ${adminMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>{adminMsg.text}</p>
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      if (!newAdminName || !newAdminEmail || !newAdminPassword) { setAdminMsg({ key: 'add', type: 'error', text: 'All fields required.' }); return; }
+                      if (newAdminPassword.length < 4) { setAdminMsg({ key: 'add', type: 'error', text: 'Password min 4 chars.' }); return; }
+                      setNewAdminSaving(true);
+                      try {
+                        await api.createAdmin(user!.email, newAdminName, newAdminEmail, newAdminPassword);
+                        const rows = await api.getSuperAdminAdmins(user!.email);
+                        setAdminList(rows);
+                        setNewAdminName(''); setNewAdminEmail(''); setNewAdminPassword('');
+                        setShowAddAdmin(false);
+                        setAdminMsg({ key: 'add', type: 'success', text: '✓ Admin created!' });
+                        setTimeout(() => setAdminMsg(null), 3000);
+                      } catch (e: any) {
+                        setAdminMsg({ key: 'add', type: 'error', text: e.message || 'Failed to create admin.' });
+                      } finally { setNewAdminSaving(false); }
+                    }}
+                    disabled={newAdminSaving}
+                    className="px-3 py-1.5 text-xs font-bold rounded-lg bg-brand-primary text-white hover:bg-brand-primary/90 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {newAdminSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />} Create
+                  </button>
+                  <button onClick={() => { setShowAddAdmin(false); setNewAdminName(''); setNewAdminEmail(''); setNewAdminPassword(''); }}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-borderLine text-textSecondary hover:text-textPrimary">Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {/* Admin Table */}
+            {adminListLoading ? (
+              <div className="flex items-center justify-center py-10 gap-2 text-textSecondary text-xs">
+                <RefreshCw className="w-4 h-4 animate-spin" /> Loading admins…
+              </div>
+            ) : adminList.length === 0 ? (
+              <div className="text-center py-10 text-textSecondary text-xs">
+                No regular admins yet. Click “Add Admin” to create one.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-borderLine text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
+                      <th className="py-3 px-4">Email</th>
+                      <th className="py-3 px-4">Name</th>
+                      <th className="py-3 px-4">Password</th>
+                      <th className="py-3 px-4">Created By</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-borderLine text-sm">
+                    {adminList.map((row) => {
+                      const isVisible = showAdminPwdMap[row.email] ?? false;
+                      const isEditing = adminPwdEditId === row.email;
+                      const rowMsg = adminMsg?.key === row.email ? adminMsg : null;
+                      return (
+                        <tr key={row.email} className="hover:bg-background/50 transition-colors">
+                          <td className="py-3.5 px-4 text-xs font-bold text-brand-primary">{row.email}</td>
+                          <td className="py-3.5 px-4 text-sm font-medium text-textPrimary">{row.name}</td>
+                          <td className="py-3.5 px-4">
+                            {isEditing ? (
+                              <input type="text" value={adminPwdEditValue} onChange={(e) => setAdminPwdEditValue(e.target.value)} autoFocus
+                                className="px-3 py-1.5 text-xs rounded-lg border border-brand-primary bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary w-44 font-mono" />
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs text-textPrimary">{isVisible ? (row.password || '(not set)') : '••••••••'}</span>
+                                <button onClick={() => setShowAdminPwdMap((p) => ({ ...p, [row.email]: !isVisible }))}
+                                  className="p-1 text-textSecondary hover:text-textPrimary" title={isVisible ? 'Hide' : 'Show'}>
+                                  {isVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            )}
+                            {rowMsg && (
+                              <p className={`text-[10px] font-semibold mt-1 ${rowMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>{rowMsg.text}</p>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-xs text-textSecondary">{row.created_by || '—'}</td>
+                          <td className="py-3.5 px-4 text-right">
+                            {isEditing ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={async () => {
+                                    if (!adminPwdEditValue || adminPwdEditValue.length < 4) {
+                                      setAdminMsg({ key: row.email, type: 'error', text: 'Min 4 chars required.' });
+                                      setTimeout(() => setAdminMsg(null), 3000); return;
+                                    }
+                                    setAdminPwdSaving(true);
+                                    try {
+                                      await api.setAdminPassword(user!.email, row.email, adminPwdEditValue);
+                                      setAdminList((prev) => prev.map((r) => r.email === row.email ? { ...r, password: adminPwdEditValue } : r));
+                                      setAdminPwdEditId(null); setAdminPwdEditValue('');
+                                      setAdminMsg({ key: row.email, type: 'success', text: '✓ Password updated!' });
+                                      setTimeout(() => setAdminMsg(null), 3000);
+                                    } catch (e: any) {
+                                      setAdminMsg({ key: row.email, type: 'error', text: e.message || 'Save failed.' });
+                                      setTimeout(() => setAdminMsg(null), 4000);
+                                    } finally { setAdminPwdSaving(false); }
+                                  }}
+                                  disabled={adminPwdSaving}
+                                  className="px-3 py-1.5 text-xs font-bold rounded-lg bg-brand-primary text-white hover:bg-brand-primary/90 disabled:opacity-50 flex items-center gap-1"
+                                >
+                                  {adminPwdSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />} Save
+                                </button>
+                                <button onClick={() => { setAdminPwdEditId(null); setAdminPwdEditValue(''); }}
+                                  className="p-1.5 rounded-lg border border-borderLine text-textSecondary hover:text-textPrimary"><X className="w-3.5 h-3.5" /></button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-end gap-2">
+                                <button onClick={() => { setAdminPwdEditId(row.email); setAdminPwdEditValue(row.password || ''); }}
+                                  className="p-1.5 rounded-lg border border-borderLine text-textPrimary hover:bg-background" title="Change password">
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (!confirm(`Delete admin ${row.email}? This cannot be undone.`)) return;
+                                    try {
+                                      await api.deleteAdmin(user!.email, row.email);
+                                      setAdminList((prev) => prev.filter((r) => r.email !== row.email));
+                                    } catch (e: any) {
+                                      setAdminMsg({ key: row.email, type: 'error', text: e.message || 'Delete failed.' });
+                                      setTimeout(() => setAdminMsg(null), 4000);
+                                    }
+                                  }}
+                                  className="p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors" title="Delete admin">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ——— Section B: Change My Password (super admin self-service) ——— */}
+          <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
+            <h3 className="text-base font-bold text-textPrimary flex items-center gap-2 mb-1">
+              <Lock className="w-5 h-5 text-brand-primary" /> Change My Super Admin Password
+            </h3>
+            <p className="text-xs text-textSecondary mb-5">
+              Changing <span className="font-semibold text-textPrimary">{user.email}</span>'s password only. You cannot change another super admin's password.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 max-w-lg">
+              <input type="password" placeholder="New password (min 4 chars)" value={myNewPwd} onChange={(e) => setMyNewPwd(e.target.value)}
+                className="px-3 py-2 text-xs rounded-lg border border-borderLine bg-background focus:outline-none focus:border-brand-primary flex-1 font-mono" />
+              <input type="password" placeholder="Confirm new password" value={myNewPwdConfirm} onChange={(e) => setMyNewPwdConfirm(e.target.value)}
+                className="px-3 py-2 text-xs rounded-lg border border-borderLine bg-background focus:outline-none focus:border-brand-primary flex-1 font-mono" />
+              <button
+                onClick={async () => {
+                  if (!myNewPwd || myNewPwd.length < 4) { setMyPwdMsg({ type: 'error', text: 'Min 4 characters required.' }); return; }
+                  if (myNewPwd !== myNewPwdConfirm) { setMyPwdMsg({ type: 'error', text: 'Passwords do not match.' }); return; }
+                  setMyPwdSaving(true);
+                  try {
+                    await api.changeSuperAdminMyPassword(user!.email, myNewPwd);
+                    setMyNewPwd(''); setMyNewPwdConfirm('');
+                    setMyPwdMsg({ type: 'success', text: '✓ Password updated! Use the new password on next login.' });
+                    setTimeout(() => setMyPwdMsg(null), 5000);
+                  } catch (e: any) {
+                    setMyPwdMsg({ type: 'error', text: e.message || 'Failed to update password.' });
+                  } finally { setMyPwdSaving(false); }
+                }}
+                disabled={myPwdSaving}
+                className="px-4 py-2 text-xs font-bold rounded-lg bg-brand-primary text-white hover:bg-brand-primary/90 disabled:opacity-50 flex items-center gap-1 whitespace-nowrap"
+              >
+                {myPwdSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />} Update Password
+              </button>
+            </div>
+            {myPwdMsg && (
+              <p className={`text-xs font-semibold mt-3 ${myPwdMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>{myPwdMsg.text}</p>
+            )}
+          </div>
         </div>
       )}
 

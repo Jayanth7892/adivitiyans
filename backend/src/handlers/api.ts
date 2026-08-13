@@ -197,14 +197,52 @@ app.post('/auth/admin-login', async (req: Request, res: Response) => {
 
     const emailLower = email.toLowerCase();
 
-    // Read credentials from Lambda environment variables with defaults (server-side only, never in frontend)
+    // ── Priority 1: Super admin credentials (DB) ──────────────────────────────
+    if (!db.isMock) {
+      try {
+        const saResult = await db.query(
+          'SELECT email, password FROM super_admin_credentials WHERE LOWER(email) = $1',
+          [emailLower]
+        );
+        if (saResult.rows.length > 0) {
+          if (saResult.rows[0].password === password) {
+            return res.json({ valid: true, role: 'admin', isSuperAdmin: true, email: saResult.rows[0].email });
+          }
+          // Email matches a super admin but password is wrong → reject immediately
+          await new Promise(resolve => setTimeout(resolve, 600));
+          return res.status(401).json({ valid: false, error: 'Invalid email or password.' });
+        }
+      } catch {
+        // Table may not exist on first cold-start; fall through to next check
+      }
+
+      // ── Priority 2: Regular admin accounts (DB) ───────────────────────────
+      try {
+        const adminResult = await db.query(
+          'SELECT email, name, password FROM admin_accounts WHERE LOWER(email) = $1',
+          [emailLower]
+        );
+        if (adminResult.rows.length > 0) {
+          if (adminResult.rows[0].password === password) {
+            return res.json({ valid: true, role: 'admin', isSuperAdmin: false, email: adminResult.rows[0].email });
+          }
+          // Email matches a regular admin but password is wrong → reject immediately
+          await new Promise(resolve => setTimeout(resolve, 600));
+          return res.status(401).json({ valid: false, error: 'Invalid email or password.' });
+        }
+      } catch {
+        // Table may not exist on first cold-start; fall through
+      }
+    }
+
+    // ── Priority 3: Legacy env-var admin (backwards compatible) ───────────────
     const adminEmail = (process.env.ADMIN_MASTER_EMAIL || 'admin@rgmcet.edu.in').toLowerCase();
     const adminPass  = process.env.ADMIN_MASTER_PASS || 'admin@2026';
     const hodEmail   = (process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in').toLowerCase();
     const hodPass    = process.env.HOD_MASTER_PASS || 'cseds@2026';
 
     if (adminEmail && emailLower === adminEmail && adminPass && password === adminPass) {
-      return res.json({ valid: true, role: 'admin', email: adminEmail });
+      return res.json({ valid: true, role: 'admin', isSuperAdmin: false, email: adminEmail });
     }
 
     // Check DB-persisted HOD credentials first (takes precedence over env vars when set)
@@ -235,6 +273,140 @@ app.post('/auth/admin-login', async (req: Request, res: Response) => {
     return res.status(401).json({ valid: false, error: 'Invalid email or password.' });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// Super Admin: Manage Regular Admins
+// All endpoints validate the caller is a super admin before proceeding.
+// ============================================================================
+
+/** Helper — verify caller_email is a valid super admin */
+async function isSuperAdminCaller(callerEmail: string): Promise<boolean> {
+  if (!callerEmail || db.isMock) return false;
+  try {
+    const r = await db.query(
+      'SELECT 1 FROM super_admin_credentials WHERE LOWER(email) = LOWER($1)',
+      [callerEmail]
+    );
+    return r.rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+const SUPER_ADMIN_EMAILS_LOWER = [
+  'jayakrushna1622@gmail.com',
+  'dineshkumarpathipati@gmail.com',
+  'jayanthkumarnaidu777@gmail.com',
+];
+
+// GET /super-admin/admins — list all regular admins (email, name, password, created_at)
+app.get('/super-admin/admins', async (req: Request, res: Response) => {
+  try {
+    const callerEmail = String(req.query.caller_email || '');
+    if (!await isSuperAdminCaller(callerEmail)) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    const result = await db.query(
+      'SELECT email, name, password, created_by, created_at FROM admin_accounts ORDER BY created_at DESC'
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /super-admin/admins — create a regular admin
+app.post('/super-admin/admins', async (req: Request, res: Response) => {
+  try {
+    const { caller_email, name, email, password } = req.body;
+    if (!await isSuperAdminCaller(caller_email)) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'name, email and password are required' });
+    }
+    if (String(password).length < 4) {
+      return res.status(400).json({ error: 'Password must be at least 4 characters' });
+    }
+    // Prevent adding a super admin email as a regular admin
+    if (SUPER_ADMIN_EMAILS_LOWER.includes(email.toLowerCase())) {
+      return res.status(400).json({ error: 'Cannot create a regular admin account for a super admin email' });
+    }
+    await db.query(
+      `INSERT INTO admin_accounts (email, name, password, created_by, created_at, updated_at)
+       VALUES (LOWER($1), $2, $3, LOWER($4), NOW(), NOW())
+       ON CONFLICT (email) DO UPDATE SET name = $2, password = $3, updated_at = NOW()`,
+      [email, name, password, caller_email]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /super-admin/admins/:email — delete a regular admin
+app.delete('/super-admin/admins/:email', async (req: Request, res: Response) => {
+  try {
+    const { caller_email } = req.body;
+    if (!await isSuperAdminCaller(caller_email)) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    const targetEmail = req.params.email.toLowerCase();
+    // Prevent deletion of any super admin email
+    if (SUPER_ADMIN_EMAILS_LOWER.includes(targetEmail)) {
+      return res.status(400).json({ error: 'Super admin accounts cannot be deleted' });
+    }
+    await db.query('DELETE FROM admin_accounts WHERE LOWER(email) = $1', [targetEmail]);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /super-admin/admins/:email/password — change a regular admin's password
+app.put('/super-admin/admins/:email/password', async (req: Request, res: Response) => {
+  try {
+    const { caller_email, password } = req.body;
+    if (!await isSuperAdminCaller(caller_email)) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    if (!password || String(password).length < 4) {
+      return res.status(400).json({ error: 'Password must be at least 4 characters' });
+    }
+    const targetEmail = req.params.email.toLowerCase();
+    if (SUPER_ADMIN_EMAILS_LOWER.includes(targetEmail)) {
+      return res.status(400).json({ error: 'Use /super-admin/my-password to change a super admin password' });
+    }
+    await db.query(
+      'UPDATE admin_accounts SET password = $1, updated_at = NOW() WHERE LOWER(email) = $2',
+      [password, targetEmail]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /super-admin/my-password — super admin changes ONLY their own password
+app.put('/super-admin/my-password', async (req: Request, res: Response) => {
+  try {
+    const { my_email, new_password } = req.body;
+    if (!await isSuperAdminCaller(my_email)) {
+      return res.status(403).json({ error: 'Super admin access required' });
+    }
+    if (!new_password || String(new_password).length < 4) {
+      return res.status(400).json({ error: 'Password must be at least 4 characters' });
+    }
+    // Updates ONLY the row for my_email — cannot target another super admin
+    await db.query(
+      'UPDATE super_admin_credentials SET password = $1, updated_at = NOW() WHERE LOWER(email) = LOWER($2)',
+      [new_password, my_email]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

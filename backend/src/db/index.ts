@@ -297,6 +297,30 @@ async function ensureSchema(p: Pool) {
       password TEXT NOT NULL DEFAULT '',
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`,
+
+    // Super admin credentials — 3 fixed super admins, individually-changeable passwords
+    `CREATE TABLE IF NOT EXISTS super_admin_credentials (
+      email VARCHAR(100) PRIMARY KEY,
+      password TEXT NOT NULL,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`,
+
+    // Seed the 3 super admins — DO NOTHING on conflict so changed passwords survive redeploys
+    `INSERT INTO super_admin_credentials (email, password) VALUES
+      ('jayakrushna1622@gmail.com', 'jdj275152'),
+      ('dineshkumarpathipati@gmail.com', 'jdj275152'),
+      ('jayanthkumarnaidu777@gmail.com', 'jdj275152')
+     ON CONFLICT (email) DO NOTHING;`,
+
+    // Regular admin accounts — created/managed by super admins
+    `CREATE TABLE IF NOT EXISTS admin_accounts (
+      email VARCHAR(100) PRIMARY KEY,
+      name  VARCHAR(100) NOT NULL DEFAULT 'Admin',
+      password TEXT NOT NULL,
+      created_by VARCHAR(100),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`,
   ];
 
   try {

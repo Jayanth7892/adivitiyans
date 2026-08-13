@@ -357,4 +357,40 @@ export const api = {
       body: JSON.stringify({ password }),
     });
   },
+
+  // ── Super Admin: Manage Regular Admins ──────────────────────────────────────
+  // callerEmail is sent with every request; backend validates it against super_admin_credentials.
+
+  getSuperAdminAdmins: async (callerEmail: string): Promise<{ email: string; name: string; password: string; created_by: string; created_at: string }[]> => {
+    return fetchWithAuth(`/super-admin/admins?caller_email=${encodeURIComponent(callerEmail)}`);
+  },
+
+  createAdmin: async (callerEmail: string, name: string, email: string, password: string): Promise<{ success: boolean }> => {
+    return fetchWithAuth('/super-admin/admins', {
+      method: 'POST',
+      body: JSON.stringify({ caller_email: callerEmail, name, email, password }),
+    });
+  },
+
+  deleteAdmin: async (callerEmail: string, targetEmail: string): Promise<{ success: boolean }> => {
+    return fetchWithAuth(`/super-admin/admins/${encodeURIComponent(targetEmail)}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ caller_email: callerEmail }),
+    });
+  },
+
+  setAdminPassword: async (callerEmail: string, targetEmail: string, password: string): Promise<{ success: boolean }> => {
+    return fetchWithAuth(`/super-admin/admins/${encodeURIComponent(targetEmail)}/password`, {
+      method: 'PUT',
+      body: JSON.stringify({ caller_email: callerEmail, password }),
+    });
+  },
+
+  // Super admin changes ONLY their own password (my_email scoped server-side)
+  changeSuperAdminMyPassword: async (myEmail: string, newPassword: string): Promise<{ success: boolean }> => {
+    return fetchWithAuth('/super-admin/my-password', {
+      method: 'PUT',
+      body: JSON.stringify({ my_email: myEmail, new_password: newPassword }),
+    });
+  },
 };

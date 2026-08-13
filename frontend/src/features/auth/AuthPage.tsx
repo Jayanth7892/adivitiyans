@@ -277,8 +277,8 @@ export const AuthPage: React.FC = () => {
           throw new Error(authResult.error || 'Incorrect password. Please enter valid admin credentials.');
         }
 
-        login(ADMIN_MASTER_EMAIL, 'admin', 'ADMIN_MASTER', 'System Administrator', jwtToken);
-        registerSession(ADMIN_MASTER_EMAIL, 'admin'); // non-blocking
+        login(data.email, 'admin', 'ADMIN_MASTER', 'System Administrator', jwtToken);
+        registerSession(data.email, 'admin'); // non-blocking
         navigate('/admin/dashboard');
         return;
       }
