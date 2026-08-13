@@ -94,6 +94,17 @@ export const AdminDashboardPage: React.FC = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
+  // Student Passwords panel state
+  type PwdRow = { roll_number: string; name: string; email: string; year: string; section: string; password: string };
+  const [pwdStudents, setPwdStudents] = useState<PwdRow[]>([]);
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdSearch, setPwdSearch] = useState('');
+  const [pwdEditId, setPwdEditId] = useState<string | null>(null);
+  const [pwdEditValue, setPwdEditValue] = useState('');
+  const [pwdSaving, setPwdSaving] = useState(false);
+  const [pwdMessage, setPwdMessage] = useState<{ rollNo: string; type: 'success' | 'error'; text: string } | null>(null);
+  const [showPwdMap, setShowPwdMap] = useState<Record<string, boolean>>({});
+
   // Add/Edit form state
   const [formName, setFormName] = useState('');
   const [formRegNo, setFormRegNo] = useState('');
@@ -391,6 +402,7 @@ export const AdminDashboardPage: React.FC = () => {
           { key: 'performance', label: 'CGPA & Coding Rankings' },
           { key: 'faculty', label: 'Faculty & Mentor Assignments' },
           { key: 'hod-credentials', label: '🔑 HOD Credentials' },
+          { key: 'student-passwords', label: '🔒 Student Passwords' },
         ].map((t) => (
           <button
             key={t.key}
@@ -403,6 +415,14 @@ export const AdminDashboardPage: React.FC = () => {
                   setHodCreds(data);
                   setHodCredsLoading(false);
                 }).catch(() => setHodCredsLoading(false));
+              }
+              // Fetch student passwords when that tab is opened
+              if (t.key === 'student-passwords') {
+                setPwdLoading(true);
+                api.getStudentPasswords().then((rows) => {
+                  setPwdStudents(rows);
+                  setPwdLoading(false);
+                }).catch(() => setPwdLoading(false));
               }
             }}
             className={`pb-3 transition-colors ${activeTab === t.key ? 'border-b-2 border-brand-primary text-brand-primary' : 'text-textSecondary hover:text-textPrimary'}`}
@@ -1128,6 +1148,185 @@ export const AdminDashboardPage: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── TAB 5: Student Passwords ── */}
+      {activeTab === 'student-passwords' && (
+        <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-base font-bold text-textPrimary flex items-center gap-2">
+                <Lock className="w-5 h-5 text-brand-primary" />
+                Student Password Management
+              </h3>
+              <p className="text-xs text-textSecondary mt-0.5">
+                View or reset any student's plain-text login password.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setPwdLoading(true);
+                api.getStudentPasswords().then((rows) => { setPwdStudents(rows); setPwdLoading(false); }).catch(() => setPwdLoading(false));
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-borderLine hover:bg-background transition-all"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${pwdLoading ? 'animate-spin' : ''}`} /> Refresh
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-borderLine bg-background text-xs w-full sm:w-72 mb-4">
+            <Search className="w-4 h-4 text-textSecondary shrink-0" />
+            <input
+              type="text" value={pwdSearch} onChange={(e) => setPwdSearch(e.target.value)}
+              placeholder="Search by name or roll number…"
+              className="bg-transparent border-none outline-none text-textPrimary flex-1 text-xs"
+            />
+          </div>
+
+          {/* Table */}
+          {pwdLoading ? (
+            <div className="flex items-center justify-center py-12 gap-2 text-textSecondary text-xs">
+              <RefreshCw className="w-4 h-4 animate-spin" /> Loading passwords…
+            </div>
+          ) : pwdStudents.length === 0 ? (
+            <div className="text-center py-12 text-textSecondary text-xs">
+              No students found. Students appear here once registered.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-borderLine text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
+                    <th className="py-3 px-4">Roll No</th>
+                    <th className="py-3 px-4">Name</th>
+                    <th className="py-3 px-4">Year / Sec</th>
+                    <th className="py-3 px-4">Password</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-borderLine text-sm">
+                  {pwdStudents
+                    .filter((r) =>
+                      !pwdSearch ||
+                      r.name.toLowerCase().includes(pwdSearch.toLowerCase()) ||
+                      r.roll_number.toLowerCase().includes(pwdSearch.toLowerCase())
+                    )
+                    .map((row) => {
+                      const isEditing = pwdEditId === row.roll_number;
+                      const isVisible = showPwdMap[row.roll_number] ?? false;
+                      const rowMsg = pwdMessage?.rollNo === row.roll_number ? pwdMessage : null;
+
+                      return (
+                        <tr key={row.roll_number} className="hover:bg-background/50 transition-colors">
+                          {/* Roll No */}
+                          <td className="py-3.5 px-4 font-bold text-brand-primary text-xs">{row.roll_number}</td>
+
+                          {/* Name + Email */}
+                          <td className="py-3.5 px-4">
+                            <p className="font-bold text-textPrimary text-sm">{row.name}</p>
+                            <p className="text-[11px] text-textSecondary">{row.email}</p>
+                          </td>
+
+                          {/* Year / Section */}
+                          <td className="py-3.5 px-4 text-xs font-medium text-textPrimary">
+                            {row.year} • Sec {row.section}
+                          </td>
+
+                          {/* Password cell */}
+                          <td className="py-3.5 px-4">
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={pwdEditValue}
+                                onChange={(e) => setPwdEditValue(e.target.value)}
+                                autoFocus
+                                placeholder="New password (min 4 chars)"
+                                className="px-3 py-1.5 text-xs rounded-lg border border-brand-primary bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary w-48 font-mono"
+                              />
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs text-textPrimary">
+                                  {isVisible
+                                    ? (row.password || <span className="italic text-textSecondary">not set</span>)
+                                    : '••••••••'}
+                                </span>
+                                <button
+                                  onClick={() => setShowPwdMap((prev) => ({ ...prev, [row.roll_number]: !isVisible }))}
+                                  className="p-1 text-textSecondary hover:text-textPrimary transition-colors"
+                                  title={isVisible ? 'Hide' : 'Show password'}
+                                >
+                                  {isVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            )}
+                            {/* Inline toast */}
+                            {rowMsg && (
+                              <p className={`text-[10px] font-semibold mt-1 ${rowMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                                {rowMsg.text}
+                              </p>
+                            )}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3.5 px-4 text-right">
+                            {isEditing ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={async () => {
+                                    if (!pwdEditValue || pwdEditValue.length < 4) {
+                                      setPwdMessage({ rollNo: row.roll_number, type: 'error', text: 'Min 4 characters required.' });
+                                      setTimeout(() => setPwdMessage(null), 3000);
+                                      return;
+                                    }
+                                    setPwdSaving(true);
+                                    try {
+                                      await api.setStudentPassword(row.roll_number, pwdEditValue);
+                                      // Update local list
+                                      setPwdStudents((prev) => prev.map((r) => r.roll_number === row.roll_number ? { ...r, password: pwdEditValue } : r));
+                                      setPwdEditId(null);
+                                      setPwdEditValue('');
+                                      setPwdMessage({ rollNo: row.roll_number, type: 'success', text: '✓ Password updated!' });
+                                      setTimeout(() => setPwdMessage(null), 3000);
+                                    } catch (err: any) {
+                                      setPwdMessage({ rollNo: row.roll_number, type: 'error', text: err.message || 'Save failed.' });
+                                      setTimeout(() => setPwdMessage(null), 4000);
+                                    } finally {
+                                      setPwdSaving(false);
+                                    }
+                                  }}
+                                  disabled={pwdSaving}
+                                  className="px-3 py-1.5 text-xs font-bold rounded-lg bg-brand-primary text-white hover:bg-brand-primary/90 disabled:opacity-50 flex items-center gap-1"
+                                >
+                                  {pwdSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />} Save
+                                </button>
+                                <button
+                                  onClick={() => { setPwdEditId(null); setPwdEditValue(''); }}
+                                  className="p-1.5 rounded-lg border border-borderLine text-textSecondary hover:text-textPrimary transition-colors"
+                                  title="Cancel"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => { setPwdEditId(row.roll_number); setPwdEditValue(row.password || ''); }}
+                                className="p-1.5 rounded-lg border border-borderLine text-textPrimary hover:bg-background transition-colors"
+                                title="Change password"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
