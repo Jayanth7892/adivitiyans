@@ -466,13 +466,13 @@ export const AuthPage: React.FC = () => {
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="flex-1 overflow-y-auto flex flex-col justify-center py-4 sm:py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-primary text-white font-black text-2xl shadow-lg shadow-brand-primary/30 mb-4">
+        <div className="inline-flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-brand-primary text-white font-black text-xl sm:text-2xl shadow-lg shadow-brand-primary/30 mb-2 sm:mb-4">
           A
         </div>
-        <h2 className="text-3xl font-extrabold text-textPrimary tracking-tight">Advitiyans</h2>
-        <p className="mt-1.5 text-sm text-textSecondary">Student 360°, Faculty & Placement Cell Platform</p>
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-textPrimary tracking-tight">Advitiyans</h2>
+        <p className="mt-1 sm:mt-1.5 text-xs sm:text-sm text-textSecondary">Student 360°, Faculty & Placement Cell Platform</p>
       </div>
 
       {/* ── Session Kicked-Out Banner ── */}
@@ -503,8 +503,8 @@ export const AuthPage: React.FC = () => {
         </div>
       )}
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg">
-        <div className="bg-surface py-8 px-6 shadow-sm border border-borderLine sm:rounded-2xl sm:px-10">
+      <div className="mt-4 sm:mt-8 sm:mx-auto sm:w-full sm:max-w-lg">
+        <div className="bg-surface py-5 sm:py-8 px-5 sm:px-6 shadow-sm border border-borderLine sm:rounded-2xl sm:px-10">
           {/* Inline Error Banner */}
           {errorMessage && (
             <div className="mb-6 flex items-start gap-3 bg-red-950/60 border border-red-500/50 rounded-xl px-4 py-3 text-sm animate-pulse-once">
