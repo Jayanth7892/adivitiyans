@@ -83,7 +83,7 @@ const MainLayout: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-background flex overflow-hidden">
+    <div className="h-dvh bg-background flex overflow-hidden">
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <div className="flex-1 flex flex-col lg:pl-[260px] min-w-0">
         <TopBar onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
