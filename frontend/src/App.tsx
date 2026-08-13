@@ -1,4 +1,4 @@
-import React, { useState, Suspense, lazy, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense, lazy } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -25,6 +25,29 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * CacheClearer — watches user identity and clears ALL React Query cache
+ * whenever the logged-in user changes (login, logout, or role switch).
+ * This prevents data from one role (HOD / Admin / Student) leaking into
+ * another role's view after a session change.
+ */
+const CacheClearer: React.FC = () => {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const prevUserIdRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    const currentId = user?.id;
+    if (prevUserIdRef.current !== currentId) {
+      // User changed — nuke stale cache immediately
+      qc.clear();
+      prevUserIdRef.current = currentId;
+    }
+  }, [user?.id, qc]);
+
+  return null;
+};
+
 const RoleDashboardRedirect: React.FC = () => {
   const { role } = useAuth();
   if (role === 'admin') {
@@ -42,15 +65,6 @@ const RoleDashboardRedirect: React.FC = () => {
 const MainLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { isAuthenticated, isLoading } = useAuth();
-  const queryClient = useQueryClient();
-
-  // Clear all cached queries whenever a user logs out to prevent
-  // stale data from one role (HOD/Admin/Student) bleeding into another.
-  useEffect(() => {
-    if (!isAuthenticated && !isLoading) {
-      queryClient.clear();
-    }
-  }, [isAuthenticated, isLoading, queryClient]);
 
   if (isLoading) {
     return (
@@ -86,6 +100,8 @@ export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        {/* Clears React Query cache on every user/role change — prevents HOD data leaking into student view */}
+        <CacheClearer />
         <Router>
           <Routes>
             <Route path="/login" element={<AuthPage />} />

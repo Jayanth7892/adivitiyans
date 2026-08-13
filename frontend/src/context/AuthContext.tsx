@@ -60,6 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.removeItem(JWT_TOKEN_KEY);
     sessionStorage.removeItem(SESSION_TOKEN_KEY);
     setUser(null);
+    setRole('student'); // reset role so next login starts clean
     if (reason === 'session_superseded') {
       setSessionKickedOut(true);
     }
@@ -192,6 +193,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sessionStorage.removeItem(AUTH_USER_KEY);
     sessionStorage.removeItem(JWT_TOKEN_KEY);
     setUser(null);
+    setRole('student'); // reset role so the next login starts from a clean state
     setSessionKickedOut(false);
   };
 
