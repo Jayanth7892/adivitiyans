@@ -84,6 +84,16 @@ export const AdminDashboardPage: React.FC = () => {
   const [inspectTab, setInspectTab] = useState('personal-info');
   const [saving, setSaving] = useState(false);
 
+  // Bulk delete state
+  const [selectedRollNos, setSelectedRollNos] = useState<Set<string>>(new Set());
+  const [deleteModal, setDeleteModal] = useState<{
+    type: 'single' | 'selected' | 'section' | 'all';
+    label: string;
+    rollNos: string[];
+  } | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
   // Add/Edit form state
   const [formName, setFormName] = useState('');
   const [formRegNo, setFormRegNo] = useState('');
@@ -269,14 +279,36 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const handleDeleteStudent = async (rollNo: string) => {
-    if (!window.confirm(`Are you sure you want to delete student ${rollNo}? This cannot be undone.`)) return;
+  // Single delete — opens confirm modal instead of window.confirm
+  const handleDeleteStudent = (rollNo: string, name: string) => {
+    setDeleteConfirmText('');
+    setDeleteModal({ type: 'single', label: `student "${name}" (${rollNo})`, rollNos: [rollNo] });
+  };
+
+  // Bulk delete — called from selected / section / all actions
+  const openBulkDeleteModal = (type: 'selected' | 'section' | 'all', rollNos: string[], label: string) => {
+    setDeleteConfirmText('');
+    setDeleteModal({ type, label, rollNos });
+  };
+
+  // Execute delete after modal confirmation
+  const handleExecuteDelete = async () => {
+    if (!deleteModal || deleteConfirmText !== 'DELETE') return;
+    setDeleting(true);
     try {
-      await api.deleteStudent(rollNo);
-      alert(`Student ${rollNo} deleted.`);
+      if (deleteModal.type === 'all') {
+        await api.deleteAllStudents();
+      } else {
+        await api.bulkDeleteStudents(deleteModal.rollNos);
+      }
+      setDeleteModal(null);
+      setDeleteConfirmText('');
+      setSelectedRollNos(new Set());
       refetch();
     } catch (e: any) {
       alert('Delete failed: ' + e.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -422,13 +454,75 @@ export const AdminDashboardPage: React.FC = () => {
                 <option value="B">Section B</option>
                 <option value="C">Section C</option>
               </select>
+              {/* Section-wise delete — only when section filter is active */}
+              {sectionFilter && (
+                <button
+                  onClick={() => {
+                    const sectionIds = filteredStudents.map(s => s.roll_number);
+                    const label = `all ${sectionIds.length} student(s) in Section ${sectionFilter}${yearFilter ? ` (${yearFilter})` : ''}`;
+                    openBulkDeleteModal('section', sectionIds, label);
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold rounded-lg border border-red-300 text-red-600 bg-red-50 hover:bg-red-100 transition-all flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete Section
+                </button>
+              )}
+              {/* Delete All — always visible */}
+              <button
+                onClick={() => openBulkDeleteModal('all', [], `ALL ${uniqueStudents.length} students in the database`)}
+                className="px-3 py-1.5 text-xs font-bold rounded-lg border border-red-400 text-red-700 bg-red-50 hover:bg-red-600 hover:text-white transition-all flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete All
+              </button>
             </div>
           </div>
+
+          {/* Bulk action bar — shown when rows are selected */}
+          {selectedRollNos.size > 0 && (
+            <div className="mb-4 flex items-center gap-3 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200">
+              <span className="text-xs font-bold text-red-700">
+                ✓ {selectedRollNos.size} student{selectedRollNos.size > 1 ? 's' : ''} selected
+              </span>
+              <button
+                onClick={() => openBulkDeleteModal('selected', Array.from(selectedRollNos), `${selectedRollNos.size} selected student(s)`)}
+                className="px-3 py-1 text-xs font-bold rounded-lg bg-red-600 text-white hover:bg-red-700 transition-all flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Delete Selected
+              </button>
+              <button
+                onClick={() => setSelectedRollNos(new Set())}
+                className="px-3 py-1 text-xs font-semibold rounded-lg border border-red-300 text-red-600 hover:bg-red-100 transition-all"
+              >
+                Clear
+              </button>
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
+                  {/* Checkbox header — selects/deselects all visible */}
+                  <th className="py-3 px-3 w-10">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 accent-red-600 cursor-pointer"
+                      checked={filteredStudents.length > 0 && filteredStudents.every(s => selectedRollNos.has(s.roll_number))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedRollNos(prev => new Set([...prev, ...filteredStudents.map(s => s.roll_number)]));
+                        } else {
+                          setSelectedRollNos(prev => {
+                            const next = new Set(prev);
+                            filteredStudents.forEach(s => next.delete(s.roll_number));
+                            return next;
+                          });
+                        }
+                      }}
+                    />
+                  </th>
                   <th className="py-3 px-4">Student Name</th>
                   <th className="py-3 px-4">Reg Number</th>
                   <th className="py-3 px-4">Dept / Year</th>
@@ -440,10 +534,25 @@ export const AdminDashboardPage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-borderLine text-sm">
                 {filteredStudents.length === 0 && (
-                  <tr><td colSpan={7} className="py-10 text-center text-textSecondary text-xs">No students found matching your filters.</td></tr>
+                  <tr><td colSpan={8} className="py-10 text-center text-textSecondary text-xs">No students found matching your filters.</td></tr>
                 )}
                 {filteredStudents.map((s, i) => (
-                  <tr key={s.roll_number} className="hover:bg-background/50 transition-colors">
+                  <tr key={s.roll_number} className={`hover:bg-background/50 transition-colors ${selectedRollNos.has(s.roll_number) ? 'bg-red-50/40' : ''}`}>
+                    {/* Row checkbox */}
+                    <td className="py-3.5 px-3">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 accent-red-600 cursor-pointer"
+                        checked={selectedRollNos.has(s.roll_number)}
+                        onChange={(e) => {
+                          setSelectedRollNos(prev => {
+                            const next = new Set(prev);
+                            e.target.checked ? next.add(s.roll_number) : next.delete(s.roll_number);
+                            return next;
+                          });
+                        }}
+                      />
+                    </td>
                     <td className="py-3.5 px-4 font-bold text-textPrimary">
                       {s.name}
                       <p className="text-[11px] text-textSecondary font-normal">{s.email}</p>
@@ -471,7 +580,7 @@ export const AdminDashboardPage: React.FC = () => {
                           className="p-1.5 rounded-lg border border-borderLine text-textPrimary hover:bg-background" title="Edit Student">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDeleteStudent(s.roll_number)}
+                        <button onClick={() => handleDeleteStudent(s.roll_number, s.name)}
                           className="p-1.5 rounded-lg border border-borderLine text-alert hover:bg-alert-soft" title="Delete Student">
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1015,6 +1124,69 @@ export const AdminDashboardPage: React.FC = () => {
                   <><RefreshCw className="w-4 h-4 animate-spin" /> Resetting...</>
                 ) : (
                   <><KeyRound className="w-4 h-4" /> Force Reset HOD Credentials</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-surface border border-borderLine rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+            {/* Header */}
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-textPrimary">Confirm Permanent Delete</h3>
+                <p className="text-xs text-textSecondary mt-0.5">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            {/* What will be deleted */}
+            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              <p className="font-semibold mb-0.5">You are about to delete:</p>
+              <p className="font-bold">{deleteModal.label}</p>
+              <p className="text-xs mt-1.5 text-red-600">
+                All academic records, coding profiles, certificates, skills and achievements for these students will also be permanently removed.
+              </p>
+            </div>
+
+            {/* Type to confirm */}
+            <div>
+              <label className="block text-xs font-semibold text-textPrimary mb-1.5">
+                Type <span className="font-black text-red-600 tracking-widest">DELETE</span> to confirm:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE here"
+                className="w-full px-3.5 py-2 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-red-400 font-mono tracking-widest"
+                autoFocus
+              />
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setDeleteModal(null); setDeleteConfirmText(''); }}
+                className="flex-1 py-2.5 rounded-xl border border-borderLine text-textPrimary text-sm font-semibold hover:bg-background transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExecuteDelete}
+                disabled={deleteConfirmText !== 'DELETE' || deleting}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {deleting ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Deleting...</>
+                ) : (
+                  <><Trash2 className="w-4 h-4" /> Delete Forever</>
                 )}
               </button>
             </div>

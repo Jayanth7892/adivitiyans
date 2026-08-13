@@ -1053,6 +1053,36 @@ app.delete('/students/:id', async (req: Request, res: Response) => {
 });
 
 // ============================================================================
+// Bulk Delete Students (Admin)
+// ============================================================================
+
+// POST /admin/students/bulk-delete — delete multiple students by roll-number array
+app.post('/admin/students/bulk-delete', async (req: Request, res: Response) => {
+  try {
+    const { roll_numbers } = req.body;
+    if (!Array.isArray(roll_numbers) || roll_numbers.length === 0) {
+      return res.status(400).json({ error: 'roll_numbers must be a non-empty array' });
+    }
+    const ids = roll_numbers.map((r: string) => String(r).toUpperCase());
+
+    if (db.isMock) {
+      let deleted = 0;
+      ids.forEach((id) => { if (db.mockStore.students.delete(id)) deleted++; });
+      return res.json({ deleted, message: `${deleted} student(s) deleted from mock store` });
+    }
+
+    const result = await db.query(
+      'DELETE FROM students WHERE roll_number = ANY($1) RETURNING roll_number',
+      [ids]
+    );
+    const deleted = result.rows.length;
+    res.json({ deleted, message: `${deleted} student(s) deleted successfully` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
 // Academics
 // ============================================================================
 app.get('/students/:id/academics', async (req: Request, res: Response) => {

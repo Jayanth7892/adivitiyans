@@ -122,6 +122,17 @@ export const api = {
     });
   },
 
+  bulkDeleteStudents: async (rollNumbers: string[]): Promise<{ deleted: number; message: string }> => {
+    return fetchWithAuth('/admin/students/bulk-delete', {
+      method: 'POST',
+      body: JSON.stringify({ roll_numbers: rollNumbers }),
+    });
+  },
+
+  deleteAllStudents: async (): Promise<{ message: string }> => {
+    return fetchWithAuth('/students', { method: 'DELETE' });
+  },
+
   getStudentByEmail: async (email: string): Promise<StudentProfile | null> => {
     try {
       return await fetchWithAuth(`/students/by-email/${encodeURIComponent(email)}`);
