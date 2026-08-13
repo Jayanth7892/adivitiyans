@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Plus, Award, GraduationCap, TrendingUp, ArrowUpRight, ArrowDownRight, Edit2, Calendar, CheckCircle2 } from 'lucide-react';
+import { Plus, Award, GraduationCap, TrendingUp, ArrowUpRight, ArrowDownRight, Edit2, Calendar, CheckCircle2, Lock } from 'lucide-react';
 import { AcademicRecord } from '../../../types';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
@@ -10,15 +10,32 @@ import { PillButton } from '../../../components/common/PillButton';
 interface AcademicsTabProps {
   academics: AcademicRecord[];
   readOnly?: boolean;
+  studentYear?: string;  // e.g. '2nd Year' — drives semester unlock check
   onRefresh: () => void;
 }
 
-export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly = false, onRefresh }) => {
+export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly = false, studentYear, onRefresh }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingSemester, setEditingSemester] = useState<AcademicRecord | null>(null);
   const [saving, setSaving] = useState(false);
+  const [maxAllowedSemester, setMaxAllowedSemester] = useState<number>(8); // default open (fail-safe)
+  const [unlockLoading, setUnlockLoading] = useState(true);
   const { user } = useAuth();
   const activeRollNo = user?.rollNumber || '23091A3251';
+
+  // Fetch semester unlock settings for this student's year
+  useEffect(() => {
+    if (readOnly) { setUnlockLoading(false); return; }
+    const yr = studentYear || '3rd Year';
+    api.getSemesterUnlockSettings()
+      .then((settings) => {
+        const match = settings.find((s) => s.year_label === yr);
+        setMaxAllowedSemester(match !== undefined ? match.max_semester : 8);
+      })
+      .catch(() => setMaxAllowedSemester(8))
+      .finally(() => setUnlockLoading(false));
+  }, [studentYear, readOnly]);
+
 
   // Sort academics by semester number ascending
   const sortedAcademics = [...academics].sort((a, b) => a.semester - b.semester);
@@ -109,29 +126,40 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
             </div>
           </div>
 
-          {/* Primary Action Button to enter semester GPA */}
-          {!readOnly && (
-            <div>
-              <PillButton
-                variant="primary"
-                size="md"
-                onClick={() => {
-                  setEditingSemester(null);
-                  reset({
-                    semester: (sortedAcademics.length || 0) + 1,
-                    semester_gpa: 9.0,
-                    programming_grade: 'O',
-                    attendance_pct: 95.0,
-                    theory_grade: 'A+',
-                    remarks: 'Good progress',
-                  });
-                  setShowAddModal(true);
-                }}
-                icon={<Plus className="w-4 h-4" />}
-              >
-                + Enter Semester GPA
-              </PillButton>
-            </div>
+          {/* Add Semester button — gated by HOD unlock settings */}
+          {!readOnly && !unlockLoading && (
+            sortedAcademics.length < maxAllowedSemester ? (
+              <div>
+                <PillButton
+                  variant="primary"
+                  size="md"
+                  onClick={() => {
+                    setEditingSemester(null);
+                    reset({
+                      semester: (sortedAcademics.length || 0) + 1,
+                      semester_gpa: 9.0,
+                      programming_grade: 'O',
+                      attendance_pct: 95.0,
+                      theory_grade: 'A+',
+                      remarks: 'Good progress',
+                    });
+                    setShowAddModal(true);
+                  }}
+                  icon={<Plus className="w-4 h-4" />}
+                >
+                  + Enter Semester {sortedAcademics.length + 1} GPA
+                </PillButton>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700">
+                <Lock className="w-4 h-4 shrink-0" />
+                <span className="text-xs font-semibold">
+                  {maxAllowedSemester === 0
+                    ? 'No semesters open yet — HOD will unlock when your first semester begins.'
+                    : `Sem ${sortedAcademics.length + 1} entry not yet unlocked by HOD.`}
+                </span>
+              </div>
+            )
           )}
         </div>
 

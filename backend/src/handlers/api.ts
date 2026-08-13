@@ -245,18 +245,19 @@ app.post('/auth/admin-login', async (req: Request, res: Response) => {
 // POST /auth/hod-credentials/admin-reset — Admin resets HOD credentials (no current password needed)
 // ============================================================================
 
-// GET /auth/hod-credentials — returns current HOD login email (admin-facing)
+// GET /auth/hod-credentials — returns current HOD email AND password (admin-facing)
 app.get('/auth/hod-credentials', async (_req: Request, res: Response) => {
   try {
     const hodEmailEnv = (process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in');
+    const hodPassEnv  = (process.env.HOD_MASTER_PASS  || 'cseds@2026');
 
     if (db.isMock) {
-      return res.json({ email: hodEmailEnv, source: 'env', updated_at: null });
+      return res.json({ email: hodEmailEnv, password: hodPassEnv, source: 'env', updated_at: null });
     }
 
-    const result = await db.query('SELECT email, updated_at FROM hod_credentials LIMIT 1').catch(() => ({ rows: [] }));
+    const result = await db.query('SELECT email, password, updated_at FROM hod_credentials LIMIT 1').catch(() => ({ rows: [] }));
     if (result.rows.length > 0) {
-      return res.json({ email: result.rows[0].email, source: 'database', updated_at: result.rows[0].updated_at });
+      return res.json({ email: result.rows[0].email, password: result.rows[0].password, source: 'database', updated_at: result.rows[0].updated_at });
     }
     return res.json({ email: hodEmailEnv, source: 'env', updated_at: null });
   } catch (err: any) {
@@ -347,6 +348,115 @@ app.post('/auth/hod-credentials/admin-reset', async (req: Request, res: Response
     return res.json({ success: true, message: 'Mock mode: HOD credentials reset (not persisted).', email: new_email || currentEmail });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// Semester Unlock Settings — HOD/Admin controls which semesters students can fill
+// ============================================================================
+
+// Mock state for semester unlock (used when DB is unavailable)
+const mockSemesterUnlock: Record<string, number> = {
+  '1st Year': 0, '2nd Year': 2, '3rd Year': 4, '4th Year': 6,
+};
+
+// GET /settings/semester-unlock
+app.get('/settings/semester-unlock', async (_req: Request, res: Response) => {
+  try {
+    if (db.isMock) {
+      return res.json(Object.entries(mockSemesterUnlock).map(([year_label, max_semester]) => ({ year_label, max_semester })));
+    }
+    const result = await db.query(
+      `SELECT year_label, max_semester FROM semester_unlock_settings ORDER BY CASE year_label
+        WHEN '1st Year' THEN 1 WHEN '2nd Year' THEN 2 WHEN '3rd Year' THEN 3 ELSE 4 END`
+    );
+    // If table is empty (fresh DB), return defaults
+    if (result.rows.length === 0) {
+      return res.json([
+        { year_label: '1st Year', max_semester: 0 },
+        { year_label: '2nd Year', max_semester: 2 },
+        { year_label: '3rd Year', max_semester: 4 },
+        { year_label: '4th Year', max_semester: 6 },
+      ]);
+    }
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /settings/semester-unlock — HOD/Admin unlocks next semesters for a year batch
+app.put('/settings/semester-unlock', async (req: Request, res: Response) => {
+  try {
+    const { year_label, max_semester } = req.body;
+    if (!year_label || max_semester === undefined || max_semester === null) {
+      return res.status(400).json({ error: 'year_label and max_semester are required' });
+    }
+    const newMax = Number(max_semester);
+    if (isNaN(newMax) || newMax < 0 || newMax > 8) {
+      return res.status(400).json({ error: 'max_semester must be between 0 and 8' });
+    }
+    if (db.isMock) {
+      mockSemesterUnlock[year_label] = newMax;
+      return res.json({ year_label, max_semester: newMax, updated_at: new Date().toISOString() });
+    }
+    const result = await db.query(
+      `INSERT INTO semester_unlock_settings (year_label, max_semester, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (year_label) DO UPDATE SET max_semester = $2, updated_at = NOW()
+       RETURNING *`,
+      [year_label, newMax]
+    );
+    res.json(result.rows[0]);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// Admin: Student Password Management
+// ============================================================================
+
+// GET /admin/student-passwords — admin views all student passwords in plain text
+app.get('/admin/student-passwords', async (_req: Request, res: Response) => {
+  try {
+    if (db.isMock) {
+      return res.json([]);
+    }
+    const result = await db.query(`
+      SELECT s.roll_number, s.name, s.email, s.year, s.section,
+             COALESCE(sp.password, '') as password,
+             sp.updated_at as pwd_updated_at
+      FROM students s
+      LEFT JOIN student_passwords sp ON s.roll_number = sp.roll_number
+      ORDER BY s.roll_number
+    `);
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /students/:id/password — admin sets a student's password
+app.put('/students/:id/password', async (req: Request, res: Response) => {
+  try {
+    const rollNo = req.params.id.toUpperCase();
+    const { password } = req.body;
+    if (!password || String(password).length < 4) {
+      return res.status(400).json({ error: 'Password must be at least 4 characters' });
+    }
+    if (db.isMock) {
+      return res.json({ success: true, roll_number: rollNo });
+    }
+    await db.query(
+      `INSERT INTO student_passwords (roll_number, password, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (roll_number) DO UPDATE SET password = $2, updated_at = NOW()`,
+      [rollNo, password]
+    );
+    res.json({ success: true, roll_number: rollNo });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

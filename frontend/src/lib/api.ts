@@ -302,8 +302,8 @@ export const api = {
   },
 
   // HOD Credential Management
-  // Fetch current HOD email (admin-facing — shows DB override or env default)
-  getHodCredentials: async (): Promise<{ email: string; source: string; updated_at: string | null }> => {
+  // Fetch current HOD email & password (admin-facing — shows DB override or env default)
+  getHodCredentials: async (): Promise<{ email: string; password: string; source: string; updated_at: string | null }> => {
     return fetchWithAuth('/auth/hod-credentials');
   },
 
@@ -320,6 +320,30 @@ export const api = {
     return fetchWithAuth('/auth/hod-credentials/admin-reset', {
       method: 'POST',
       body: JSON.stringify({ new_email: newEmail || undefined, new_password: newPassword || undefined }),
+    });
+  },
+
+  // Semester unlock settings
+  getSemesterUnlockSettings: async (): Promise<{ year_label: string; max_semester: number }[]> => {
+    return fetchWithAuth('/settings/semester-unlock');
+  },
+
+  updateSemesterUnlock: async (yearLabel: string, maxSemester: number): Promise<{ year_label: string; max_semester: number }> => {
+    return fetchWithAuth('/settings/semester-unlock', {
+      method: 'PUT',
+      body: JSON.stringify({ year_label: yearLabel, max_semester: maxSemester }),
+    });
+  },
+
+  // Admin student password management
+  getStudentPasswords: async (): Promise<{ roll_number: string; name: string; email: string; year: string; section: string; password: string }[]> => {
+    return fetchWithAuth('/admin/student-passwords');
+  },
+
+  setStudentPassword: async (rollNo: string, password: string): Promise<{ success: boolean }> => {
+    return fetchWithAuth(`/students/${rollNo}/password`, {
+      method: 'PUT',
+      body: JSON.stringify({ password }),
     });
   },
 };

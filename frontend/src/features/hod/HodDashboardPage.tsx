@@ -200,6 +200,15 @@ export const HodDashboardPage: React.FC = () => {
   const [showSettingsPwd, setShowSettingsPwd] = useState(false);
   const [showNewPwd, setShowNewPwd] = useState(false);
 
+  // Semester Unlock Control state
+  const [unlockSettings, setUnlockSettings] = useState<{ year_label: string; max_semester: number }[]>([
+    { year_label: '1st Year', max_semester: 0 },
+    { year_label: '2nd Year', max_semester: 2 },
+    { year_label: '3rd Year', max_semester: 4 },
+    { year_label: '4th Year', max_semester: 6 },
+  ]);
+  const [unlockSavingYear, setUnlockSavingYear] = useState<string | null>(null);
+
   // Fetch ALL student sub-data in parallel whenever a student is opened for inspection
   useEffect(() => {
     if (!inspectStudent) {
@@ -256,6 +265,13 @@ export const HodDashboardPage: React.FC = () => {
       setSyncingCron(false);
     }
   };
+
+  // Fetch real semester unlock settings from backend
+  useEffect(() => {
+    api.getSemesterUnlockSettings()
+      .then(setUnlockSettings)
+      .catch(() => {}); // silently keep defaults on error
+  }, []);
 
   const [liveSnapshots, setLiveSnapshots] = useState<Record<string, number>>({});
 
@@ -1251,6 +1267,83 @@ export const HodDashboardPage: React.FC = () => {
       {/* ── TAB: Account Settings ── */}
       {activeTab === 'settings' && (
         <div className="space-y-6">
+
+          {/* ── Semester Entry Control Panel ── */}
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-textPrimary">Semester Entry Control</h3>
+                <p className="text-xs text-textSecondary">Control which semesters students can fill their SGPA for. Click +1 or +2 to unlock the next semester(s).</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {([
+                { year: '1st Year', color: 'bg-purple-100 text-purple-700 border-purple-200', max: 2 },
+                { year: '2nd Year', color: 'bg-amber-100 text-amber-700 border-amber-200', max: 4 },
+                { year: '3rd Year', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', max: 6 },
+                { year: '4th Year', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', max: 8 },
+              ] as const).map(({ year, color, max }) => {
+                const setting = unlockSettings.find(s => s.year_label === year);
+                const current = setting?.max_semester ?? 0;
+                const isSaving = unlockSavingYear === year;
+                const handleUnlock = async (delta: 1 | 2) => {
+                  const newMax = Math.min(current + delta, 8);
+                  if (newMax === current) return;
+                  setUnlockSavingYear(year);
+                  try {
+                    const updated = await api.updateSemesterUnlock(year, newMax);
+                    setUnlockSettings(prev => prev.map(s =>
+                      s.year_label === year ? { ...s, max_semester: updated.max_semester } : s
+                    ));
+                  } catch (e: any) {
+                    alert('Failed to update: ' + e.message);
+                  } finally {
+                    setUnlockSavingYear(null);
+                  }
+                };
+                return (
+                  <div key={year} className="flex items-center justify-between p-3.5 rounded-xl bg-background border border-borderLine">
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${color}`}>{year}</span>
+                      <span className="text-sm text-textPrimary">
+                        {current === 0 ? (
+                          <span className="text-textSecondary italic">No semesters open</span>
+                        ) : (
+                          <>Sem 1 – Sem <span className="font-bold text-brand-primary">{current}</span> unlocked</>
+                        )}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isSaving ? (
+                        <RefreshCw className="w-4 h-4 animate-spin text-brand-primary" />
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleUnlock(1)}
+                            disabled={current >= 8}
+                            className="px-3 py-1 text-xs font-bold rounded-lg bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            +1 Sem
+                          </button>
+                          <button
+                            onClick={() => handleUnlock(2)}
+                            disabled={current >= 8}
+                            className="px-3 py-1 text-xs font-bold rounded-lg bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            +2 Sem
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm max-w-lg">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center shrink-0">

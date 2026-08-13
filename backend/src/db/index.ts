@@ -265,6 +265,38 @@ async function ensureSchema(p: Pool) {
     `INSERT INTO faculty (faculty_id, name, email, department, role)
      VALUES ('HOD_CSEDS', 'Dr. HOD (CSE & Data Science)', 'hodcseds@rgmcet.edu.in', 'Data Science', 'hod')
      ON CONFLICT (email) DO UPDATE SET role = 'hod', department = 'Data Science';`,
+
+    // HOD credentials table — plain-text email+password managed by HOD and visible to admin
+    `CREATE TABLE IF NOT EXISTS hod_credentials (
+      id SERIAL PRIMARY KEY,
+      email VARCHAR(100) NOT NULL,
+      password TEXT NOT NULL,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`,
+
+    // Seed HOD credentials with env defaults if no row exists yet
+    `INSERT INTO hod_credentials (email, password)
+     SELECT 'hodcseds@rgmcet.edu.in', 'cseds@2026'
+     WHERE NOT EXISTS (SELECT 1 FROM hod_credentials LIMIT 1);`,
+
+    // Semester unlock settings — HOD/Admin controls which semesters students can fill
+    `CREATE TABLE IF NOT EXISTS semester_unlock_settings (
+      year_label VARCHAR(20) PRIMARY KEY,
+      max_semester INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`,
+
+    // Seed defaults: 1st Year=0, 2nd Year=2, 3rd Year=4, 4th Year=6
+    `INSERT INTO semester_unlock_settings (year_label, max_semester) VALUES
+      ('1st Year', 0), ('2nd Year', 2), ('3rd Year', 4), ('4th Year', 6)
+     ON CONFLICT (year_label) DO NOTHING;`,
+
+    // Student passwords — admin-managed plain-text passwords (not Cognito)
+    `CREATE TABLE IF NOT EXISTS student_passwords (
+      roll_number VARCHAR(10) PRIMARY KEY REFERENCES students(roll_number) ON DELETE CASCADE,
+      password TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`,
   ];
 
   try {
