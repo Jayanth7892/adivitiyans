@@ -97,9 +97,18 @@ export const ProfilePage: React.FC = () => {
     .join('')
     .toUpperCase() || 'S';
 
-  // If currentTab is 'coding-profiles', render standalone matching BytsOne layout
+  // Coding-profiles tab: render standalone full-page layout.
+  // IMPORTANT: always pass the target studentRollNumber so the section fetches
+  // the viewed student's handles — not the logged-in user's (HOD/admin has no handles).
   if (currentTab === 'coding-profiles') {
-    return <CodingProfilesTab profiles={codingProfiles} onRefresh={handleRefreshAll} />;
+    return (
+      <CodingProfilesTab
+        onRefresh={handleRefreshAll}
+        studentRollNumber={activeRollNo}
+        studentName={student?.name || displayName}
+        readOnly={isViewingOther}
+      />
+    );
   }
 
   return (
