@@ -108,9 +108,8 @@ const MainLayout: React.FC = () => {
       >
         <TopBar
           onMenuToggle={() => {
-            // On desktop: toggle icon-rail collapse
-            // On mobile: toggle overlay open/close
-            if (window.innerWidth >= 1024) {
+            // Use matchMedia — same breakpoint as Tailwind's lg: (min-width: 1024px)
+            if (window.matchMedia('(min-width: 1024px)').matches) {
               setCollapsed((c) => !c);
             } else {
               setIsSidebarOpen((o) => !o);

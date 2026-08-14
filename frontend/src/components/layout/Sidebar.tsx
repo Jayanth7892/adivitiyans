@@ -126,11 +126,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
 
   return (
     <>
-      {/* Mobile backdrop — tapping outside closes the sidebar */}
+      {/* Mobile backdrop — tapping outside closes the sidebar.
+          top-16 ensures it starts BELOW the header so the hamburger button
+          remains clickable even while the sidebar overlay is open. */}
       {isOpen && (
         <div
           onClick={onClose}
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-sm"
+          className="fixed inset-x-0 bottom-0 top-16 bg-black/40 z-40 lg:hidden backdrop-blur-sm"
         />
       )}
 
