@@ -64,13 +64,13 @@ const RoleDashboardRedirect: React.FC = () => {
 };
 
 const MainLayout: React.FC = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);  // mobile overlay
+  const [collapsed, setCollapsed] = useState(false);           // desktop icon-rail
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
 
   // Scroll the main content area to the top whenever the route or tab changes.
-  // This ensures clicking any sidebar link always shows the top of the destination.
   useEffect(() => {
     if (mainRef.current) {
       mainRef.current.scrollTo({ top: 0, behavior: 'instant' });
@@ -94,9 +94,29 @@ const MainLayout: React.FC = () => {
 
   return (
     <div className="h-dvh bg-background flex overflow-hidden">
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col lg:pl-[260px] min-w-0">
-        <TopBar onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
+      <Sidebar
+        isOpen={isSidebarOpen}
+        collapsed={collapsed}
+        onClose={() => setIsSidebarOpen(false)}
+      />
+      {/* Content area shifts right based on sidebar width */}
+      <div
+        className={[
+          'flex-1 flex flex-col min-w-0 transition-all duration-300',
+          collapsed ? 'lg:pl-14' : 'lg:pl-[220px]',
+        ].join(' ')}
+      >
+        <TopBar
+          onMenuToggle={() => {
+            // On desktop: toggle icon-rail collapse
+            // On mobile: toggle overlay open/close
+            if (window.innerWidth >= 1024) {
+              setCollapsed((c) => !c);
+            } else {
+              setIsSidebarOpen((o) => !o);
+            }
+          }}
+        />
         <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-7xl w-full mx-auto">
             <Suspense fallback={<DashboardSkeleton />}>
