@@ -108,6 +108,7 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
 
   const handleSaveCert = async () => {
     if (!title.trim() || readOnly) return;
+    if (!activeRollNo) return; // auth not ready yet — prevent malformed API call
     try {
       const certData = {
         provider,

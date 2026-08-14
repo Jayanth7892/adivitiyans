@@ -1504,7 +1504,7 @@ app.post('/students/:id/coding-profiles', requireOwnerOrRole('id', 'faculty', 'h
   }
 });
 
-app.delete('/students/:id/coding-profiles/:platform', requireOwnerOrRole('id', 'admin'), async (req: Request, res: Response) => {
+app.delete('/students/:id/coding-profiles/:platform', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const platform = String(req.params.platform);
@@ -1693,7 +1693,7 @@ app.get('/students/:id/certifications', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/students/:id/certifications', requireOwnerOrRole('id', 'admin'), async (req: Request, res: Response) => {
+app.post('/students/:id/certifications', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const validated = certificationSchema.parse(req.body);
@@ -1722,7 +1722,7 @@ app.post('/students/:id/certifications', requireOwnerOrRole('id', 'admin'), asyn
   }
 });
 
-app.put('/students/:id/certifications/:certId', requireOwnerOrRole('id', 'admin'), async (req: Request, res: Response) => {
+app.put('/students/:id/certifications/:certId', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const certId = req.params.certId;
@@ -1753,7 +1753,7 @@ app.put('/students/:id/certifications/:certId', requireOwnerOrRole('id', 'admin'
   }
 });
 
-app.delete('/students/:id/certifications/:certId', requireOwnerOrRole('id', 'admin'), async (req: Request, res: Response) => {
+app.delete('/students/:id/certifications/:certId', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const certId = req.params.certId;
@@ -1854,7 +1854,7 @@ app.get('/students/:id/achievements', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/students/:id/achievements', requireOwnerOrRole('id', 'admin'), async (req: Request, res: Response) => {
+app.post('/students/:id/achievements', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const validated = achievementSchema.parse(req.body);
@@ -1905,7 +1905,7 @@ app.get('/students/:id/placement-profile', async (req: Request, res: Response) =
   }
 });
 
-app.put('/students/:id/placement-profile', requireOwnerOrRole('id', 'admin'), async (req: Request, res: Response) => {
+app.put('/students/:id/placement-profile', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const validated = placementProfileSchema.parse(req.body);

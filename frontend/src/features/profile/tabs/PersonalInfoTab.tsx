@@ -73,6 +73,7 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, acade
   }, [student, activeName, activeRoll, activeEmail, reset]);
 
   const onSubmit = async (data: any) => {
+    if (!activeRoll) return; // auth not ready yet — prevent malformed API call
     setSaving(true);
     try {
       const payload: any = {

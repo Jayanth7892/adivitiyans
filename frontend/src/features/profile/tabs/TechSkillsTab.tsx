@@ -37,6 +37,7 @@ export const TechSkillsTab: React.FC<TechSkillsTabProps> = ({ skills, readOnly =
 
   const handleAddSkill = async () => {
     if (!toolInput.trim() || readOnly) return;
+    if (!activeRollNo) return; // auth not ready yet — prevent malformed API call
     setSaving(true);
     try {
       await api.saveTechSkill(activeRollNo, {

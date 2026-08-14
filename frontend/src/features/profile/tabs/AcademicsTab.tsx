@@ -83,6 +83,7 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
       alert(`Semester ${data.semester} is not yet unlocked. HOD has unlocked up to Semester ${maxAllowedSemester}.`);
       return;
     }
+    if (!activeRollNo) return; // auth not ready yet — prevent malformed API call
     setSaving(true);
     try {
       await api.saveAcademicRecord(activeRollNo, {

@@ -38,6 +38,7 @@ export const AchievementsTab: React.FC<AchievementsTabProps> = ({ achievements, 
 
   const handleSave = async () => {
     if (!title.trim() || readOnly) return;
+    if (!activeRollNo) return; // auth not ready yet — prevent malformed API call
     setSaving(true);
     try {
       await api.saveAchievement(activeRollNo, {

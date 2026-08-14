@@ -28,6 +28,7 @@ export const SoftSkillsTab: React.FC<SoftSkillsTabProps> = ({ softSkills, readOn
 
   const handleRatingChange = async (skillName: any, ratingValue: number) => {
     if (readOnly) return;
+    if (!activeRollNo) return; // auth not ready yet — prevent malformed API call
     setSavingSkill(skillName);
     try {
       await api.saveSoftSkill(activeRollNo, {

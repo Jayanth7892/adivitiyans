@@ -43,6 +43,7 @@ export const PlacementPreferencesTab: React.FC<PlacementPreferencesTabProps> = (
 
   const handleSave = async () => {
     if (readOnly) return;
+    if (!activeRollNo) return; // auth not ready yet — prevent malformed API call
     setSaving(true);
     try {
       await api.updatePlacementProfile(activeRollNo, {
