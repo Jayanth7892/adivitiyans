@@ -1278,21 +1278,36 @@ export const HodDashboardPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-base font-bold text-textPrimary">Semester Entry Control</h3>
-                <p className="text-xs text-textSecondary">Control which semesters students can fill their SGPA for. Click +1 or +2 to unlock the next semester(s).</p>
+                <p className="text-xs text-textSecondary">Control which semesters students can fill their SGPA for. Click +1 or +2 to unlock, −1 or −2 to lock semester(s). Minimum limits enforced per year.</p>
               </div>
             </div>
             <div className="space-y-3">
               {([
-                { year: '1st Year', color: 'bg-purple-100 text-purple-700 border-purple-200', max: 2 },
-                { year: '2nd Year', color: 'bg-amber-100 text-amber-700 border-amber-200', max: 4 },
-                { year: '3rd Year', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', max: 6 },
-                { year: '4th Year', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', max: 8 },
-              ] as const).map(({ year, color, max }) => {
+                { year: '1st Year', color: 'bg-purple-100 text-purple-700 border-purple-200', min: 0, max: 2 },
+                { year: '2nd Year', color: 'bg-amber-100 text-amber-700 border-amber-200', min: 2, max: 4 },
+                { year: '3rd Year', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', min: 4, max: 6 },
+                { year: '4th Year', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', min: 6, max: 8 },
+              ] as const).map(({ year, color, min, max }) => {
                 const setting = unlockSettings.find(s => s.year_label === year);
                 const current = setting?.max_semester ?? 0;
                 const isSaving = unlockSavingYear === year;
                 const handleUnlock = async (delta: 1 | 2) => {
                   const newMax = Math.min(current + delta, 8);
+                  if (newMax === current) return;
+                  setUnlockSavingYear(year);
+                  try {
+                    const updated = await api.updateSemesterUnlock(year, newMax);
+                    setUnlockSettings(prev => prev.map(s =>
+                      s.year_label === year ? { ...s, max_semester: updated.max_semester } : s
+                    ));
+                  } catch (e: any) {
+                    alert('Failed to update: ' + e.message);
+                  } finally {
+                    setUnlockSavingYear(null);
+                  }
+                };
+                const handleLock = async (delta: 1 | 2) => {
+                  const newMax = Math.max(current - delta, min);
                   if (newMax === current) return;
                   setUnlockSavingYear(year);
                   try {
@@ -1316,26 +1331,41 @@ export const HodDashboardPage: React.FC = () => {
                         ) : (
                           <>Sem 1 – Sem <span className="font-bold text-brand-primary">{current}</span> unlocked</>
                         )}
+                        <span className="text-[10px] text-textSecondary ml-1.5">(min: {min})</span>
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       {isSaving ? (
                         <RefreshCw className="w-4 h-4 animate-spin text-brand-primary" />
                       ) : (
                         <>
                           <button
+                            onClick={() => handleLock(2)}
+                            disabled={current <= min}
+                            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            −2
+                          </button>
+                          <button
+                            onClick={() => handleLock(1)}
+                            disabled={current <= min}
+                            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            −1
+                          </button>
+                          <button
                             onClick={() => handleUnlock(1)}
                             disabled={current >= 8}
-                            className="px-3 py-1 text-xs font-bold rounded-lg bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                           >
-                            +1 Sem
+                            +1
                           </button>
                           <button
                             onClick={() => handleUnlock(2)}
                             disabled={current >= 8}
-                            className="px-3 py-1 text-xs font-bold rounded-lg bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                           >
-                            +2 Sem
+                            +2
                           </button>
                         </>
                       )}
@@ -1345,6 +1375,7 @@ export const HodDashboardPage: React.FC = () => {
               })}
             </div>
           </div>
+
 
           <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm max-w-lg">
             <div className="flex items-center gap-3 mb-6">

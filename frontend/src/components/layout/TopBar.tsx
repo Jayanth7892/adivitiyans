@@ -56,7 +56,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
     { name: 'System Admin Dashboard', path: '/admin', category: 'Page' },
   ];
 
-  // Perform search
+  // Perform search with debounce to prevent race conditions
   useEffect(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) {
@@ -68,22 +68,35 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
     setIsSearchOpen(true);
     setSearching(true);
 
-    const matchedPages = SYSTEM_PAGES.filter(p => p.name.toLowerCase().includes(query));
+    const debounceTimer = setTimeout(() => {
+      let cancelled = false;
+      const matchedPages = SYSTEM_PAGES.filter(p => p.name.toLowerCase().includes(query));
 
-    api.getAllStudents({ search: query })
-      .then((students) => {
-        setSearchResults({
-          students: students.slice(0, 5),
-          pages: matchedPages,
+      api.getAllStudents({ search: query })
+        .then((students) => {
+          if (!cancelled) {
+            setSearchResults({
+              students: students.slice(0, 5),
+              pages: matchedPages,
+            });
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setSearchResults({
+              students: [],
+              pages: matchedPages,
+            });
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
         });
-      })
-      .catch(() => {
-        setSearchResults({
-          students: [],
-          pages: matchedPages,
-        });
-      })
-      .finally(() => setSearching(false));
+
+      // Return cleanup for the inner scope (handled by outer return)
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
   }, [searchQuery]);
 
   const handleLogout = () => {
@@ -105,11 +118,8 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
         </button>
 
         <Link to="/" className="flex items-center gap-2 group">
-          <h2 className="text-base font-bold text-textPrimary tracking-tight flex items-center gap-2">
-            <span>Advitiyans</span>
-            <span className="text-[10px] font-semibold text-brand-primary bg-brand-soft px-2 py-0.5 rounded-full border border-brand-primary/20">
-              RGMCET Student 360
-            </span>
+          <h2 className="text-base font-bold text-textPrimary tracking-tight">
+            <span>A</span><span className="text-brand-primary">D</span><span>VITIYAN</span><span className="text-brand-primary">S</span>
           </h2>
         </Link>
       </div>

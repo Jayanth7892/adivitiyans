@@ -11,7 +11,7 @@ export const Footer: React.FC = () => {
           "Code. Create. Elevate."
         </p>
         <p className="text-[10px] sm:text-[11px] text-textSecondary leading-snug">
-          Handcrafted with <span className="text-red-500">❤️</span> by{' '}
+          Handcrafted with <span className="text-red-500">❤️</span> from <span className="text-brand-primary font-semibold">Data Science</span> by{' '}
           <span className="text-textPrimary font-semibold">Jaya Krushna</span>,{' '}
           <span className="text-textPrimary font-semibold">Dinesh Kumar</span> &amp;{' '}
           <span className="text-textPrimary font-semibold">Jayanth Kumar Naidu</span>
