@@ -27,15 +27,23 @@ export const ProfilePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const activeRollNo = user?.rollNumber ?? '';
+
+  // ?id=ROLLNO means admin/HOD is viewing a specific student's profile from search.
+  // Fall back to the logged-in user's own roll number for students on their own profile.
+  const viewId = searchParams.get('id') || '';
+  const activeRollNo = viewId || user?.rollNumber || '';
+  const isViewingOther = Boolean(viewId && viewId !== user?.rollNumber);
 
   const currentTab = searchParams.get('tab') || 'personal-info';
 
   const setTab = (slug: string) => {
-    setSearchParams({ tab: slug });
+    // Preserve ?id= param while switching tabs
+    const params: Record<string, string> = { tab: slug };
+    if (viewId) params.id = viewId;
+    setSearchParams(params);
   };
 
-  // Queries for profile sections
+  // Queries for profile sections — all keyed by activeRollNo so switching students busts cache
   const { data: student, refetch: refetchStudent } = useQuery({ queryKey: ['studentProfile', activeRollNo], queryFn: () => api.getStudentProfile(activeRollNo), enabled: Boolean(activeRollNo) });
   const { data: academics = [], refetch: refetchAcademics } = useQuery({ queryKey: ['academics', activeRollNo], queryFn: () => api.getAcademics(activeRollNo), enabled: Boolean(activeRollNo) });
   const { data: codingProfiles = [], refetch: refetchCoding } = useQuery({ queryKey: ['codingProfiles', activeRollNo], queryFn: () => api.getCodingProfiles(activeRollNo), enabled: Boolean(activeRollNo) });
@@ -46,7 +54,7 @@ export const ProfilePage: React.FC = () => {
   const { data: placement, refetch: refetchPlacement } = useQuery({ queryKey: ['placementProfile', activeRollNo], queryFn: () => api.getPlacementProfile(activeRollNo), enabled: Boolean(activeRollNo) });
   const { data: scoreData, refetch: refetchScore } = useQuery({ queryKey: ['employabilityScore', activeRollNo], queryFn: () => api.getEmployabilityScore(activeRollNo), enabled: Boolean(activeRollNo), staleTime: 0, refetchOnMount: 'always' });
 
-  // BUG-06 fix: guard against missing rollNumber (HOD/Admin on /profile, or mid-login race)
+  // Guard: no roll number at all (admin/HOD on /profile with no ?id= param)
   if (!activeRollNo) {
     return (
       <div className="flex items-center justify-center h-64 text-textSecondary text-sm">
@@ -54,6 +62,7 @@ export const ProfilePage: React.FC = () => {
       </div>
     );
   }
+
 
   const handleRefreshAll = () => {
     refetchStudent();
@@ -79,8 +88,8 @@ export const ProfilePage: React.FC = () => {
     { slug: 'placement-preferences', label: 'Academic Growth Target', icon: Target },
   ];
 
-  const displayName = user?.name || student?.name || 'Student Profile';
-  const displayRollNo = user?.rollNumber || student?.roll_number || '';
+  const displayName = student?.name || user?.name || 'Student Profile';
+  const displayRollNo = student?.roll_number || user?.rollNumber || '';
   const initials = displayName
     .split(' ')
     .filter(Boolean)
@@ -95,6 +104,12 @@ export const ProfilePage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Read-only banner when admin/HOD views a student's profile via search */}
+      {isViewingOther && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
+          <span>👁️ Viewing read-only profile of <span className="font-extrabold">{displayName}</span> ({displayRollNo}). Changes are disabled.</span>
+        </div>
+      )}
       {/* Top Header Card */}
       <div className="bg-surface border border-borderLine rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row items-center gap-6">
         <div className="relative group">
@@ -146,12 +161,12 @@ export const ProfilePage: React.FC = () => {
 
       {/* Render Active Tab Content */}
       <div className="pt-2">
-        {currentTab === 'personal-info' && <PersonalInfoTab student={student} academics={academics} onRefresh={handleRefreshAll} />}
-        {currentTab === 'academics' && <AcademicsTab academics={academics} studentYear={student?.year} onRefresh={handleRefreshAll} />}
-        {currentTab === 'tech-skills' && <TechSkillsTab skills={techSkills} onRefresh={handleRefreshAll} />}
-        {currentTab === 'certifications' && <CertificationsTab certifications={certifications} onRefresh={handleRefreshAll} />}
-        {currentTab === 'soft-skills' && <SoftSkillsTab softSkills={softSkills} onRefresh={handleRefreshAll} />}
-        {currentTab === 'achievements' && <AchievementsTab achievements={achievements} onRefresh={handleRefreshAll} />}
+        {currentTab === 'personal-info' && <PersonalInfoTab student={student} academics={academics} onRefresh={handleRefreshAll} readOnly={isViewingOther} />}
+        {currentTab === 'academics' && <AcademicsTab academics={academics} studentYear={student?.year} onRefresh={handleRefreshAll} readOnly={isViewingOther} />}
+        {currentTab === 'tech-skills' && <TechSkillsTab skills={techSkills} onRefresh={handleRefreshAll} readOnly={isViewingOther} />}
+        {currentTab === 'certifications' && <CertificationsTab certifications={certifications} onRefresh={handleRefreshAll} readOnly={isViewingOther} />}
+        {currentTab === 'soft-skills' && <SoftSkillsTab softSkills={softSkills} onRefresh={handleRefreshAll} readOnly={isViewingOther} />}
+        {currentTab === 'achievements' && <AchievementsTab achievements={achievements} onRefresh={handleRefreshAll} readOnly={isViewingOther} />}
         {currentTab === 'placement-preferences' && (
           <PlacementPreferencesTab placement={placement} scoreData={scoreData} onRefresh={handleRefreshAll} />
         )}
