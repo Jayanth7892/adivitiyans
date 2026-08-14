@@ -16,10 +16,15 @@ import {
   REGISTRATION_NUMBER_REGEX,
   RGMCET_EMAIL_REGEX,
 } from '../lib/validation';
+import { extractAuth, requireAuth, requireRole, requireOwnerOrRole } from '../lib/authMiddleware';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Global auth extraction — runs on every request, NEVER blocks.
+// Sets req.auth = { email, role, regNo } or null.
+app.use(extractAuth);
 
 import path from 'path';
 import fs from 'fs';
@@ -302,7 +307,7 @@ const SUPER_ADMIN_EMAILS_LOWER = [
 ];
 
 // GET /super-admin/admins — list all regular admins (email, name, password, created_at)
-app.get('/super-admin/admins', async (req: Request, res: Response) => {
+app.get('/super-admin/admins', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const callerEmail = String(req.query.caller_email || '');
     if (!await isSuperAdminCaller(callerEmail)) {
@@ -318,7 +323,7 @@ app.get('/super-admin/admins', async (req: Request, res: Response) => {
 });
 
 // POST /super-admin/admins — create a regular admin
-app.post('/super-admin/admins', async (req: Request, res: Response) => {
+app.post('/super-admin/admins', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const { caller_email, name, email, password } = req.body;
     if (!await isSuperAdminCaller(caller_email)) {
@@ -347,7 +352,7 @@ app.post('/super-admin/admins', async (req: Request, res: Response) => {
 });
 
 // DELETE /super-admin/admins/:email — delete a regular admin
-app.delete('/super-admin/admins/:email', async (req: Request, res: Response) => {
+app.delete('/super-admin/admins/:email', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const { caller_email } = req.body;
     if (!await isSuperAdminCaller(caller_email)) {
@@ -366,7 +371,7 @@ app.delete('/super-admin/admins/:email', async (req: Request, res: Response) => 
 });
 
 // PUT /super-admin/admins/:email/password — change a regular admin's password
-app.put('/super-admin/admins/:email/password', async (req: Request, res: Response) => {
+app.put('/super-admin/admins/:email/password', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const { caller_email, password } = req.body;
     if (!await isSuperAdminCaller(caller_email)) {
@@ -390,7 +395,7 @@ app.put('/super-admin/admins/:email/password', async (req: Request, res: Respons
 });
 
 // PUT /super-admin/my-password — super admin changes ONLY their own password
-app.put('/super-admin/my-password', async (req: Request, res: Response) => {
+app.put('/super-admin/my-password', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const { my_email, new_password } = req.body;
     if (!await isSuperAdminCaller(my_email)) {
@@ -418,7 +423,7 @@ app.put('/super-admin/my-password', async (req: Request, res: Response) => {
 // ============================================================================
 
 // GET /auth/hod-credentials — returns current HOD email AND password (admin-facing)
-app.get('/auth/hod-credentials', async (_req: Request, res: Response) => {
+app.get('/auth/hod-credentials', requireRole('hod', 'admin'), async (_req: Request, res: Response) => {
   try {
     const hodEmailEnv = (process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in');
     const hodPassEnv  = (process.env.HOD_MASTER_PASS  || 'cseds@2026');
@@ -438,7 +443,7 @@ app.get('/auth/hod-credentials', async (_req: Request, res: Response) => {
 });
 
 // PUT /auth/hod-credentials — HOD updates own email/password (no current password required)
-app.put('/auth/hod-credentials', async (req: Request, res: Response) => {
+app.put('/auth/hod-credentials', requireRole('hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const { new_email, new_password } = req.body;
     if (!new_email && !new_password) {
@@ -474,7 +479,7 @@ app.put('/auth/hod-credentials', async (req: Request, res: Response) => {
 });
 
 // POST /auth/hod-credentials/admin-reset — Admin resets HOD credentials (no verification needed)
-app.post('/auth/hod-credentials/admin-reset', async (req: Request, res: Response) => {
+app.post('/auth/hod-credentials/admin-reset', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const { new_email, new_password } = req.body;
     if (!new_email && !new_password) {
@@ -542,7 +547,7 @@ app.get('/settings/semester-unlock', async (_req: Request, res: Response) => {
 });
 
 // PUT /settings/semester-unlock — HOD/Admin unlocks next semesters for a year batch
-app.put('/settings/semester-unlock', async (req: Request, res: Response) => {
+app.put('/settings/semester-unlock', requireRole('hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const { year_label, max_semester } = req.body;
     if (!year_label || max_semester === undefined || max_semester === null) {
@@ -574,7 +579,7 @@ app.put('/settings/semester-unlock', async (req: Request, res: Response) => {
 // ============================================================================
 
 // GET /admin/student-passwords — admin views all student passwords in plain text
-app.get('/admin/student-passwords', async (_req: Request, res: Response) => {
+app.get('/admin/student-passwords', requireRole('admin'), async (_req: Request, res: Response) => {
   try {
     if (db.isMock) {
       return res.json([]);
@@ -594,7 +599,7 @@ app.get('/admin/student-passwords', async (_req: Request, res: Response) => {
 });
 
 // PUT /students/:id/password — admin sets a student's password
-app.put('/students/:id/password', async (req: Request, res: Response) => {
+app.put('/students/:id/password', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const rollNo = req.params.id.toUpperCase();
     const { password } = req.body;
@@ -613,6 +618,40 @@ app.put('/students/:id/password', async (req: Request, res: Response) => {
     res.json({ success: true, roll_number: rollNo });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
+// Auth: Faculty/HOD Registration Key Validation (SEC-01 fix)
+// The secret key is stored server-side in FACULTY_SECRET_KEY env var.
+// Frontend sends the user-entered key here for validation — never exposes it.
+// ============================================================================
+app.post('/auth/validate-faculty-key', async (req: Request, res: Response) => {
+  try {
+    const { securityKey } = req.body;
+    if (!securityKey) {
+      return res.status(400).json({ valid: false, error: 'Security key is required.' });
+    }
+
+    const serverKey = process.env.FACULTY_SECRET_KEY;
+    if (!serverKey) {
+      // Fail closed: if the env var isn't set, registration is disabled (GAP-08)
+      console.warn('[AUTH] FACULTY_SECRET_KEY env var is not set. Faculty/HOD registration is disabled.');
+      return res.status(503).json({
+        valid: false,
+        error: 'Faculty registration is currently disabled. Please contact the system administrator to configure the registration key.',
+      });
+    }
+
+    if (securityKey === serverKey) {
+      return res.json({ valid: true });
+    }
+
+    // Brute-force delay on failure
+    await new Promise(resolve => setTimeout(resolve, 600));
+    return res.status(401).json({ valid: false, error: 'Invalid security key. Please contact the department coordinator for the correct key.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -940,7 +979,7 @@ app.post('/students', async (req: Request, res: Response) => {
 });
 
 // POST /students/bulk-import — Bulk Import Students & Marks from CSV/Excel
-app.post('/students/bulk-import', async (req: Request, res: Response) => {
+app.post('/students/bulk-import', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const studentsArray = Array.isArray(req.body) ? req.body : req.body.students;
     if (!Array.isArray(studentsArray) || studentsArray.length === 0) {
@@ -1032,7 +1071,7 @@ app.post('/students/bulk-import', async (req: Request, res: Response) => {
 });
 
 // POST /reports/cron-sync — Trigger Background Sync for LeetCode & GitHub Profiles
-app.post('/reports/cron-sync', async (_req: Request, res: Response) => {
+app.post('/reports/cron-sync', requireRole('admin', 'hod'), async (_req: Request, res: Response) => {
   try {
     const result = await runCodingProfileCronSync();
     res.json({
@@ -1099,7 +1138,7 @@ app.get('/students/:id', async (req: Request, res: Response) => {
 });
 
 // PUT /students/:id — Update Student Profile (Supports Partial Updates)
-app.put('/students/:id', async (req: Request, res: Response) => {
+app.put('/students/:id', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const body = req.body || {};
@@ -1190,7 +1229,7 @@ app.put('/students/:id', async (req: Request, res: Response) => {
 });
 
 // DELETE /students — Delete ALL students
-app.delete('/students', async (_req: Request, res: Response) => {
+app.delete('/students', requireRole('admin'), async (_req: Request, res: Response) => {
   try {
     if (db.isMock) {
       db.mockStore.students.clear();
@@ -1204,7 +1243,7 @@ app.delete('/students', async (_req: Request, res: Response) => {
 });
 
 // DELETE /students/:id
-app.delete('/students/:id', async (req: Request, res: Response) => {
+app.delete('/students/:id', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
 
@@ -1229,7 +1268,7 @@ app.delete('/students/:id', async (req: Request, res: Response) => {
 // ============================================================================
 
 // POST /admin/students/bulk-delete — delete multiple students by roll-number array
-app.post('/admin/students/bulk-delete', async (req: Request, res: Response) => {
+app.post('/admin/students/bulk-delete', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const { roll_numbers } = req.body;
     if (!Array.isArray(roll_numbers) || roll_numbers.length === 0) {
@@ -1275,7 +1314,7 @@ app.get('/students/:id/academics', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/students/:id/academics', async (req: Request, res: Response) => {
+app.post('/students/:id/academics', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const validated = academicSchema.parse(req.body);
@@ -1334,7 +1373,7 @@ app.get('/students/:id/coding-profiles', async (req: Request, res: Response) => 
   }
 });
 
-app.post('/students/:id/coding-profiles', async (req: Request, res: Response) => {
+app.post('/students/:id/coding-profiles', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const validated = codingProfileSchema.parse(req.body);
@@ -1388,7 +1427,7 @@ app.post('/students/:id/coding-profiles', async (req: Request, res: Response) =>
   }
 });
 
-app.delete('/students/:id/coding-profiles/:platform', async (req: Request, res: Response) => {
+app.delete('/students/:id/coding-profiles/:platform', requireOwnerOrRole('id', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const platform = String(req.params.platform);
@@ -1523,7 +1562,7 @@ app.get('/students/:id/tech-skills', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/students/:id/tech-skills', async (req: Request, res: Response) => {
+app.post('/students/:id/tech-skills', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const validated = techSkillSchema.parse(req.body);
@@ -1577,7 +1616,7 @@ app.get('/students/:id/certifications', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/students/:id/certifications', async (req: Request, res: Response) => {
+app.post('/students/:id/certifications', requireOwnerOrRole('id', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const validated = certificationSchema.parse(req.body);
@@ -1606,7 +1645,7 @@ app.post('/students/:id/certifications', async (req: Request, res: Response) => 
   }
 });
 
-app.put('/students/:id/certifications/:certId', async (req: Request, res: Response) => {
+app.put('/students/:id/certifications/:certId', requireOwnerOrRole('id', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const certId = req.params.certId;
@@ -1637,7 +1676,7 @@ app.put('/students/:id/certifications/:certId', async (req: Request, res: Respon
   }
 });
 
-app.delete('/students/:id/certifications/:certId', async (req: Request, res: Response) => {
+app.delete('/students/:id/certifications/:certId', requireOwnerOrRole('id', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const certId = req.params.certId;
@@ -1685,7 +1724,7 @@ app.get('/students/:id/soft-skills', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/students/:id/soft-skills', async (req: Request, res: Response) => {
+app.post('/students/:id/soft-skills', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const validated = softSkillSchema.parse(req.body);
@@ -1738,7 +1777,7 @@ app.get('/students/:id/achievements', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/students/:id/achievements', async (req: Request, res: Response) => {
+app.post('/students/:id/achievements', requireOwnerOrRole('id', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const validated = achievementSchema.parse(req.body);
@@ -1789,7 +1828,7 @@ app.get('/students/:id/placement-profile', async (req: Request, res: Response) =
   }
 });
 
-app.put('/students/:id/placement-profile', async (req: Request, res: Response) => {
+app.put('/students/:id/placement-profile', requireOwnerOrRole('id', 'admin'), async (req: Request, res: Response) => {
   try {
     const studentId = req.params.id.toUpperCase();
     const validated = placementProfileSchema.parse(req.body);

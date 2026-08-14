@@ -174,13 +174,13 @@ export const AuthPage: React.FC = () => {
     }
   };
 
-  const FACULTY_SECRET_KEY = 'RGMCET_FACULTY_2026';
-
   const onFacultySignUp = async (data: FacultySignUpInput) => {
     setErrorMessage(null);
     try {
-      if (data.securityKey !== FACULTY_SECRET_KEY) {
-        throw new Error(`Invalid Faculty Secret Passcode. Authorized security key is required for ${data.department} Faculty registration.`);
+      // Validate faculty secret key on the server (SEC-01 fix: key no longer in frontend bundle)
+      const keyResult = await api.validateFacultyKey(data.securityKey);
+      if (!keyResult.valid) {
+        throw new Error(keyResult.error || 'Invalid security key.');
       }
 
       const generatedFacId = `FAC_${data.email.split('@')[0].toUpperCase()}`;
@@ -216,8 +216,10 @@ export const AuthPage: React.FC = () => {
   const onHodSignUp = async (data: FacultySignUpInput) => {
     setErrorMessage(null);
     try {
-      if (data.securityKey !== FACULTY_SECRET_KEY) {
-        throw new Error(`Invalid Faculty Secret Passcode. Authorized security key is required for HOD registration.`);
+      // Validate faculty secret key on the server (SEC-01 fix: key no longer in frontend bundle)
+      const keyResult = await api.validateFacultyKey(data.securityKey);
+      if (!keyResult.valid) {
+        throw new Error(keyResult.error || 'Invalid security key.');
       }
 
       const generatedHodId = `HOD_${data.email.split('@')[0].toUpperCase()}`;

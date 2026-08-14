@@ -53,7 +53,7 @@ export const FacultyDashboardPage: React.FC = () => {
   const activeTab = searchParams.get('tab') || 'mentees';
 
   // Use the logged-in faculty's ID from auth context
-  const facultyId = user?.rollNumber || 'FAC001';
+  const facultyId = user?.rollNumber || '';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
@@ -69,6 +69,7 @@ export const FacultyDashboardPage: React.FC = () => {
   const { data: mentees = [], refetch } = useQuery({
     queryKey: ['facultyMentees', facultyId],
     queryFn: () => api.getFacultyMentees(facultyId),
+    enabled: Boolean(facultyId),
   });
 
   const { data: deptReport } = useQuery({
@@ -88,7 +89,7 @@ export const FacultyDashboardPage: React.FC = () => {
   }, [mentees]);
 
   // Queries for inspected mentee sub-resources
-  const menteeId = inspectMentee?.roll_number || '23091A3251';
+  const menteeId = inspectMentee?.roll_number || '';
   const { data: inspectAcademics = [] } = useQuery({
     queryKey: ['inspectAcademics', menteeId],
     queryFn: () => api.getAcademics(menteeId),

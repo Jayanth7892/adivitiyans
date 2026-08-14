@@ -24,7 +24,7 @@ const CORE_SOFT_SKILLS = [
 export const SoftSkillsTab: React.FC<SoftSkillsTabProps> = ({ softSkills, readOnly = false, onRefresh }) => {
   const [savingSkill, setSavingSkill] = useState<string | null>(null);
   const { user } = useAuth();
-  const activeRollNo = user?.rollNumber || '23091A3251';
+  const activeRollNo = user?.rollNumber || '';
 
   const handleRatingChange = async (skillName: any, ratingValue: number) => {
     if (readOnly) return;

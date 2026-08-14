@@ -33,7 +33,7 @@ export const TechSkillsTab: React.FC<TechSkillsTabProps> = ({ skills, readOnly =
   const [ratingInput, setRatingInput] = useState<number>(4);
   const [saving, setSaving] = useState(false);
   const { user } = useAuth();
-  const activeRollNo = user?.rollNumber || '23091A3251';
+  const activeRollNo = user?.rollNumber || '';
 
   const handleAddSkill = async () => {
     if (!toolInput.trim() || readOnly) return;

@@ -21,7 +21,7 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
   const [maxAllowedSemester, setMaxAllowedSemester] = useState<number>(8); // default open (fail-safe)
   const [unlockLoading, setUnlockLoading] = useState(true);
   const { user } = useAuth();
-  const activeRollNo = user?.rollNumber || '23091A3251';
+  const activeRollNo = user?.rollNumber || '';
 
   // Fetch semester unlock settings for this student's year
   useEffect(() => {

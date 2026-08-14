@@ -104,6 +104,20 @@ export const api = {
   },
 
 
+  // Faculty/HOD Registration Key Validation (SEC-01 fix: validated server-side)
+  validateFacultyKey: async (securityKey: string): Promise<{ valid: boolean; error?: string }> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/validate-faculty-key`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ securityKey }),
+      });
+      return await res.json();
+    } catch {
+      return { valid: false, error: 'Could not reach the server. Please try again.' };
+    }
+  },
+
   getAllStudents: async (params?: { department?: string; batch?: string; section?: string; search?: string }): Promise<StudentProfile[]> => {
     const query = new URLSearchParams(params as any).toString();
     return fetchWithAuth(`/students${query ? `?${query}` : ''}`);
@@ -142,7 +156,7 @@ export const api = {
   },
 
   // Student Profile
-  getStudentProfile: async (id: string = '23091A3251'): Promise<StudentProfile> => {
+  getStudentProfile: async (id: string): Promise<StudentProfile> => {
     return fetchWithAuth(`/students/${id}`);
   },
 
@@ -154,7 +168,7 @@ export const api = {
   },
 
   // Sub-resources
-  getAcademics: async (id: string = '23091A3251'): Promise<AcademicRecord[]> => {
+  getAcademics: async (id: string): Promise<AcademicRecord[]> => {
     return fetchWithAuth(`/students/${id}/academics`);
   },
 
@@ -165,7 +179,7 @@ export const api = {
     });
   },
 
-  getCodingProfiles: async (id: string = '23091A3251'): Promise<CodingProfile[]> => {
+  getCodingProfiles: async (id: string): Promise<CodingProfile[]> => {
     return fetchWithAuth(`/students/${id}/coding-profiles`);
   },
 
@@ -186,7 +200,7 @@ export const api = {
     return fetchWithAuth(`/proxy/leetcode/${encodeURIComponent(handle)}`);
   },
 
-  getTechSkills: async (id: string = '23091A3251'): Promise<TechSkill[]> => {
+  getTechSkills: async (id: string): Promise<TechSkill[]> => {
     return fetchWithAuth(`/students/${id}/tech-skills`);
   },
 
@@ -197,7 +211,7 @@ export const api = {
     });
   },
 
-  getCertifications: async (id: string = '23091A3251'): Promise<Certification[]> => {
+  getCertifications: async (id: string): Promise<Certification[]> => {
     return fetchWithAuth(`/students/${id}/certifications`);
   },
 
@@ -221,7 +235,7 @@ export const api = {
     });
   },
 
-  getSoftSkills: async (id: string = '23091A3251'): Promise<SoftSkill[]> => {
+  getSoftSkills: async (id: string): Promise<SoftSkill[]> => {
     return fetchWithAuth(`/students/${id}/soft-skills`);
   },
 
@@ -232,7 +246,7 @@ export const api = {
     });
   },
 
-  getAchievements: async (id: string = '23091A3251'): Promise<Achievement[]> => {
+  getAchievements: async (id: string): Promise<Achievement[]> => {
     return fetchWithAuth(`/students/${id}/achievements`);
   },
 
@@ -243,7 +257,7 @@ export const api = {
     });
   },
 
-  getPlacementProfile: async (id: string = '23091A3251'): Promise<PlacementProfile> => {
+  getPlacementProfile: async (id: string): Promise<PlacementProfile> => {
     return fetchWithAuth(`/students/${id}/placement-profile`);
   },
 
@@ -255,7 +269,7 @@ export const api = {
   },
 
   // Employability Score
-  getEmployabilityScore: async (id: string = '23091A3251'): Promise<ScoreBreakdown> => {
+  getEmployabilityScore: async (id: string): Promise<ScoreBreakdown> => {
     return fetchWithAuth(`/students/${id}/employability-score`);
   },
 
@@ -282,7 +296,7 @@ export const api = {
   },
 
   // Faculty Mentees
-  getFacultyMentees: async (facultyId: string = 'FAC001'): Promise<StudentProfile[]> => {
+  getFacultyMentees: async (facultyId: string): Promise<StudentProfile[]> => {
     return fetchWithAuth(`/faculty/${facultyId}/mentees`);
   },
 

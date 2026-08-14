@@ -34,7 +34,7 @@ export const AchievementsTab: React.FC<AchievementsTabProps> = ({ achievements, 
   const [organization, setOrganization] = useState('');
   const [saving, setSaving] = useState(false);
   const { user } = useAuth();
-  const activeRollNo = user?.rollNumber || '23091A3251';
+  const activeRollNo = user?.rollNumber || '';
 
   const handleSave = async () => {
     if (!title.trim() || readOnly) return;

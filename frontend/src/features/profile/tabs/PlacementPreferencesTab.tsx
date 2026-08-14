@@ -28,7 +28,7 @@ export const PlacementPreferencesTab: React.FC<PlacementPreferencesTabProps> = (
   const [needFromDept, setNeedFromDept] = useState(placement?.need_from_department || '');
   const [saving, setSaving] = useState(false);
   const { user } = useAuth();
-  const activeRollNo = user?.rollNumber || '23091A3251';
+  const activeRollNo = user?.rollNumber || '';
 
   const handleAddSpec = () => {
     if (newInput.trim() && !specializations.includes(newInput.trim())) {

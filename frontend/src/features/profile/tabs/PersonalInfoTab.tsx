@@ -43,7 +43,7 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, acade
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const { user } = useAuth();
-  const activeRoll = student?.roll_number || user?.rollNumber || '23091A3251';
+  const activeRoll = student?.roll_number || user?.rollNumber || '';
   const activeName = student?.name || user?.name || 'Student';
   const activeEmail = student?.email || user?.email || 'student@rgmcet.edu.in';
 

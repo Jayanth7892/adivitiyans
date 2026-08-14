@@ -30,18 +30,20 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
 
-  const activeRollNo = studentRollNumber || user?.rollNumber || '23091A3251';
+  const activeRollNo = studentRollNumber || user?.rollNumber || '';
 
   // Fetch real student profile from API
   const { data: student } = useQuery({
     queryKey: ['studentProfile', activeRollNo],
     queryFn: () => api.getStudentProfile(activeRollNo),
+    enabled: Boolean(activeRollNo),
   });
 
   // Fetch real linked handles from API
   const { data: linkedProfiles = [], refetch: refetchCodingProfiles } = useQuery({
     queryKey: ['codingProfiles', activeRollNo],
     queryFn: () => api.getCodingProfiles(activeRollNo),
+    enabled: Boolean(activeRollNo),
   });
 
   const activeStudentName = customStudentName || student?.name || user?.name || 'Student';

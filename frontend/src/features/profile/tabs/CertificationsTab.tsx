@@ -36,7 +36,7 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [editingCert, setEditingCert] = useState<Certification | null>(null);
   const { user } = useAuth();
-  const activeRollNo = user?.rollNumber || '23091A3251';
+  const activeRollNo = user?.rollNumber || '';
 
   const completedCerts = certifications.filter((c) => !c.suggested);
   const suggestedCerts = certifications.filter((c) => c.suggested);
