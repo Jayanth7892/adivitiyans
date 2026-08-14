@@ -269,6 +269,17 @@ export class AdvitiyansStack extends cdk.Stack {
     // Grant Lambda permission to connect to RDS Proxy via IAM (optional, using password auth here)
     rdsProxy.grantConnect(apiLambda, 'postgres');
 
+    // Grant Lambda permission to delete and manage users in Cognito User Pool
+    apiLambda.addToRolePolicy(new iam.PolicyStatement({
+      actions: [
+        'cognito-idp:AdminDeleteUser',
+        'cognito-idp:AdminGetUser',
+        'cognito-idp:AdminDisableUser',
+        'cognito-idp:ListUsers',
+      ],
+      resources: [userPool.userPoolArn],
+    }));
+
     // ========================================================================
     // 11. API Gateway REST API with Cognito Authorizer
     // ========================================================================
