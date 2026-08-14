@@ -321,6 +321,10 @@ async function ensureSchema(p: Pool) {
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`,
+
+    `INSERT INTO admin_accounts (email, name, password, created_by) VALUES
+      ('admin@rgmcet.edu.in', 'College Administrator', 'admin@2026', 'System')
+     ON CONFLICT (email) DO NOTHING;`,
   ];
 
   try {
