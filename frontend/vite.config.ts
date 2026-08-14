@@ -7,7 +7,7 @@ export default defineConfig({
   base: './',
   plugins: [react()],
   define: {
-    'import.meta.env.VITE_API_BASE_URL': JSON.stringify(process.env.VITE_API_BASE_URL || 'https://w8tlnuswea.execute-api.ap-south-1.amazonaws.com/prod'),
+    'import.meta.env.VITE_API_BASE_URL': JSON.stringify(process.env.VITE_API_BASE_URL || 'https://caam6j4dbh.execute-api.ap-south-1.amazonaws.com/prod'),
     global: 'window',
   },
   resolve: {

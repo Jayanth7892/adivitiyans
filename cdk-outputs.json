@@ -1,14 +1,16 @@
 {
   "AdvitiyansStack": {
-    "ApiGatewayUrl": "https://w8tlnuswea.execute-api.ap-south-1.amazonaws.com/prod/",
-    "UserPoolClientId": "5ihiahvdp6q3hsog92uhio3npt",
-    "UserPoolId": "ap-south-1_bZRIQfhYY",
-    "FrontendBucketName": "advitiyansstack-advitiyansfrontendbucketb4592ef5-e2ajahjiz5w3",
-    "RdsEndpoint": "advitiyansstack-advitiyansrds96a61eb9-noswr0j7qzxt.chu8eggw0kny.ap-south-1.rds.amazonaws.com",
-    "DbSecretArn": "arn:aws:secretsmanager:ap-south-1:071340280897:secret:advitiyans-db-credentials-QJ6Aul",
-    "AdvitiyansRestApiEndpoint3CE9C4ED": "https://w8tlnuswea.execute-api.ap-south-1.amazonaws.com/prod/",
-    "UploadsBucketName": "advitiyansstack-advitiyansuploadsbucket750f5866-apomtlaieadu",
-    "FrontendWebsiteUrl": "http://advitiyansstack-advitiyansfrontendbucketb4592ef5-e2ajahjiz5w3.s3-website.ap-south-1.amazonaws.com",
+    "ApiGatewayUrl": "https://caam6j4dbh.execute-api.ap-south-1.amazonaws.com/prod/",
+    "UserPoolClientId": "6ufn4tstvrk6718ujcsjun6lpe",
+    "UserPoolId": "ap-south-1_sYp8CvKjn",
+    "CloudFrontUrl": "https://d1r0k8fn16z5du.cloudfront.net",
+    "FrontendBucketName": "advitiyansstack-advitiyansfrontendbucketb4592ef5-8mha9huivnqu",
+    "RdsEndpoint": "advitiyansstack-advitiyansrds96a61eb9-xyn7qi0iwsci.chu8eggw0kny.ap-south-1.rds.amazonaws.com",
+    "DbSecretArn": "arn:aws:secretsmanager:ap-south-1:071340280897:secret:advitiyans-db-credentials-s51wBK",
+    "CloudFrontDistributionId": "E2BJDIOGP2M6ID",
+    "AdvitiyansRestApiEndpoint3CE9C4ED": "https://caam6j4dbh.execute-api.ap-south-1.amazonaws.com/prod/",
+    "UploadsBucketName": "advitiyansstack-advitiyansuploadsbucket750f5866-88a6dgozdke9",
+    "FrontendWebsiteUrl": "http://advitiyansstack-advitiyansfrontendbucketb4592ef5-8mha9huivnqu.s3-website.ap-south-1.amazonaws.com",
     "RdsProxyEndpoint": "advitiyans-rds-proxy.proxy-chu8eggw0kny.ap-south-1.rds.amazonaws.com"
   }
 }

@@ -11,7 +11,7 @@ import {
 } from '../types';
 import { getIdToken } from './cognitoAuth';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://w8tlnuswea.execute-api.ap-south-1.amazonaws.com/prod';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://caam6j4dbh.execute-api.ap-south-1.amazonaws.com/prod';
 
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
   // Prefer per-tab sessionStorage JWT (set by AuthContext on login, tab-isolated)

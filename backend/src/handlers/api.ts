@@ -17,7 +17,7 @@ import {
   RGMCET_EMAIL_REGEX,
 } from '../lib/validation';
 import { extractAuth, requireAuth, requireRole, requireOwnerOrRole } from '../lib/authMiddleware';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 const BCRYPT_ROUNDS = 10;
 

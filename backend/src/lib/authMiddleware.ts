@@ -70,10 +70,12 @@ export async function extractAuth(req: Request, _res: Response, next: NextFuncti
     // ── Attempt 1: Decode as a real Cognito JWT ──
     const payload = decodeJwtPayload(token);
     if (payload && payload.email) {
+      const email = (payload.email || '').toLowerCase();
+      const derivedRegNo = (payload['custom:reg_no'] || (email.includes('@') ? email.split('@')[0] : '')).toUpperCase();
       req.auth = {
-        email: (payload.email || '').toLowerCase(),
+        email,
         role: (payload['custom:role'] || 'student').toLowerCase(),
-        regNo: (payload['custom:reg_no'] || '').toUpperCase(),
+        regNo: derivedRegNo,
       };
       return next();
     }
@@ -190,7 +192,8 @@ export function requireOwnerOrRole(paramName: string, ...elevatedRoles: string[]
 
     // Students must own the resource
     const resourceId = req.params[paramName]?.toUpperCase();
-    if (req.auth.role === 'student' && req.auth.regNo && resourceId === req.auth.regNo) {
+    const emailPrefix = req.auth.email?.includes('@') ? req.auth.email.split('@')[0].toUpperCase() : '';
+    if (req.auth.role === 'student' && (resourceId === req.auth.regNo || resourceId === emailPrefix)) {
       return next();
     }
 

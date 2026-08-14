@@ -11,8 +11,8 @@ import {
 } from 'amazon-cognito-identity-js';
 
 // Cognito User Pool configuration from environment or hardcoded from cdk-outputs
-const USER_POOL_ID = import.meta.env.VITE_COGNITO_USER_POOL_ID || 'ap-south-1_bZRIQfhYY';
-const CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID || '5ihiahvdp6q3hsog92uhio3npt';
+const USER_POOL_ID = import.meta.env.VITE_COGNITO_USER_POOL_ID || 'ap-south-1_sYp8CvKjn';
+const CLIENT_ID = import.meta.env.VITE_COGNITO_CLIENT_ID || '6ufn4tstvrk6718ujcsjun6lpe';
 
 const userPool = new CognitoUserPool({
   UserPoolId: USER_POOL_ID,
