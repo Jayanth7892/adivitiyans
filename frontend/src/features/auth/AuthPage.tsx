@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, UserCheck, Lock, CheckCircle2, XCircle, Loader2, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { studentSignUpSchema, facultySignUpSchema, loginSchema, StudentSignUpInput, FacultySignUpInput, LoginInput } from '../../lib/validation/auth';
 import { api } from '../../lib/api';
-import { cognitoSignUp, cognitoSignIn } from '../../lib/cognitoAuth';
+import { cognitoSignUp, cognitoSignIn, cognitoSignOut } from '../../lib/cognitoAuth';
 import { useAuth } from '../../context/AuthContext';
 import { PillButton } from '../../components/common/PillButton';
 import { Footer } from '../../components/layout/Footer';
@@ -134,11 +134,13 @@ export const AuthPage: React.FC = () => {
       } catch (cognitoErr: any) {
         const msg = cognitoErr.message || '';
         if (msg.includes('User already exists') || msg.includes('UsernameExistsException')) {
+          // Cognito has this email but DB says it's available — previous admin deletion
+          // did not fully remove the Cognito account. Try to login to verify, then let through.
           try {
             const authRes = await cognitoSignIn(data.email, data.password);
             jwtToken = authRes.idToken;
           } catch {
-            throw new Error('An account with this email already exists. Please log in using your password.');
+            throw new Error('This email is already registered in the system. If you were previously enrolled, please contact the administrator to reset your account.');
           }
         } else {
           throw cognitoErr;
@@ -406,32 +408,15 @@ export const AuthPage: React.FC = () => {
         if (!student) {
           student = await api.getStudentByEmail(data.email);
         }
+        // IMPORTANT: If student authenticated via Cognito but is NOT in the database,
+        // it means an admin deleted them. We must block login and NOT recreate their profile.
         if (!student) {
-          const derivedRollNo = data.email.split('@')[0].toUpperCase();
-          const derivedName = derivedRollNo.startsWith('23091A')
-            ? `Student ${derivedRollNo}`
-            : (data.email.split('@')[0].replace(/\./g, ' ').toUpperCase() || 'Student User');
-
-          await api.createStudent({
-            roll_number: derivedRollNo,
-            name: derivedName,
-            email: data.email,
-            year: '4th Year',
-            department: 'CSE(Data Science)',
-            batch: '2023-2027',
-            section: 'A',
-          }).catch((e) => console.warn('[Self-heal student create error]:', e));
-
-          student = await api.getStudentByEmail(data.email);
+          cognitoSignOut(); // invalidate Cognito session immediately
+          throw new Error('Your account has been removed by an administrator. Please contact the system admin to be re-enrolled.');
         }
 
-        if (student) {
-          rollNo = student.roll_number;
-          displayName = student.name;
-        } else {
-          rollNo = data.email.split('@')[0].toUpperCase();
-          displayName = `Student ${rollNo}`;
-        }
+        rollNo = student.roll_number;
+        displayName = student.name;
       } else if (activeTab === 'faculty') {
         let faculty = await api.getFacultyByEmail(data.email).catch(() => null);
         if (!faculty) {
