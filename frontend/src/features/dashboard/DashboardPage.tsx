@@ -91,7 +91,7 @@ export const DashboardPage: React.FC = () => {
               icon={<TrendingUp className="w-5 h-5" />}
               iconBgColor="bg-brand-soft text-brand-primary"
               label="Academic Performance Score"
-              value={`${scoreData?.overallScore || 92.4}/100`}
+              value={`${scoreData?.overallScore ?? 0}/100`}
               subtext="Computed from GPA & coding activity"
               onClick={() => navigate('/profile?tab=placement-preferences')}
             />
