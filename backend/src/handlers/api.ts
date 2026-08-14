@@ -2472,5 +2472,43 @@ app.get('*', (_req: Request, res: Response) => {
   return sendIndexHtml(res);
 });
 
+// ============================================================================
+// Startup Migration: Enforce Semester Lock on Existing Data
+// Runs once on server start. Reads max_semester for each year from DB and
+// deletes any academics rows where semester > max_semester for that year batch.
+// This ensures historical data entered before the lock was applied is purged.
+// ============================================================================
+(async () => {
+  if (db.isMock) return; // skip in local dev mock mode
+  try {
+    // Read all semester unlock settings
+    const settings = await db.query(
+      `SELECT year_label, max_semester FROM semester_unlock_settings`
+    );
+    if (!settings.rows.length) return;
+
+    let totalDeleted = 0;
+    for (const row of settings.rows) {
+      const { year_label, max_semester } = row;
+      const del = await db.query(
+        `DELETE FROM academics
+         WHERE semester > $1
+           AND student_id IN (
+             SELECT roll_number FROM students WHERE year = $2
+           )`,
+        [Number(max_semester), year_label]
+      );
+      totalDeleted += del.rowCount ?? 0;
+    }
+    if (totalDeleted > 0) {
+      console.log(`[Startup] Semester lock migration: deleted ${totalDeleted} academic record(s) that exceeded semester lock.`);
+    } else {
+      console.log('[Startup] Semester lock migration: no excess records found — all data is within lock bounds.');
+    }
+  } catch (err: any) {
+    console.warn('[Startup] Semester lock migration warning:', err.message);
+  }
+})();
+
 export const handler = serverless(app);
 export default app;
