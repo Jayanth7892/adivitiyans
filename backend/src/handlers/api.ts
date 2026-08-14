@@ -589,6 +589,14 @@ const YEAR_MIN_SEMESTER: Record<string, number> = {
   '4th Year': 6,
 };
 
+// Per-year maximum semester ceilings — HOD cannot unlock more than these
+const YEAR_MAX_SEMESTER: Record<string, number> = {
+  '1st Year': 2,
+  '2nd Year': 4,
+  '3rd Year': 6,
+  '4th Year': 8,
+};
+
 // PUT /settings/semester-unlock — HOD/Admin locks or unlocks semesters for a year batch
 // When decreasing max_semester, cascade-deletes all academics rows above the new max
 // for every student in that year batch (including CGPA recalculation trigger).
@@ -603,11 +611,19 @@ app.put('/settings/semester-unlock', requireRole('hod', 'admin'), async (req: Re
       return res.status(400).json({ error: 'max_semester must be between 0 and 8' });
     }
 
-    // Enforce per-year minimum floor — prevents setting below the fixed minimum
+    // Enforce per-year minimum floor
     const minFloor = YEAR_MIN_SEMESTER[year_label] ?? 0;
     if (newMax < minFloor) {
       return res.status(400).json({
         error: `Cannot set max_semester below ${minFloor} for ${year_label}.`,
+      });
+    }
+
+    // Enforce per-year maximum ceiling
+    const maxCeil = YEAR_MAX_SEMESTER[year_label] ?? 8;
+    if (newMax > maxCeil) {
+      return res.status(400).json({
+        error: `Cannot set max_semester above ${maxCeil} for ${year_label}.`,
       });
     }
 

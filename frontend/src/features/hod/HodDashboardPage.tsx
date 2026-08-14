@@ -1292,7 +1292,8 @@ export const HodDashboardPage: React.FC = () => {
                 const current = setting?.max_semester ?? 0;
                 const isSaving = unlockSavingYear === year;
                 const handleUnlock = async (delta: 1 | 2) => {
-                  const newMax = Math.min(current + delta, 8);
+                  // Cap at per-year maximum (1st→2, 2nd→4, 3rd→6, 4th→8)
+                  const newMax = Math.min(current + delta, max);
                   if (newMax === current) return;
                   setUnlockSavingYear(year);
                   try {
@@ -1374,14 +1375,14 @@ export const HodDashboardPage: React.FC = () => {
                           </button>
                           <button
                             onClick={() => handleUnlock(1)}
-                            disabled={current >= 8}
+                            disabled={current >= max}
                             className="px-2.5 py-1 text-xs font-bold rounded-lg bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             +1
                           </button>
                           <button
                             onClick={() => handleUnlock(2)}
-                            disabled={current >= 8}
+                            disabled={current >= max}
                             className="px-2.5 py-1 text-xs font-bold rounded-lg bg-brand-primary/10 text-brand-primary border border-brand-primary/20 hover:bg-brand-primary hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             +2
