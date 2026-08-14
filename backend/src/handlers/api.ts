@@ -2474,14 +2474,14 @@ app.get('*', (_req: Request, res: Response) => {
 
 // ============================================================================
 // Startup Migration: Enforce Semester Lock on Existing Data
-// Runs once on server start. Reads max_semester for each year from DB and
-// deletes any academics rows where semester > max_semester for that year batch.
-// This ensures historical data entered before the lock was applied is purged.
+// Only runs in traditional server mode (not serverless/Lambda).
+// In Lambda, ensureSchema() runs per-request and handles the seed correction.
 // ============================================================================
 (async () => {
-  if (db.isMock) return; // skip in local dev mock mode
+  if (db.isMock) return;
+  // Skip in AWS Lambda — don't compete for DB connections on cold start
+  if (process.env.AWS_LAMBDA_FUNCTION_NAME) return;
   try {
-    // Read all semester unlock settings
     const settings = await db.query(
       `SELECT year_label, max_semester FROM semester_unlock_settings`
     );
