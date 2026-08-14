@@ -117,12 +117,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               });
             }
 
-            // Silently refresh Cognito JWT in background
-            getCurrentSession().then((cognitoSession) => {
-              if (cognitoSession) {
-                sessionStorage.setItem(JWT_TOKEN_KEY, cognitoSession.idToken);
-              }
-            }).catch(() => { /* ignore */ });
+            // Silently refresh Cognito JWT in background — BUT ONLY for student/faculty.
+            // Admin/HOD use demo_token and must NOT have it overwritten by a stale Cognito session.
+            if (savedUser.role !== 'admin' && savedUser.role !== 'hod') {
+              getCurrentSession().then((cognitoSession) => {
+                if (cognitoSession) {
+                  sessionStorage.setItem(JWT_TOKEN_KEY, cognitoSession.idToken);
+                }
+              }).catch(() => { /* ignore */ });
+            }
 
             return; // early return — UI is already unblocked
           } catch { /* corrupted data — fall through to setIsLoading(false) */ }

@@ -279,7 +279,9 @@ export const AuthPage: React.FC = () => {
           throw new Error(authResult.error || 'Incorrect password. Please enter valid admin credentials.');
         }
 
-        login(data.email, 'admin', 'ADMIN_MASTER', 'System Administrator', jwtToken);
+        // Sign out any lingering student Cognito session so it doesn't pollute the admin token
+        cognitoSignOut();
+        login(data.email, 'admin', 'ADMIN_MASTER', 'System Administrator', undefined);
         registerSession(data.email, 'admin');
         navigate('/admin/dashboard');
         return;
@@ -292,6 +294,9 @@ export const AuthPage: React.FC = () => {
         if (!hodAuthResult.valid || hodAuthResult.role !== 'hod') {
           throw new Error(hodAuthResult.error || 'Incorrect password. Please enter the valid HOD password.');
         }
+
+        // Clear any lingering student Cognito session before attempting HOD Cognito sign-in
+        cognitoSignOut();
 
         // Attempt Cognito sign in for JWT (best-effort; HOD works without JWT if Cognito fails)
         try {
