@@ -45,7 +45,7 @@ export const DashboardPage: React.FC = () => {
   const { data: softSkills = [] } = useQuery({ queryKey: ['softSkills', activeRollNo], queryFn: () => api.getSoftSkills(activeRollNo), enabled: Boolean(activeRollNo) });
   const { data: achievements = [] } = useQuery({ queryKey: ['achievements', activeRollNo], queryFn: () => api.getAchievements(activeRollNo), enabled: Boolean(activeRollNo) });
   const { data: placement } = useQuery({ queryKey: ['placementProfile', activeRollNo], queryFn: () => api.getPlacementProfile(activeRollNo), enabled: Boolean(activeRollNo) });
-  const { data: scoreData } = useQuery({ queryKey: ['academicScore', activeRollNo], queryFn: () => api.getEmployabilityScore(activeRollNo), enabled: Boolean(activeRollNo) });
+  const { data: scoreData } = useQuery({ queryKey: ['employabilityScore', activeRollNo], queryFn: () => api.getEmployabilityScore(activeRollNo), enabled: Boolean(activeRollNo), staleTime: 0, refetchOnMount: 'always' });
 
   // Calculate live completion % & signature nudge cards using shared util
   const completionStatus = calculateProfileCompletion(

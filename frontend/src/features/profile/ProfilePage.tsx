@@ -44,7 +44,7 @@ export const ProfilePage: React.FC = () => {
   const { data: softSkills = [], refetch: refetchSoft } = useQuery({ queryKey: ['softSkills', activeRollNo], queryFn: () => api.getSoftSkills(activeRollNo), enabled: Boolean(activeRollNo) });
   const { data: achievements = [], refetch: refetchAchievements } = useQuery({ queryKey: ['achievements', activeRollNo], queryFn: () => api.getAchievements(activeRollNo), enabled: Boolean(activeRollNo) });
   const { data: placement, refetch: refetchPlacement } = useQuery({ queryKey: ['placementProfile', activeRollNo], queryFn: () => api.getPlacementProfile(activeRollNo), enabled: Boolean(activeRollNo) });
-  const { data: scoreData, refetch: refetchScore } = useQuery({ queryKey: ['employabilityScore', activeRollNo], queryFn: () => api.getEmployabilityScore(activeRollNo), enabled: Boolean(activeRollNo) });
+  const { data: scoreData, refetch: refetchScore } = useQuery({ queryKey: ['employabilityScore', activeRollNo], queryFn: () => api.getEmployabilityScore(activeRollNo), enabled: Boolean(activeRollNo), staleTime: 0, refetchOnMount: 'always' });
 
   // BUG-06 fix: guard against missing rollNumber (HOD/Admin on /profile, or mid-login race)
   if (!activeRollNo) {
