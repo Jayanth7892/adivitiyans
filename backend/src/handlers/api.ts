@@ -1550,24 +1550,79 @@ app.post('/students/:id/coding-profiles', requireOwnerOrRole('id', 'faculty', 'h
          medium_count = EXCLUDED.medium_count,
          hard_count = EXCLUDED.hard_count,
          contest_rating = EXCLUDED.contest_rating,
-         repositories_count = EXCLUDED.repositories_count,
          commits_count = EXCLUDED.commits_count,
          prs_merged = EXCLUDED.prs_merged,
-         last_synced = CURRENT_TIMESTAMP`,
+         last_synced = CURRENT_TIMESTAMP
+         -- NOTE: repositories_count, followers_count, stars_count, top_language are intentionally
+         -- NOT overwritten here — they are managed exclusively by the cron sync from GitHub API`,
       [studentId, validated.platform, validated.handle, validated.streak,
        validated.score_rating, validated.easy_count || 0, validated.medium_count || 0, validated.hard_count || 0, validated.contest_rating || 0,
        validated.repositories_count, validated.commits_count, validated.prs_merged]
     );
 
-    // If platform is LeetCode, update student's aggregate leetcode_solved score
+    // If platform is LeetCode, touch student record
     if (validated.platform === 'LeetCode') {
-      const lcTotal = (validated.score_rating || 0) > 0
-        ? validated.score_rating
-        : ((validated.easy_count || 0) + (validated.medium_count || 0) + (validated.hard_count || 0));
       await db.query(
         'UPDATE students SET updated_at = CURRENT_TIMESTAMP WHERE UPPER(roll_number) = $1',
         [studentId]
       ).catch(() => {});
+    }
+
+    // If platform is GitHub, immediately fetch stats from GitHub API in background
+    if (validated.platform === 'GitHub' && validated.handle && validated.handle !== 'Not Linked') {
+      const cleanHandle = validated.handle.replace(/^@/, '').trim();
+      if (cleanHandle) {
+        // Fire-and-forget: fetch GitHub user + repo list and write real stats
+        (async () => {
+          try {
+            const https = require('https');
+            const fetchJson = (url: string): Promise<any> => new Promise((resolve, reject) => {
+              const r = https.get(url, { headers: { 'User-Agent': 'Advitiyans-App' } }, (res: any) => {
+                let d = '';
+                res.on('data', (c: any) => (d += c));
+                res.on('end', () => {
+                  try {
+                    if (res.statusCode >= 200 && res.statusCode < 300) resolve(JSON.parse(d));
+                    else reject(new Error(`HTTP ${res.statusCode}`));
+                  } catch (e) { reject(e); }
+                });
+              });
+              r.on('error', reject);
+              r.setTimeout(8000, () => { r.destroy(); reject(new Error('timeout')); });
+            });
+
+            const user = await fetchJson(`https://api.github.com/users/${cleanHandle}`);
+            if (user && typeof user.public_repos === 'number') {
+              const repos: number = user.public_repos;
+              const followers: number = user.followers || 0;
+              let stars = 0;
+              let topLanguage = '';
+              try {
+                const repoList: any[] = await fetchJson(`https://api.github.com/users/${cleanHandle}/repos?per_page=100&sort=pushed`);
+                if (Array.isArray(repoList)) {
+                  stars = repoList.reduce((sum: number, r: any) => sum + (r.stargazers_count || 0), 0);
+                  const langCounts: Record<string, number> = {};
+                  for (const r of repoList) {
+                    if (r.language) langCounts[r.language] = (langCounts[r.language] || 0) + 1;
+                  }
+                  topLanguage = Object.entries(langCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+                }
+              } catch { /* repos fetch failed, still save user stats */ }
+
+              await db.query(
+                `UPDATE coding_profiles
+                 SET repositories_count = $1, followers_count = $2, stars_count = $3,
+                     top_language = $4, updated_at = CURRENT_TIMESTAMP
+                 WHERE student_id = $5 AND LOWER(platform) = 'github'`,
+                [repos, followers, stars, topLanguage, studentId]
+              ).catch(() => {});
+              console.log(`[GitHub Sync] ${cleanHandle}: repos=${repos}, stars=${stars}, followers=${followers}, lang=${topLanguage}`);
+            }
+          } catch (e: any) {
+            console.warn(`[GitHub Sync] Failed for ${cleanHandle}:`, e.message);
+          }
+        })();
+      }
     }
 
     const result = await db.query(
