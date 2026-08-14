@@ -71,8 +71,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     stopPolling();
     pollTimerRef.current = setInterval(async () => {
       const result = await api.validateSession(email, token);
-      if (!result.valid) {
-        forceLogout(result.reason || 'invalid');
+      // Only force-logout if another device has actively superseded this session.
+      // Ignore 'no_session' (race on registration) and 'session_expired' (network/db issue).
+      if (!result.valid && result.reason === 'session_superseded') {
+        forceLogout('session_superseded');
       }
     }, SESSION_POLL_INTERVAL_MS);
   }, [stopPolling, forceLogout]);
@@ -106,8 +108,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const savedToken = sessionStorage.getItem(SESSION_TOKEN_KEY);
             if (savedToken && savedUser.email) {
               api.validateSession(savedUser.email, savedToken).then((result) => {
-                if (!result.valid) {
-                  forceLogout(result.reason || 'invalid');
+                // Only force-logout on session_superseded (another device logged in).
+                // Do NOT force-logout on 'no_session' — this can happen due to a race
+                // where the session registration request hasn't reached the backend yet.
+                if (!result.valid && result.reason === 'session_superseded') {
+                  forceLogout('session_superseded');
                 } else {
                   startPolling(savedUser.email, savedToken);
                 }

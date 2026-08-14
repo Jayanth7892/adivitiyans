@@ -14,16 +14,26 @@ import { getIdToken } from './cognitoAuth';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://caam6j4dbh.execute-api.ap-south-1.amazonaws.com/prod';
 
 async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
-  // Prefer per-tab sessionStorage JWT (set by AuthContext on login, tab-isolated)
-  // Falls back to Cognito session if sessionStorage token is missing (e.g. fresh page load)
-  let token: string | null = null;
-  try {
-    token = await getIdToken();
-  } catch { /* ignore */ }
-  // Override with sessionStorage token — it's tab-specific and more reliable
+  // ── Token resolution priority ──────────────────────────────────────────────
+  // 1. sessionStorage JWT (tab-isolated, set on login)
+  // 2. Cognito session (student/faculty real JWT — only if no sessionStorage token)
+  //
+  // IMPORTANT: Never fall through to Cognito if we already have a token in
+  // sessionStorage. Admin/HOD use demo_token_admin_... stored in sessionStorage.
+  // Cognito's shared localStorage may still hold a student's JWT from a previous
+  // login on the same browser — using it would override admin's role to "student".
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // Check sessionStorage first — it's tab-isolated and authoritative
   const sessionToken = sessionStorage.getItem('advitiyans_jwt_token');
-  if (sessionToken) {
-    token = sessionToken;
+
+  let token: string | null = sessionToken;
+
+  // Only fall back to Cognito if sessionStorage has nothing (fresh page load for students)
+  if (!token) {
+    try {
+      token = await getIdToken();
+    } catch { /* ignore */ }
   }
 
   let userEmail = '';
