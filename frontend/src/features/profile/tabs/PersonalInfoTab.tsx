@@ -42,7 +42,7 @@ const FINANCIAL_BACKGROUNDS = [
 export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, academics = [], readOnly = false, onRefresh }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const activeRoll = student?.roll_number || user?.rollNumber || '';
   const activeName = student?.name || user?.name || 'Student';
   const activeEmail = student?.email || user?.email || 'student@rgmcet.edu.in';
@@ -61,7 +61,7 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, acade
       native_place: student?.native_place || '',
       department: student?.department || 'CSE (Data Science)',
       batch: student?.batch || '2023-2027',
-      section: student?.section || 'A',
+      section: student?.section || '',
       hostel_day_scholar: (student?.hostel_day_scholar as any) || 'Day Scholar',
       driving_license: Boolean(student?.driving_license),
       passport: Boolean(student?.passport),
@@ -85,10 +85,17 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, acade
         year: data.year && data.year !== '' ? data.year : (student?.year || '3rd Year'),
         department: data.department && data.department !== '' ? data.department : (student?.department || 'CSE (Data Science)'),
         batch: data.batch && data.batch !== '' ? data.batch : (student?.batch || '2023-2027'),
-        section: data.section && data.section !== '' ? data.section : (student?.section || 'A'),
+        section: data.section && data.section !== '' ? data.section : (student?.section || ''),
         hostel_day_scholar: data.hostel_day_scholar && data.hostel_day_scholar !== '' ? data.hostel_day_scholar : (student?.hostel_day_scholar || 'Day Scholar'),
       };
       await api.updateStudentProfile(data.roll_number || activeRoll, payload);
+
+      // Instantly update the name shown in TopBar/header without requiring re-login
+      const savedName = payload.name || activeName;
+      if (user && savedName !== user.name) {
+        login(user.email, user.role, user.rollNumber, savedName, sessionStorage.getItem('advitiyans_jwt_token') || undefined);
+      }
+
       setIsEditing(false);
       onRefresh();
     } catch (e: any) {
@@ -213,7 +220,20 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, acade
           <div>
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Mobile Phone</label>
             {isEditing ? (
-              <input {...register('phone')} placeholder="e.g. 9876543210" className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background" />
+              <input
+                {...register('phone')}
+                type="text"
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="e.g. 9876543210"
+                onKeyDown={(e) => {
+                  // Allow: backspace, delete, tab, escape, enter, arrows
+                  if (['Backspace','Delete','Tab','Escape','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) return;
+                  // Block non-digit characters
+                  if (!/^[0-9]$/.test(e.key)) e.preventDefault();
+                }}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background"
+              />
             ) : (
               <p className="text-sm font-medium text-textPrimary">{s?.phone || 'Not provided'}</p>
             )}

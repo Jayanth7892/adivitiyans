@@ -116,7 +116,8 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
 
       {/* Right side */}
       <div className="flex items-center gap-3 md:gap-5">
-        {/* Functional Search Bar */}
+        {/* Search Bar — hidden for student role (students don't search the directory) */}
+        {user?.role !== 'student' && (
         <div ref={searchRef} className="relative hidden md:block">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-background border border-borderLine text-xs text-textPrimary w-64 md:w-80 focus-within:border-brand-primary focus-within:ring-2 focus-within:ring-brand-primary/20 transition-all">
             <Search className="w-3.5 h-3.5 text-textSecondary shrink-0" />
@@ -205,6 +206,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
             </div>
           )}
         </div>
+        )}
 
         {/* Notifications Icon */}
         <button className="p-2 rounded-full text-textSecondary hover:bg-background transition-colors relative">
