@@ -5,7 +5,7 @@ import {
   Award, ExternalLink, BarChart2, Star, GraduationCap, RefreshCw, AlertCircle,
 } from 'lucide-react';
 import { api } from '../../lib/api';
-import { fetchLivePlatformSnapshot } from './liveFetchers';
+import { fetchLivePlatformSnapshot, fetchLiveGitHub } from './liveFetchers';
 import { StudentProfile } from '../../types';
 import { StatCard } from '../../components/common/StatCard';
 
@@ -51,6 +51,7 @@ export const CodingAnalyticsPage: React.FC = () => {
   const [sectionFilter, setSectionFilter] = useState('');
   const [search, setSearch] = useState('');
   const [liveSnapshots, setLiveSnapshots] = useState<Record<string, { total: number; easy: number; medium: number; hard: number; rating: number }>>({});
+  const [liveGhSnapshots, setLiveGhSnapshots] = useState<Record<string, { repos: number; stars: number; followers: number; topLang: string }>>({});
   const [loadingLive, setLoadingLive] = useState(false);
 
   // Fetch real students dynamically from Database Backend API
@@ -105,6 +106,40 @@ export const CodingAnalyticsPage: React.FC = () => {
     }
   }, [students]);
 
+  // Fetch real live GitHub stats for connected handles
+  useEffect(() => {
+    let mounted = true;
+    async function loadGithubStats() {
+      const ghMap: Record<string, { repos: number; stars: number; followers: number; topLang: string }> = {};
+
+      await Promise.allSettled(
+        uniqueStudents.map(async (s) => {
+          const ghHandle = (s as any).github_handle;
+          const isValid = Boolean(ghHandle) && ghHandle !== 'Not Linked' && String(ghHandle).trim() !== '';
+          if (!isValid) return;
+          try {
+            const cleanHandle = String(ghHandle).replace(/^@/, '').trim();
+            const snap = await fetchLiveGitHub(cleanHandle);
+            const repos = typeof snap.kpis[0]?.value === 'number' ? snap.kpis[0].value : 0;
+            const stars = typeof snap.kpis[1]?.value === 'number' ? snap.kpis[1].value : 0;
+            const followers = typeof snap.kpis[2]?.value === 'number' ? snap.kpis[2].value : 0;
+            const topLang = snap.topicAnalysis?.[0]?.label || '';
+            ghMap[s.roll_number] = { repos, stars, followers, topLang };
+          } catch (e) {
+            console.warn(`GitHub live fetch failed for ${s.roll_number}:`, e);
+          }
+        })
+      );
+
+      if (mounted) setLiveGhSnapshots(ghMap);
+    }
+
+    if (uniqueStudents.length > 0) {
+      loadGithubStats();
+    }
+    return () => { mounted = false; };
+  }, [students]);
+
   // Map real database students to live analytics without any duplicate or hardcoded fake profiles
   const enrichedStudents: EnrichedStudent[] = uniqueStudents.map((s) => {
     const cgpa = (s as any).cgpa !== undefined && (s as any).cgpa !== null ? Number((s as any).cgpa) : 0.0;
@@ -121,11 +156,12 @@ export const CodingAnalyticsPage: React.FC = () => {
     const medium = liveData ? liveData.medium : (isLcLinked ? Math.round(totalSolved * 0.48) : 0);
     const hard = liveData ? liveData.hard : (isLcLinked ? Math.round(totalSolved * 0.07) : 0);
     const contestRating = liveData ? liveData.rating : (isLcLinked ? Math.max(1400, 1200 + totalSolved * 1.5) : 0);
-    const repos = isGhLinked ? Number((s as any).github_repos || 0) : 0;
-    const stars = isGhLinked ? Number((s as any).github_stars || 0) : 0;
-    const followers = isGhLinked ? Number((s as any).github_followers || 0) : 0;
+    const liveGh = liveGhSnapshots[s.roll_number];
+    const repos = isGhLinked ? (liveGh?.repos ?? Number((s as any).github_repos || 0)) : 0;
+    const stars = isGhLinked ? (liveGh?.stars ?? Number((s as any).github_stars || 0)) : 0;
+    const followers = isGhLinked ? (liveGh?.followers ?? Number((s as any).github_followers || 0)) : 0;
     const topLang = isGhLinked
-      ? ((s as any).github_top_language || 'Not synced yet')
+      ? (liveGh?.topLang || (s as any).github_top_language || 'Loading...')
       : 'Not Linked';
 
     return {

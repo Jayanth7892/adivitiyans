@@ -248,6 +248,7 @@ export async function fetchLiveGitHub(handle: string): Promise<PlatformStatsSnap
     kpis: [
       { label: 'Public Repositories', value: user.public_repos ?? repos.length },
       { label: 'Total Stars Earned', value: totalStars },
+      { label: 'Followers', value: user.followers ?? 0 },
       { label: 'User name', value: cleanHandle, isLink: true },
     ],
     awards: [
