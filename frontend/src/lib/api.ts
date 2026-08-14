@@ -330,6 +330,27 @@ export const api = {
     return fetchWithAuth(`/faculty/${facultyId}/mentees`);
   },
 
+  // Get all faculty with mentee counts (admin)
+  getAllFaculty: async (): Promise<any[]> => {
+    return fetchWithAuth(`/faculty`);
+  },
+
+  // Link email to faculty record (admin)
+  patchFacultyEmail: async (facultyId: string, email: string): Promise<any> => {
+    return fetchWithAuth(`/faculty/${facultyId}/email`, {
+      method: 'PATCH',
+      body: JSON.stringify({ email }),
+    });
+  },
+
+  // Upload mentor assignment CSV rows
+  uploadMentorAssignments: async (rows: { roll1: string; roll2?: string; facultyName: string }[]): Promise<any> => {
+    return fetchWithAuth(`/mentor-assignments/upload`, {
+      method: 'POST',
+      body: JSON.stringify({ rows }),
+    });
+  },
+
   // Reports & Analytics
   getDepartmentReport: async (dept: string = 'CSE(Data Science)') => {
     return fetchWithAuth(`/reports/department/${dept}`);

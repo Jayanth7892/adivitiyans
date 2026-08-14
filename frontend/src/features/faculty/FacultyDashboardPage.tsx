@@ -127,11 +127,29 @@ export const FacultyDashboardPage: React.FC = () => {
   });
 
   const filteredMentees = mentees.filter((m) => {
-    const q = searchQuery.toLowerCase();
+      const q = searchQuery.toLowerCase();
     const matchesSearch = !q || m.name.toLowerCase().includes(q) || m.roll_number.toLowerCase().includes(q);
     const matchesSection = !sectionFilter || m.section === sectionFilter;
     const matchesYear = !yearFilter || m.year === yearFilter;
     return matchesSearch && matchesSection && matchesYear;
+  });
+
+  // Group filtered mentees by year for collapsible sections
+  const YEAR_ORDER = ['4th Year', '3rd Year', '2nd Year', '1st Year'];
+  const groupedByYear = YEAR_ORDER.map(year => ({
+    year,
+    mentees: filteredMentees.filter(m => m.year === year),
+  })).filter(g => g.mentees.length > 0);
+  // Also collect any mentees with unexpected year values
+  const knownYears = new Set(YEAR_ORDER);
+  const otherMentees = filteredMentees.filter(m => !knownYears.has(m.year));
+  if (otherMentees.length > 0) groupedByYear.push({ year: 'Other', mentees: otherMentees });
+
+  const [collapsedYears, setCollapsedYears] = useState<Set<string>>(new Set());
+  const toggleYear = (year: string) => setCollapsedYears(prev => {
+    const next = new Set(prev);
+    if (next.has(year)) next.delete(year); else next.add(year);
+    return next;
   });
 
   const handleSaveRemark = async () => {
@@ -228,16 +246,16 @@ export const FacultyDashboardPage: React.FC = () => {
         />
       </div>
 
-      {/* Tab 1: Mentee Directory */}
+      {/* Tab 1: Mentee Directory — Year-Grouped */}
       {activeTab === 'mentees' && (
         <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
               <h3 className="text-base font-bold text-textPrimary">Assigned Mentee Directory</h3>
-              <p className="text-xs text-textSecondary">Search and inspect mentee 360° academic progress</p>
+              <p className="text-xs text-textSecondary">Grouped by academic year — click a year to expand/collapse</p>
             </div>
 
-              <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-borderLine bg-background text-xs w-56">
                 <Search className="w-4 h-4 text-textSecondary shrink-0" />
                 <input
@@ -265,72 +283,117 @@ export const FacultyDashboardPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
-                  <th className="py-3 px-4">Student</th>
-                  <th className="py-3 px-4">Registration No</th>
-                  <th className="py-3 px-4">Dept / Batch / Sec</th>
-                  <th className="py-3 px-4">Academic Year</th>
-                  <th className="py-3 px-4">CGPA</th>
-                  <th className="py-3 px-4">Academic Standing</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-borderLine text-sm">
-                {filteredMentees.map((mentee) => (
-                  <tr key={mentee.roll_number} className="hover:bg-background/50 transition-colors">
-                    <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-brand-primary text-white font-bold flex items-center justify-center text-xs">
-                          {mentee.name.split(' ').map((n) => n[0]).join('')}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-textPrimary leading-tight">{mentee.name}</p>
-                          <p className="text-[11px] text-textSecondary">{mentee.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-brand-primary text-xs">{mentee.roll_number}</td>
-                    <td className="py-3.5 px-4 text-xs">{mentee.department} • {mentee.batch} • Sec {mentee.section}</td>
-                    <td className="py-3.5 px-4 text-xs font-medium text-textPrimary">{mentee.year}</td>
-                    <td className="py-3.5 px-4 text-sm font-bold text-textPrimary">{Number((mentee as any).cgpa) > 0 ? Number((mentee as any).cgpa).toFixed(2) : '—'}</td>
-                    <td className="py-3.5 px-4">
-                      {(() => {
-                        const standing = getStanding((mentee as any).cgpa);
-                        return (
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${standing.color}`}>
-                            {standing.label}
-                          </span>
-                        );
-                      })()}
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => setInspectMentee(mentee)}
-                          className="p-1.5 rounded-lg border border-borderLine text-brand-primary hover:bg-brand-soft"
-                          title="View 360° Profile"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedMentee(mentee);
-                            setRemarkInput('');
-                          }}
-                          className="p-1.5 rounded-lg border border-borderLine text-textPrimary hover:bg-background"
-                          title="Add Faculty Remarks"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {filteredMentees.length === 0 && (
+            <div className="py-12 text-center text-textSecondary text-xs">
+              No mentees found matching the filters.
+            </div>
+          )}
+
+          {/* Year Groups */}
+          <div className="space-y-4">
+            {groupedByYear.map(({ year, mentees: yearMentees }) => {
+              const isCollapsed = collapsedYears.has(year);
+              const atRiskCount = yearMentees.filter(m => Number((m as any).cgpa) > 0 && Number((m as any).cgpa) < 6.0).length;
+              const avgCgpa = yearMentees.filter(m => Number((m as any).cgpa) > 0).length > 0
+                ? (yearMentees.reduce((s, m) => s + Number((m as any).cgpa || 0), 0) / yearMentees.filter(m => Number((m as any).cgpa) > 0).length).toFixed(2)
+                : '—';
+
+              return (
+                <div key={year} className="border border-borderLine rounded-xl overflow-hidden">
+                  {/* Year Header */}
+                  <button
+                    onClick={() => toggleYear(year)}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-brand-soft/10 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-bold text-textPrimary">{year}</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-brand-soft text-brand-primary font-semibold">
+                        {yearMentees.length} students
+                      </span>
+                      <span className="text-[11px] text-textSecondary">Avg CGPA: {avgCgpa}</span>
+                      {atRiskCount > 0 && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 font-semibold">
+                          ⚠️ {atRiskCount} at risk
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-textSecondary text-sm">{isCollapsed ? '▶' : '▼'}</span>
+                  </button>
+
+                  {/* Mentee Table */}
+                  {!isCollapsed && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
+                            <th className="py-3 px-4">Student</th>
+                            <th className="py-3 px-4">Registration No</th>
+                            <th className="py-3 px-4">Dept / Batch / Sec</th>
+                            <th className="py-3 px-4">CGPA</th>
+                            <th className="py-3 px-4">Academic Standing</th>
+                            <th className="py-3 px-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-borderLine text-sm">
+                          {yearMentees.map((mentee) => {
+                            const cgpa = Number((mentee as any).cgpa);
+                            const isAtRisk = cgpa > 0 && cgpa < 6.0;
+                            return (
+                              <tr key={mentee.roll_number} className={`hover:bg-background/50 transition-colors ${isAtRisk ? 'bg-red-50/30' : ''}`}>
+                                <td className="py-3.5 px-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs ${isAtRisk ? 'bg-red-100 text-red-600' : 'bg-brand-primary text-white'}`}>
+                                      {mentee.name.split(' ').map((n: string) => n[0]).join('')}
+                                    </div>
+                                    <div>
+                                      <p className="font-semibold text-textPrimary leading-tight">
+                                        {isAtRisk && <span title="At risk: CGPA below 6.0">⚠️ </span>}{mentee.name}
+                                      </p>
+                                      <p className="text-[11px] text-textSecondary">{mentee.email}</p>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 font-bold text-brand-primary text-xs">{mentee.roll_number}</td>
+                                <td className="py-3.5 px-4 text-xs">{mentee.department} • {mentee.batch} • Sec {mentee.section}</td>
+                                <td className="py-3.5 px-4 text-sm font-bold text-textPrimary">{cgpa > 0 ? cgpa.toFixed(2) : '—'}</td>
+                                <td className="py-3.5 px-4">
+                                  {(() => {
+                                    const standing = getStanding((mentee as any).cgpa);
+                                    return (
+                                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${standing.color}`}>
+                                        {standing.label}
+                                      </span>
+                                    );
+                                  })()}
+                                </td>
+                                <td className="py-3.5 px-4 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      onClick={() => setInspectMentee(mentee)}
+                                      className="p-1.5 rounded-lg border border-borderLine text-brand-primary hover:bg-brand-soft"
+                                      title="View 360° Profile"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => { setSelectedMentee(mentee); setRemarkInput(''); }}
+                                      className="p-1.5 rounded-lg border border-borderLine text-textPrimary hover:bg-background"
+                                      title="Add Faculty Remarks"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

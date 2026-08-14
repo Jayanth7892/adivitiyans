@@ -45,6 +45,7 @@ import { SoftSkillsTab } from '../profile/tabs/SoftSkillsTab';
 import { AchievementsTab } from '../profile/tabs/AchievementsTab';
 import { PlacementPreferencesTab } from '../profile/tabs/PlacementPreferencesTab';
 import { BulkImportModal } from './components/BulkImportModal';
+import { FacultyRecordsTable } from './components/FacultyRecordsTable';
 import { PlacementEligibilitySection } from '../hod/components/PlacementEligibilitySection';
 
 import { fetchLivePlatformSnapshot } from '../coding/liveFetchers';
@@ -158,6 +159,20 @@ export const AdminDashboardPage: React.FC = () => {
   const [facFormEmail, setFacFormEmail] = useState('');
   const [facFormDept, setFacFormDept] = useState('CSE (Data Science)');
   const [facFormDesignation, setFacFormDesignation] = useState('Mentor');
+
+  // CSV Mentor Assignment state
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvPreview, setCsvPreview] = useState<{ roll1: string; roll2?: string; facultyName: string }[]>([]);
+  const [csvUploading, setCsvUploading] = useState(false);
+  const [csvResult, setCsvResult] = useState<any | null>(null);
+  const [csvError, setCsvError] = useState('');
+  const [csvDragOver, setCsvDragOver] = useState(false);
+
+  // Email link modal state
+  const [linkEmailFacId, setLinkEmailFacId] = useState<string | null>(null);
+  const [linkEmailValue, setLinkEmailValue] = useState('');
+  const [linkEmailSaving, setLinkEmailSaving] = useState(false);
+  const [linkEmailMsg, setLinkEmailMsg] = useState('');
 
   // Queries
   const { data: students = [], refetch } = useQuery({
@@ -403,6 +418,57 @@ export const AdminDashboardPage: React.FC = () => {
   const handleDeleteFaculty = (id: string) => {
     if (!window.confirm('Remove this faculty member?')) return;
     setFacultyList((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  // CSV Mentor Assignment handlers
+  const parseCSV = (text: string): { roll1: string; roll2?: string; facultyName: string }[] => {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    const parsed: { roll1: string; roll2?: string; facultyName: string }[] = [];
+    for (const line of lines) {
+      const sep = line.includes(',') ? ',' : '\t';
+      const cols = line.split(sep).map(c => c.trim().replace(/^"|"$/g, ''));
+      if (cols.length < 3) continue;
+      const roll1 = cols[1]?.trim().toUpperCase();
+      if (!roll1 || !/^\d{2}0\d{2}[A-Z0-9]{3,7}$/i.test(roll1)) continue;
+      let roll2 = '';
+      let facultyName = '';
+      if (cols[2] && /^\d{2}0\d{2}[A-Z0-9]{3,7}$/i.test(cols[2].trim())) {
+        roll2 = cols[2].trim().toUpperCase();
+        facultyName = cols[3]?.trim() || '';
+      } else {
+        facultyName = cols[2]?.trim() || '';
+      }
+      if (!facultyName || /^\d+$/.test(facultyName)) continue;
+      parsed.push({ roll1, ...(roll2 ? { roll2 } : {}), facultyName });
+    }
+    return parsed;
+  };
+
+  const handleCSVFile = (file: File) => {
+    setCsvFile(file); setCsvResult(null); setCsvError('');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const parsed = parseCSV(text);
+      if (parsed.length === 0) {
+        setCsvError('No valid rows found. Format: S.No | Roll 1 | Roll 2 (opt) | Faculty Name | PS No (opt)');
+        setCsvPreview([]); return;
+      }
+      setCsvPreview(parsed);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleCSVUpload = async () => {
+    if (csvPreview.length === 0) return;
+    setCsvUploading(true); setCsvError('');
+    try {
+      const result = await api.uploadMentorAssignments(csvPreview);
+      setCsvResult(result); setCsvPreview([]); setCsvFile(null);
+      queryClient.invalidateQueries({ queryKey: ['adminFaculty'] });
+    } catch (e: any) {
+      setCsvError(e.message || 'Upload failed. Please try again.');
+    } finally { setCsvUploading(false); }
   };
 
   const exportCSV = () => {
@@ -761,60 +827,147 @@ export const AdminDashboardPage: React.FC = () => {
 
       {/* ── TAB 3: Faculty & Mentor Assignments ── */}
       {activeTab === 'faculty' && (
-        <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-textPrimary">Faculty & Mentor Management</h3>
-              <p className="text-xs text-textSecondary">Add, edit, or remove faculty mentors and their mentee assignments</p>
+        <div className="space-y-6">
+          {/* CSV Upload Card */}
+          <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
+            <div className="mb-4">
+              <h3 className="text-base font-bold text-textPrimary">Upload Mentor Assignment CSV</h3>
+              <p className="text-xs text-textSecondary mt-0.5">Format: S.No | Roll 1 | Roll 2 (optional) | Faculty Name | PS No (optional)</p>
             </div>
-            <PillButton variant="primary" size="sm" onClick={openAddFacultyModal} icon={<Plus className="w-4 h-4" />}>
-              Add Faculty
-            </PillButton>
+
+            {/* Drop zone */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setCsvDragOver(true); }}
+              onDragLeave={() => setCsvDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setCsvDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleCSVFile(f); }}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
+                csvDragOver ? 'border-brand-primary bg-brand-soft/20' : 'border-borderLine hover:border-brand-primary/50 hover:bg-background'
+              }`}
+              onClick={() => document.getElementById('mentor-csv-input')?.click()}
+            >
+              <Upload className="w-8 h-8 text-brand-primary mx-auto mb-2" />
+              <p className="text-sm font-semibold text-textPrimary">
+                {csvFile ? csvFile.name : 'Drop CSV here or click to browse'}
+              </p>
+              <p className="text-xs text-textSecondary mt-1">Accepts .csv files</p>
+              <input id="mentor-csv-input" type="file" accept=".csv,.txt" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCSVFile(f); e.target.value = ''; }}
+              />
+            </div>
+
+            {csvError && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-alert bg-alert-soft px-3 py-2 rounded-lg">
+                <AlertCircle className="w-4 h-4 shrink-0" />{csvError}
+              </div>
+            )}
+
+            {/* Preview table */}
+            {csvPreview.length > 0 && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                  <p className="text-xs font-semibold text-textPrimary">{csvPreview.length} rows parsed</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[...new Set(csvPreview.map(r => r.facultyName))].map(name => (
+                      <span key={name} className="text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                        {name} → {csvPreview.filter(r => r.facultyName === name).length} rows
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="max-h-44 overflow-y-auto border border-borderLine rounded-lg">
+                  <table className="w-full text-xs">
+                    <thead className="bg-background border-b border-borderLine sticky top-0">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold">Roll 1</th>
+                        <th className="px-3 py-2 text-left font-semibold">Roll 2</th>
+                        <th className="px-3 py-2 text-left font-semibold">Faculty Name</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-borderLine">
+                      {csvPreview.slice(0, 12).map((row, i) => (
+                        <tr key={i} className="hover:bg-background/50">
+                          <td className="px-3 py-1.5 font-mono font-bold text-brand-primary">{row.roll1}</td>
+                          <td className="px-3 py-1.5 font-mono text-textSecondary">{row.roll2 || '—'}</td>
+                          <td className="px-3 py-1.5 text-textPrimary">{row.facultyName}</td>
+                        </tr>
+                      ))}
+                      {csvPreview.length > 12 && (
+                        <tr><td colSpan={3} className="px-3 py-1.5 text-center text-textSecondary">+ {csvPreview.length - 12} more rows</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex justify-end gap-2 mt-3">
+                  <PillButton variant="outline" size="sm" onClick={() => { setCsvPreview([]); setCsvFile(null); }}>Cancel</PillButton>
+                  <PillButton variant="primary" size="sm" onClick={handleCSVUpload} disabled={csvUploading}
+                    icon={csvUploading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}>
+                    {csvUploading ? 'Uploading…' : 'Upload & Assign'}
+                  </PillButton>
+                </div>
+              </div>
+            )}
+
+            {/* Upload result */}
+            {csvResult && (
+              <div className="mt-4 p-4 bg-background border border-borderLine rounded-lg space-y-1.5 text-xs">
+                <p className="flex items-center gap-2 text-success font-semibold">
+                  <CheckCircle2 className="w-4 h-4" /> {csvResult.updated} students assigned successfully
+                </p>
+                {csvResult.autoCreatedFaculty?.length > 0 && (
+                  <p className="text-indigo-600">🆕 New faculty auto-created: {csvResult.autoCreatedFaculty.join(', ')}</p>
+                )}
+                {csvResult.alreadyExistedFaculty?.length > 0 && (
+                  <p className="text-textSecondary">✅ Existing faculty matched: {csvResult.alreadyExistedFaculty.join(', ')}</p>
+                )}
+                {csvResult.notFoundRolls?.length > 0 && (
+                  <p className="text-amber-600">⚠️ Roll numbers not found: {csvResult.notFoundRolls.join(', ')}</p>
+                )}
+                <button onClick={() => setCsvResult(null)} className="text-brand-primary underline text-[11px]">Dismiss</button>
+              </div>
+            )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
-                  <th className="py-3 px-4">Faculty ID</th>
-                  <th className="py-3 px-4">Name</th>
-                  <th className="py-3 px-4">Email</th>
-                  <th className="py-3 px-4">Department</th>
-                  <th className="py-3 px-4">Designation</th>
-                  <th className="py-3 px-4">Mentees</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-borderLine text-sm">
-                {facultyList.length === 0 && (
-                  <tr><td colSpan={7} className="py-10 text-center text-textSecondary text-xs">No faculty records found. Click "Add Faculty" to add one.</td></tr>
-                )}
-                {facultyList.map((fac) => (
-                  <tr key={fac.id} className="hover:bg-background/50 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-brand-primary text-xs">{fac.id}</td>
-                    <td className="py-3.5 px-4 font-bold text-textPrimary">{fac.name}</td>
-                    <td className="py-3.5 px-4 text-xs text-textSecondary">{fac.email}</td>
-                    <td className="py-3.5 px-4 text-xs">{fac.department}</td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-600">{fac.designation}</span>
-                    </td>
-                    <td className="py-3.5 px-4 text-xs font-semibold text-textPrimary">{fac.menteesCount} Mentees</td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEditFacultyModal(fac)}
-                          className="p-1.5 rounded-lg border border-borderLine text-brand-primary hover:bg-brand-soft" title="Edit Faculty">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDeleteFaculty(fac.id)}
-                          className="p-1.5 rounded-lg border border-borderLine text-alert hover:bg-alert-soft" title="Remove Faculty">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Live Faculty Records Table */}
+          <FacultyRecordsTable
+            onLinkEmail={(facId) => { setLinkEmailFacId(facId); setLinkEmailValue(''); setLinkEmailMsg(''); }}
+          />
+        </div>
+      )}
+
+      {/* ── Email Link Modal ── */}
+      {linkEmailFacId && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="text-base font-bold text-textPrimary mb-1">Link Email to Faculty</h3>
+            <p className="text-xs text-textSecondary mb-4">Faculty ID: <span className="font-mono font-bold">{linkEmailFacId}</span></p>
+            <input
+              type="email"
+              value={linkEmailValue}
+              onChange={(e) => setLinkEmailValue(e.target.value)}
+              placeholder="e.g. hcseds@rgmcet.edu.in"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary mb-3"
+            />
+            {linkEmailMsg && (
+              <p className={`text-xs mb-3 ${linkEmailMsg.startsWith('Error') ? 'text-alert' : 'text-success'}`}>{linkEmailMsg}</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <PillButton variant="outline" size="sm" onClick={() => setLinkEmailFacId(null)}>Cancel</PillButton>
+              <PillButton variant="primary" size="sm" disabled={linkEmailSaving || !linkEmailValue.trim()}
+                onClick={async () => {
+                  setLinkEmailSaving(true);
+                  try {
+                    await api.patchFacultyEmail(linkEmailFacId, linkEmailValue.trim());
+                    setLinkEmailMsg('Email linked successfully!');
+                    queryClient.invalidateQueries({ queryKey: ['adminFaculty'] });
+                    setTimeout(() => setLinkEmailFacId(null), 1500);
+                  } catch (e: any) {
+                    setLinkEmailMsg(`Error: ${e.message}`);
+                  } finally { setLinkEmailSaving(false); }
+                }}
+              >
+                {linkEmailSaving ? 'Saving…' : 'Save'}
+              </PillButton>
+            </div>
           </div>
         </div>
       )}

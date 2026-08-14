@@ -2214,18 +2214,192 @@ app.post('/faculty', async (req: Request, res: Response) => {
   }
 });
 
-// GET /faculty/by-email/:email — Fetch faculty profile by email
+// GET /faculty/by-email/:email — 3-tier lookup: exact → name-fuzzy → 404
 app.get('/faculty/by-email/:email', async (req: Request, res: Response) => {
   try {
-    const email = req.params.email.toLowerCase();
+    const email = req.params.email.toLowerCase().trim();
     if (db.isMock) {
       return res.json({ faculty_id: 'FAC001', name: 'Dr. M. V. Ramana', email, department: 'CSE', role: 'mentor' });
     }
-    const result = await db.query('SELECT * FROM faculty WHERE LOWER(email) = $1', [email]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Faculty profile not found' });
+
+    // Tier 1: exact email match
+    const exact = await db.query('SELECT * FROM faculty WHERE LOWER(email) = $1', [email]);
+    if (exact.rows.length > 0) return res.json(exact.rows[0]);
+
+    // Tier 2: name-based fuzzy match from email prefix
+    const prefix = email.split('@')[0].replace(/[^a-z]/gi, '').toLowerCase();
+    if (prefix.length >= 3) {
+      const all = await db.query('SELECT * FROM faculty', []);
+      const normalize = (s: string) => s.toLowerCase().replace(/^(dr|prof|mr|mrs|ms|er)\.?\s*/i, '').replace(/[^a-z]/g, '');
+      const match = all.rows.find((f: any) => {
+        const n = normalize(f.name);
+        return n.includes(prefix) || prefix.includes(n.slice(0, Math.min(n.length, 8)));
+      });
+      if (match) {
+        // Auto-link email to the matched faculty record
+        await db.query('UPDATE faculty SET email = $1, updated_at = CURRENT_TIMESTAMP WHERE faculty_id = $2', [email, match.faculty_id]);
+        return res.json({ ...match, email });
+      }
     }
-    res.json(result.rows[0]);
+
+    return res.status(404).json({ error: 'Faculty profile not found' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /faculty — List all faculty with mentee counts (admin view)
+app.get('/faculty', requireRole('admin', 'hod'), async (_req: Request, res: Response) => {
+  try {
+    if (db.isMock) {
+      return res.json([
+        { faculty_id: 'FAC001', name: 'Dr. K. V. Subbaiah', email: 'kvsubbaiah@rgmcet.edu.in', department: 'CSE', role: 'mentor', mentee_count: 3 },
+      ]);
+    }
+    const result = await db.query(`
+      SELECT f.*,
+             COUNT(s.roll_number)::int AS mentee_count
+      FROM faculty f
+      LEFT JOIN students s ON s.faculty_mentor_id = f.faculty_id
+      GROUP BY f.faculty_id
+      ORDER BY f.name
+    `);
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /faculty/:id/email — Admin manually links an email to a faculty record
+app.patch('/faculty/:id/email', requireRole('admin'), async (req: Request, res: Response) => {
+  try {
+    const facId = req.params.id.toUpperCase();
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'email is required' });
+    const cleanEmail = String(email).toLowerCase().trim();
+
+    if (db.isMock) {
+      return res.json({ message: 'Email linked successfully', faculty_id: facId, email: cleanEmail });
+    }
+
+    // Check another faculty doesn't already own this email
+    const conflict = await db.query(
+      'SELECT faculty_id FROM faculty WHERE LOWER(email) = $1 AND faculty_id != $2',
+      [cleanEmail, facId]
+    );
+    if (conflict.rows.length > 0) {
+      return res.status(409).json({ error: `Email already linked to faculty ${conflict.rows[0].faculty_id}` });
+    }
+
+    const result = await db.query(
+      `UPDATE faculty SET email = $1, updated_at = CURRENT_TIMESTAMP WHERE faculty_id = $2 RETURNING *`,
+      [cleanEmail, facId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Faculty not found' });
+    res.json({ message: 'Email linked successfully', faculty: result.rows[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /mentor-assignments/upload — Bulk assign students to faculty mentors from CSV data
+app.post('/mentor-assignments/upload', requireRole('admin'), async (req: Request, res: Response) => {
+  try {
+    type AssignRow = { roll1: string; roll2?: string; facultyName: string };
+    const rows: AssignRow[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (rows.length === 0) return res.status(400).json({ error: 'rows array is required and must be non-empty' });
+
+    const updated: string[] = [];
+    const notFoundRolls: string[] = [];
+    const autoCreatedFaculty: string[] = [];
+    const alreadyExistedFaculty: string[] = [];
+
+    // Helper: generate a stable faculty_id slug from a name
+    const slugify = (name: string) =>
+      'FAC_' + name.toUpperCase().replace(/^(DR|PROF|MR|MRS|MS|ER)\.?\s*/i, '').replace(/[^A-Z0-9]/g, '').slice(0, 20);
+
+    // Build faculty name → faculty_id cache (case-insensitive)
+    const facultyCache: Record<string, string> = {};
+    const normalize = (s: string) => s.toLowerCase().replace(/^(dr|prof|mr|mrs|ms|er)\.?\s*/i, '').replace(/\s+/g, ' ').trim();
+
+    const getAllFaculty = async () => {
+      if (db.isMock) return [];
+      const r = await db.query('SELECT faculty_id, name, email FROM faculty');
+      return r.rows;
+    };
+    const allFaculty = await getAllFaculty();
+    for (const f of allFaculty) {
+      facultyCache[normalize(f.name)] = f.faculty_id;
+    }
+
+    // Process unique faculty names first
+    const uniqueNames = [...new Set(rows.map((r) => r.facultyName.trim()).filter(Boolean))];
+
+    for (const rawName of uniqueNames) {
+      const normName = normalize(rawName);
+      if (facultyCache[normName]) {
+        alreadyExistedFaculty.push(rawName);
+        continue;
+      }
+      // Auto-create faculty
+      const facId = slugify(rawName);
+      const placeholder = `pending_${facId.replace('FAC_', '').toLowerCase()}@rgmcet.edu.in`;
+      if (!db.isMock) {
+        await db.query(
+          `INSERT INTO faculty (faculty_id, name, email, department, role)
+           VALUES ($1, $2, $3, $4, 'mentor')
+           ON CONFLICT (faculty_id) DO UPDATE SET name = EXCLUDED.name`,
+          [facId, rawName, placeholder, 'CSE(Data Science)']
+        ).catch(async () => {
+          // email unique constraint may fire — try without email
+          await db.query(
+            `INSERT INTO faculty (faculty_id, name, email, department, role)
+             VALUES ($1, $2, $3, $4, 'mentor')
+             ON CONFLICT (faculty_id) DO UPDATE SET name = EXCLUDED.name`,
+          [facId, rawName, `pending_${Date.now()}@rgmcet.edu.in`, 'CSE(Data Science)']
+          );
+        });
+      }
+      facultyCache[normName] = facId;
+      autoCreatedFaculty.push(rawName);
+    }
+
+    // Now assign students
+    for (const row of rows) {
+      const facId = facultyCache[normalize(row.facultyName.trim())];
+      if (!facId) continue;
+
+      const rolls = [row.roll1, row.roll2].filter(Boolean) as string[];
+      for (const roll of rolls) {
+        const cleanRoll = roll.trim().toUpperCase();
+        if (!cleanRoll) continue;
+
+        if (db.isMock) {
+          updated.push(cleanRoll);
+          continue;
+        }
+
+        const r = await db.query(
+          `UPDATE students SET faculty_mentor_id = $1, updated_at = CURRENT_TIMESTAMP
+           WHERE UPPER(roll_number) = $2 RETURNING roll_number`,
+          [facId, cleanRoll]
+        );
+        if (r.rows.length > 0) {
+          updated.push(cleanRoll);
+        } else {
+          notFoundRolls.push(cleanRoll);
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      updated: updated.length,
+      updatedRolls: updated,
+      notFoundRolls,
+      autoCreatedFaculty,
+      alreadyExistedFaculty,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
