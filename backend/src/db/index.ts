@@ -189,6 +189,9 @@ async function ensureSchema(p: Pool) {
       handle VARCHAR(100) NOT NULL,
       streak INT DEFAULT 0,
       repositories_count INT DEFAULT 0,
+      followers_count INT DEFAULT 0,
+      stars_count INT DEFAULT 0,
+      top_language VARCHAR(50) DEFAULT '',
       commits_count INT DEFAULT 0,
       prs_merged INT DEFAULT 0,
       score_rating NUMERIC(10, 2) DEFAULT 0.00,
@@ -197,8 +200,15 @@ async function ensureSchema(p: Pool) {
       hard_count INT DEFAULT 0,
       contest_rating NUMERIC(10, 2) DEFAULT 0.00,
       last_synced TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(student_id, platform)
     );`,
+
+    // Migrate existing deployed DBs — safe no-op if columns already exist
+    `ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS followers_count INT DEFAULT 0;`,
+    `ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS stars_count INT DEFAULT 0;`,
+    `ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS top_language VARCHAR(50) DEFAULT '';`,
+    `ALTER TABLE coding_profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;`,
 
     `CREATE TABLE IF NOT EXISTS tech_skills (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

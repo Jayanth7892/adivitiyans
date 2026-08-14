@@ -938,7 +938,10 @@ app.get('/students', async (req: Request, res: Response) => {
         COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.hard_count END), 0) AS leetcode_hard,
         COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.contest_rating END), 0) AS leetcode_contest,
         MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.handle END) AS github_handle,
-        COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.repositories_count END), 0) AS github_repos
+        COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.repositories_count END), 0) AS github_repos,
+        COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.followers_count END), 0) AS github_followers,
+        COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.stars_count END), 0) AS github_stars,
+        MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.top_language END) AS github_top_language
       FROM students s
       LEFT JOIN academics a ON a.student_id = s.roll_number
       LEFT JOIN coding_profiles c ON c.student_id = s.roll_number

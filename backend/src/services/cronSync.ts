@@ -55,16 +55,35 @@ async function fetchLeetCodeStats(handle: string): Promise<{ solved: number; eas
   return null;
 }
 
-// Fetch live GitHub repos via GitHub API
-async function fetchGitHubStats(handle: string): Promise<{ repos: number } | null> {
+// Fetch live GitHub stats via GitHub API (repos, followers, stars, top language)
+async function fetchGitHubStats(handle: string): Promise<{ repos: number; followers: number; stars: number; topLanguage: string } | null> {
   try {
     const cleanHandle = handle.replace(/^@/, '').trim();
     if (!cleanHandle || cleanHandle === 'Not Linked') return null;
 
-    const data = await fetchHttpsJson(`https://api.github.com/users/${cleanHandle}`);
-    if (data && typeof data.public_repos === 'number') {
-      return { repos: data.public_repos };
-    }
+    // Fetch user profile (repos + followers)
+    const user = await fetchHttpsJson(`https://api.github.com/users/${cleanHandle}`);
+    if (!user || typeof user.public_repos !== 'number') return null;
+
+    const repos: number = user.public_repos;
+    const followers: number = user.followers || 0;
+
+    // Fetch repo list to compute total stars + top language
+    let stars = 0;
+    let topLanguage = '';
+    try {
+      const repoList: any[] = await fetchHttpsJson(`https://api.github.com/users/${cleanHandle}/repos?per_page=100&sort=pushed`);
+      if (Array.isArray(repoList)) {
+        stars = repoList.reduce((sum, r) => sum + (r.stargazers_count || 0), 0);
+        const langCounts: Record<string, number> = {};
+        for (const r of repoList) {
+          if (r.language) langCounts[r.language] = (langCounts[r.language] || 0) + 1;
+        }
+        topLanguage = Object.entries(langCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+      }
+    } catch { /* repo list fetch failed — use defaults */ }
+
+    return { repos, followers, stars, topLanguage };
   } catch (e) {
     // Fallback
   }
@@ -107,8 +126,10 @@ export async function runCodingProfileCronSync(): Promise<SyncResult> {
         const ghData = await fetchGitHubStats(handle);
         if (ghData) {
           await db.query(
-            `UPDATE coding_profiles SET repositories_count = $1, updated_at = CURRENT_TIMESTAMP WHERE student_id = $2 AND LOWER(platform) = 'github'`,
-            [ghData.repos, student_id]
+            `UPDATE coding_profiles
+             SET repositories_count = $1, followers_count = $2, stars_count = $3, top_language = $4, updated_at = CURRENT_TIMESTAMP
+             WHERE student_id = $5 AND LOWER(platform) = 'github'`,
+            [ghData.repos, ghData.followers, ghData.stars, ghData.topLanguage, student_id]
           ).catch(() => {});
           result.githubUpdated++;
         }

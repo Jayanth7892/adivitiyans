@@ -122,13 +122,18 @@ export const CodingAnalyticsPage: React.FC = () => {
     const hard = liveData ? liveData.hard : (isLcLinked ? Math.round(totalSolved * 0.07) : 0);
     const contestRating = liveData ? liveData.rating : (isLcLinked ? Math.max(1400, 1200 + totalSolved * 1.5) : 0);
     const repos = isGhLinked ? Number((s as any).github_repos || 0) : 0;
+    const stars = isGhLinked ? Number((s as any).github_stars || 0) : 0;
+    const followers = isGhLinked ? Number((s as any).github_followers || 0) : 0;
+    const topLang = isGhLinked
+      ? ((s as any).github_top_language || 'Not synced yet')
+      : 'Not Linked';
 
     return {
       name: s.name,
       regNo: s.roll_number,
       dept: s.department || 'CSE',
       year: s.year,
-      section: s.section || 'A',
+      section: s.section || '',
       cgpa: Number(cgpa.toFixed(2)),
       standing: cgpa >= 9.0 ? 'First Class with Distinction' : (cgpa >= 6.5 ? 'First Class' : (cgpa > 0 ? 'Pass' : 'Unspecified')),
       isLcLinked,
@@ -141,9 +146,9 @@ export const CodingAnalyticsPage: React.FC = () => {
       isGhLinked,
       ghHandle: isGhLinked ? rawGhHandle : null,
       repos,
-      stars: isGhLinked ? repos * 3 : 0,
-      topLang: isGhLinked ? 'TypeScript' : 'Not Linked',
-      followers: isGhLinked ? repos * 2 : 0,
+      stars,
+      topLang,
+      followers,
     };
   });
 
