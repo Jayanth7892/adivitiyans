@@ -1,231 +1,137 @@
-import React from 'react';
-import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+﻿import React from "react";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard,
-  FileBarChart,
-  Award,
-  User,
-  CheckCircle2,
-  FileText,
-  Users,
-  LogOut,
-  X,
-  ShieldCheck,
-  BarChart2,
-  PieChart,
-  Building2,
-  LucideIcon,
-} from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+  LayoutDashboard, FileBarChart, Award, User, CheckCircle2,
+  Users, LogOut, BarChart2, PieChart, Building2, ShieldCheck, LucideIcon,
+} from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 
 interface SidebarProps {
   isOpen: boolean;
+  collapsed: boolean;
   onClose: () => void;
 }
 
-interface NavItem {
-  label: string;
-  path: string;
-  icon: LucideIcon;
-  phase2?: boolean;
-}
+interface NavItem { label: string; path: string; icon: LucideIcon; soon?: boolean; }
+interface NavGroup { title: string; items: NavItem[]; }
 
-interface NavGroup {
-  title: string;
-  items: NavItem[];
-}
-
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const { user, role, logout } = useAuth();
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) => {
+  const { role, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = () => { logout(); navigate("/login"); };
+
+  const isItemActive = (p: string) => {
+    const cur = location.pathname + location.search;
+    if (p.includes("?")) return cur === p;
+    if (p === "/admin/dashboard") return location.pathname === "/admin/dashboard" && (!location.search || location.search === "?tab=students");
+    return location.pathname === p;
   };
 
-  const isItemActive = (itemPath: string) => {
-    const currentPathWithSearch = location.pathname + location.search;
-
-    if (itemPath.includes('?')) {
-      return currentPathWithSearch === itemPath;
-    }
-    if (itemPath === '/admin/dashboard') {
-      return location.pathname === '/admin/dashboard' && (!location.search || location.search === '?tab=students');
-    }
-    return location.pathname === itemPath;
-  };
-
-  // Role-aware Navigation Configurations - Cleaned up & exact query param matching
-  const studentNavGroups: NavGroup[] = [
-    {
-      title: 'OVERVIEW',
-      items: [
-        { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-        { label: 'Overall Report', path: '/profile?tab=coding-profiles', icon: PieChart },
-        { label: 'Program Leaderboard', path: '/coding-analytics', icon: BarChart2 },
-      ],
-    },
-    {
-      title: 'STUDENT PROFILE',
-      items: [
-        { label: 'My 360° Profile', path: '/profile?tab=personal-info', icon: User },
-      ],
-    },
-    {
-      title: 'CAREER & PORTFOLIO',
-      items: [
-        { label: 'Certificates', path: '/profile?tab=certifications', icon: CheckCircle2 },
-        { label: 'Resume Builder', path: '/resume-builder', icon: FileText, phase2: true },
-      ],
-    },
+  const studentGroups: NavGroup[] = [
+    { title: "OVERVIEW", items: [
+      { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+      { label: "Overall Report", path: "/profile?tab=coding-profiles", icon: PieChart },
+      { label: "Program Leaderboard", path: "/coding-analytics", icon: BarChart2 },
+    ]},
+    { title: "STUDENT PROFILE", items: [
+      { label: "My 360° Profile", path: "/profile?tab=personal-info", icon: User },
+      { label: "Certifications", path: "/profile?tab=certifications", icon: CheckCircle2 },
+    ]},
   ];
 
-  const facultyNavGroups: NavGroup[] = [
-    {
-      title: 'FACULTY PORTAL',
-      items: [
-        { label: 'Faculty Dashboard', path: '/faculty/dashboard', icon: LayoutDashboard },
-        { label: 'Mentee Directory', path: '/faculty/dashboard?tab=mentees', icon: Users },
-        { label: 'Department CGPA Analytics', path: '/faculty/dashboard?tab=analytics', icon: FileBarChart },
-      ],
-    },
+  const facultyGroups: NavGroup[] = [
+    { title: "FACULTY PORTAL", items: [
+      { label: "Faculty Dashboard", path: "/faculty/dashboard", icon: LayoutDashboard },
+      { label: "Mentee Directory", path: "/faculty/dashboard?tab=mentees", icon: Users },
+      { label: "Dept CGPA Analytics", path: "/faculty/dashboard?tab=analytics", icon: FileBarChart },
+    ]},
   ];
 
-  const adminNavGroups: NavGroup[] = [
-    {
-      title: 'ADMINISTRATION',
-      items: [
-        { label: 'Admin Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
-        { label: 'Student Directory (CRUD)', path: '/admin/dashboard?tab=students', icon: Users },
-        { label: 'CGPA & Top Performers', path: '/admin/dashboard?tab=performance', icon: Award },
-        { label: 'Faculty & Mentors', path: '/admin/dashboard?tab=faculty', icon: ShieldCheck },
-        { label: 'Coding Leaderboard', path: '/coding-analytics', icon: BarChart2 },
-      ],
-    },
+  const adminGroups: NavGroup[] = [
+    { title: "ADMINISTRATION", items: [
+      { label: "Admin Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
+      { label: "Student Directory", path: "/admin/dashboard?tab=students", icon: Users },
+      { label: "CGPA & Top Performers", path: "/admin/dashboard?tab=performance", icon: Award },
+      { label: "Faculty & Mentors", path: "/admin/dashboard?tab=faculty", icon: ShieldCheck },
+      { label: "Coding Leaderboard", path: "/coding-analytics", icon: BarChart2 },
+    ]},
   ];
 
-  const hodNavGroups: NavGroup[] = [
-    {
-      title: 'HOD PORTAL',
-      items: [
-        { label: 'Department Overview', path: '/hod/dashboard?tab=overview', icon: Building2 },
-        { label: 'Student Directory', path: '/hod/dashboard?tab=students', icon: Users },
-        { label: 'CGPA & Rankings', path: '/hod/dashboard?tab=rankings', icon: Award },
-        { label: 'Coding Leaderboard', path: '/coding-analytics', icon: BarChart2 },
-      ],
-    },
+  const hodGroups: NavGroup[] = [
+    { title: "HOD PORTAL", items: [
+      { label: "Department Overview", path: "/hod/dashboard?tab=overview", icon: Building2 },
+      { label: "Student Directory", path: "/hod/dashboard?tab=students", icon: Users },
+      { label: "CGPA & Rankings", path: "/hod/dashboard?tab=rankings", icon: Award },
+      { label: "Coding Leaderboard", path: "/coding-analytics", icon: BarChart2 },
+    ]},
   ];
 
-  const activeNavGroups =
-    role === 'admin'
-      ? adminNavGroups
-      : role === 'faculty'
-      ? facultyNavGroups
-      : role === 'hod'
-      ? hodNavGroups
-      : studentNavGroups;
-
-  const footerDisplayName = user?.name || (user?.email ? user.email.split('@')[0] : 'User');
-  const footerInitials = footerDisplayName
-    .split(' ')
-    .filter(Boolean)
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase() || 'U';
+  const groups = role === "admin" ? adminGroups : role === "faculty" ? facultyGroups : role === "hod" ? hodGroups : studentGroups;
 
   return (
     <>
-      {/* Mobile Backdrop */}
-      {isOpen && (
-        <div
-          onClick={onClose}
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-sm transition-opacity"
-        />
-      )}
-
+      {isOpen && <div onClick={onClose} className="fixed inset-0 bg-black/40 z-40 lg:hidden backdrop-blur-sm" />}
       <aside
-        className={`fixed top-0 left-0 bottom-0 w-[260px] bg-surface border-r border-borderLine z-50 flex flex-col transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
+        className={[
+          "fixed top-0 left-0 bottom-0 z-50 flex flex-col bg-white border-r border-gray-100 transition-all duration-300 ease-in-out overflow-hidden",
+          collapsed ? "lg:w-14" : "lg:w-[220px]",
+          isOpen ? "w-[220px] translate-x-0" : "w-[220px] -translate-x-full",
+          "lg:translate-x-0",
+        ].join(" ")}
+        style={{ boxShadow: "2px 0 16px 0 rgba(0,0,0,0.05)" }}
       >
-        {/* Logo Top Bar */}
-        <div className="h-16 px-6 flex items-center justify-between border-b border-borderLine shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center text-white font-black text-lg shadow-sm">
-              A
-            </div>
-            <span className="text-xl font-extrabold tracking-tight text-textPrimary">
-              Adviti<span className="text-brand-accent">yans</span>
-            </span>
+        {/* Logo */}
+        <div className="h-16 flex items-center border-b border-gray-100 shrink-0 px-4 overflow-hidden">
+          <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm select-none">A</div>
+          <div className={["ml-2.5 overflow-hidden transition-all duration-300", collapsed ? "lg:w-0 lg:opacity-0" : "w-auto opacity-100"].join(" ")}>
+            <p className="text-sm font-extrabold tracking-tight text-textPrimary whitespace-nowrap">Adviti<span className="text-brand-primary">yans</span></p>
+            <p className="text-[9px] text-gray-400 font-medium uppercase tracking-wider whitespace-nowrap">RGMCET Student 360</p>
           </div>
-          <button
-            onClick={onClose}
-            className="lg:hidden p-1.5 rounded-lg text-textSecondary hover:bg-background"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
-        {/* Scrollable Navigation */}
-        <div className="flex-1 overflow-y-auto py-6 px-4 space-y-6">
-          {activeNavGroups.map((group) => (
-            <div key={group.title}>
-              <p className="px-3 text-[11px] font-semibold text-textSecondary uppercase tracking-wider mb-2">
-                {group.title}
-              </p>
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  const active = isItemActive(item.path);
-
-                  return (
-                    <NavLink
-                      key={item.label + item.path}
-                      to={item.path}
-                      onClick={() => onClose()}
-                      className={
-                        `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                          active && !item.phase2
-                            ? 'bg-brand-soft text-brand-primary font-semibold'
-                            : 'text-textSecondary hover:bg-background hover:text-textPrimary'
-                        }`
-                      }
-                    >
-                      <Icon className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                      {item.phase2 && (
-                        <span className="ml-auto text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-normal">
-                          Soon
-                        </span>
-                      )}
-                    </NavLink>
-                  );
-                })}
+        {/* Nav */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden py-3">
+          {groups.map((group) => (
+            <div key={group.title} className="mb-2">
+              <div className={["overflow-hidden transition-all duration-300", collapsed ? "lg:h-0 lg:opacity-0" : "h-auto opacity-100"].join(" ")}>
+                <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">{group.title}</p>
               </div>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = isItemActive(item.path);
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    onClick={onClose}
+                    title={item.label}
+                    className={[
+                      "flex items-center mx-2 mb-0.5 rounded-lg text-sm font-medium transition-all duration-150 gap-3",
+                      collapsed ? "lg:justify-center lg:px-0 lg:py-3 px-3 py-2.5" : "px-3 py-2.5",
+                      active && !item.soon ? "bg-brand-soft text-brand-primary font-semibold" : "text-gray-500 hover:bg-gray-50 hover:text-gray-800",
+                    ].join(" ")}
+                  >
+                    <Icon className="w-[18px] h-[18px] shrink-0" />
+                    <span className={["truncate transition-all duration-300", collapsed ? "lg:hidden" : "block"].join(" ")}>{item.label}</span>
+                    {item.soon && <span className={["ml-auto text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded shrink-0", collapsed ? "lg:hidden" : ""].join(" ")}>Soon</span>}
+                  </NavLink>
+                );
+              })}
             </div>
           ))}
         </div>
 
-        {/* User Footer Profile & Logout */}
-        <div className="p-4 border-t border-borderLine bg-surface shrink-0">
-          <div className="flex items-center gap-3 mb-3 p-2 rounded-lg bg-background">
-            <div className="w-9 h-9 rounded-full bg-brand-primary text-white font-bold flex items-center justify-center text-xs shrink-0">
-              {footerInitials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-textPrimary truncate">{footerDisplayName}</p>
-              <p className="text-[11px] text-brand-primary font-bold uppercase truncate">{role}</p>
-            </div>
-          </div>
-
+        {/* Logout */}
+        <div className="shrink-0 border-t border-gray-100 p-2">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-alert hover:bg-alert-soft rounded-lg transition-colors"
+            title="Log out"
+            className={["w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors", collapsed ? "lg:justify-center" : ""].join(" ")}
           >
-            <LogOut className="w-4 h-4" />
-            <span>Log out</span>
+            <LogOut className="w-[18px] h-[18px] shrink-0" />
+            <span className={collapsed ? "lg:hidden" : ""}>Log out</span>
           </button>
         </div>
       </aside>

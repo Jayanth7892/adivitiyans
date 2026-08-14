@@ -111,7 +111,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
 
   return (
     <header className="h-16 bg-surface border-b border-borderLine px-4 md:px-8 flex items-center justify-between sticky top-0 z-30 shadow-xs">
-      {/* Left side */}
+      {/* Left side — hamburger + app name */}
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuToggle}
@@ -120,12 +120,6 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
         >
           <Menu className="w-5 h-5" />
         </button>
-
-        <Link to="/" className="flex items-center gap-2 group">
-          <h2 className="text-base font-bold text-textPrimary tracking-tight">
-            <span>A</span><span className="text-brand-primary">D</span><span>VITIYAN</span><span className="text-brand-primary">S</span>
-          </h2>
-        </Link>
       </div>
 
       {/* Right side */}

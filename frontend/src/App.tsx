@@ -64,7 +64,8 @@ const RoleDashboardRedirect: React.FC = () => {
 };
 
 const MainLayout: React.FC = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);   // mobile overlay
+  const [collapsed, setCollapsed] = useState(false);             // desktop icon-only
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -84,9 +85,23 @@ const MainLayout: React.FC = () => {
 
   return (
     <div className="h-dvh bg-background flex overflow-hidden">
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-      <div className="flex-1 flex flex-col lg:pl-[260px] min-w-0">
-        <TopBar onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
+      <Sidebar
+        isOpen={isSidebarOpen}
+        collapsed={collapsed}
+        onClose={() => setIsSidebarOpen(false)}
+      />
+      {/* Content shifts right based on sidebar width */}
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${collapsed ? 'lg:pl-14' : 'lg:pl-[220px]'}`}>
+        <TopBar
+          onMenuToggle={() => {
+            // mobile: open overlay; desktop: toggle collapse
+            if (window.innerWidth >= 1024) {
+              setCollapsed((c) => !c);
+            } else {
+              setIsSidebarOpen(!isSidebarOpen);
+            }
+          }}
+        />
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-7xl w-full mx-auto">
             <Suspense fallback={<DashboardSkeleton />}>
