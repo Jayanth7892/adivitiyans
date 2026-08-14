@@ -26,9 +26,18 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     token = sessionToken;
   }
 
+  let userEmail = '';
+  try {
+    const savedUser = sessionStorage.getItem('advitiyans_auth_user');
+    if (savedUser) {
+      userEmail = JSON.parse(savedUser).email || '';
+    }
+  } catch { /* ignore */ }
+
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(userEmail ? { 'X-Caller-Email': userEmail } : {}),
     ...options.headers,
   };
 

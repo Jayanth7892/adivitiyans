@@ -181,7 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (jwtToken) {
       sessionStorage.setItem(JWT_TOKEN_KEY, jwtToken);
     } else {
-      sessionStorage.setItem(JWT_TOKEN_KEY, `demo_token_${userRole}_${Date.now()}`);
+      sessionStorage.setItem(JWT_TOKEN_KEY, `demo_token_${userRole}_${encodeURIComponent(email)}_${Date.now()}`);
     }
   };
 

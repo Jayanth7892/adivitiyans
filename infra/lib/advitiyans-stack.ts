@@ -278,7 +278,7 @@ export class AdvitiyansStack extends cdk.Stack {
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: apigateway.Cors.DEFAULT_HEADERS.concat(['x-admin-secret', 'caller_email', 'X-Requested-With']),
+        allowHeaders: apigateway.Cors.DEFAULT_HEADERS.concat(['x-admin-secret', 'caller_email', 'x-caller-email', 'X-Requested-With']),
       },
     });
 
