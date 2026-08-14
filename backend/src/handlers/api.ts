@@ -1272,15 +1272,22 @@ app.delete('/students', requireRole('admin'), async (_req: Request, res: Respons
       db.mockStore.students.clear();
       return res.json({ message: 'All student records cleared from mock store' });
     }
+
+    // Gather emails/rolls BEFORE truncate so we know who to clean up in Cognito
     const allStudents = await db.query('SELECT email, roll_number FROM students').catch(() => ({ rows: [] }));
     const allEmails = allStudents.rows.map((r: any) => r.email).filter(Boolean);
     const allRolls = allStudents.rows.map((r: any) => r.roll_number).filter(Boolean);
 
+    // DB truncate is the authoritative step — must succeed
     await db.query('TRUNCATE TABLE students CASCADE');
-    await deleteCognitoUsers([...allEmails, ...allRolls]).catch(() => {});
-    await deleteAllCognitoUsers().catch(() => {});
 
-    res.json({ message: 'All existing student records deleted successfully from database and Cognito' });
+    // Cognito cleanup is best-effort: failure must NOT cause a 500
+    Promise.allSettled([
+      deleteCognitoUsers([...allEmails, ...allRolls]),
+      deleteAllCognitoUsers(),
+    ]).catch(() => {}); // .catch is a safety net — allSettled never rejects
+
+    res.json({ message: 'All existing student records deleted successfully from database. Cognito cleanup running in background.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1297,23 +1304,25 @@ app.delete('/students/:id', requireRole('admin'), async (req: Request, res: Resp
       return res.json({ message: `Student ${studentId} deleted successfully` });
     }
 
+    // Resolve email BEFORE delete for Cognito cleanup
     let studentEmail = `${studentId.toLowerCase()}@rgmcet.edu.in`;
     const existingRes = await db.query('SELECT email FROM students WHERE UPPER(roll_number) = $1', [studentId]);
     if (existingRes.rows.length > 0 && existingRes.rows[0].email) {
       studentEmail = existingRes.rows[0].email.toLowerCase();
     }
 
+    // DB delete is the authoritative step
     const result = await db.query('DELETE FROM students WHERE UPPER(roll_number) = $1 RETURNING roll_number', [studentId]);
     if (result.rows.length === 0) {
-      // Even if not in DB, ensure Cognito is clean
-      await deleteCognitoUsers([studentId, studentEmail]).catch(() => {});
+      // Not in DB — fire Cognito cleanup anyway, then return 404
+      deleteCognitoUsers([studentId, studentEmail]).catch(() => {});
       return res.status(404).json({ error: 'Student not found in database' });
     }
 
-    // Delete from AWS Cognito User Pool & user_sessions
-    await deleteCognitoUsers([studentId, studentEmail]).catch(() => {});
+    // Cognito + session cleanup: fire-and-forget so Cognito errors never cause a 500
+    deleteCognitoUsers([studentId, studentEmail]).catch(() => {});
 
-    res.json({ message: `Student ${studentId} deleted successfully from database and Cognito` });
+    res.json({ message: `Student ${studentId} deleted successfully` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1338,22 +1347,24 @@ app.post('/admin/students/bulk-delete', requireRole('admin'), async (req: Reques
       return res.json({ deleted, message: `${deleted} student(s) deleted from mock store` });
     }
 
+    // Resolve emails BEFORE delete for Cognito cleanup
     let emailsToDelete: string[] = [];
     const existingRes = await db.query('SELECT email FROM students WHERE UPPER(roll_number) = ANY($1)', [ids]);
     if (existingRes.rows.length > 0) {
       emailsToDelete = existingRes.rows.map((r: any) => r.email).filter(Boolean);
     }
 
+    // DB delete is the authoritative step
     const result = await db.query(
       'DELETE FROM students WHERE UPPER(roll_number) = ANY($1) RETURNING roll_number',
       [ids]
     );
     const deleted = result.rows.length;
 
-    // Delete from AWS Cognito User Pool & user_sessions
-    await deleteCognitoUsers([...ids, ...emailsToDelete]).catch(() => {});
+    // Cognito + session cleanup: fire-and-forget — Cognito errors must NOT cause a 500
+    deleteCognitoUsers([...ids, ...emailsToDelete]).catch(() => {});
 
-    res.json({ deleted, message: `${deleted} student(s) deleted successfully from database and Cognito` });
+    res.json({ deleted, message: `${deleted} student(s) deleted successfully` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

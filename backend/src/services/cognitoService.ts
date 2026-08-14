@@ -13,7 +13,7 @@ const cognitoClient = new CognitoIdentityProviderClient({
 export async function deleteCognitoUsers(identifiers: (string | undefined | null)[]): Promise<void> {
   const userPoolId = process.env.COGNITO_USER_POOL_ID;
   const validIds = identifiers.filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
-  if (validIds.length === 0) return;
+  if (validIds.length === 0 || !userPoolId) return;
 
   const targets = new Set<string>();
   for (const id of validIds) {
@@ -27,60 +27,58 @@ export async function deleteCognitoUsers(identifiers: (string | undefined | null
   }
 
   // 1. Scan / Match user UUIDs in Cognito User Pool
-  if (userPoolId) {
-    try {
-      let paginationToken: string | undefined = undefined;
-      const cognitoUsernamesToDelete = new Set<string>();
+  try {
+    let paginationToken: string | undefined = undefined;
+    const cognitoUsernamesToDelete = new Set<string>();
 
-      do {
-        const res: any = await cognitoClient.send(
-          new ListUsersCommand({
-            UserPoolId: userPoolId,
-            PaginationToken: paginationToken,
-            Limit: 60,
-          })
-        );
+    do {
+      const res: any = await cognitoClient.send(
+        new ListUsersCommand({
+          UserPoolId: userPoolId,
+          PaginationToken: paginationToken,
+          Limit: 60,
+        })
+      );
 
-        for (const u of res.Users || []) {
-          const email = (u.Attributes?.find((a: any) => a.Name === 'email')?.Value || '').toLowerCase();
-          const regNo = (u.Attributes?.find((a: any) => a.Name === 'custom:reg_no')?.Value || '').toLowerCase();
-          const username = u.Username;
+      for (const u of res.Users || []) {
+        const email = (u.Attributes?.find((a: any) => a.Name === 'email')?.Value || '').toLowerCase();
+        const regNo = (u.Attributes?.find((a: any) => a.Name === 'custom:reg_no')?.Value || '').toLowerCase();
+        const username = u.Username;
 
-          // Match by internal UUID, email, or registration number
-          if (
-            targets.has(username.toLowerCase()) ||
-            (email && targets.has(email)) ||
-            (regNo && targets.has(regNo))
-          ) {
-            cognitoUsernamesToDelete.add(username);
-          }
-        }
-
-        paginationToken = res.PaginationToken;
-      } while (paginationToken);
-
-      console.log(`[Cognito] Found ${cognitoUsernamesToDelete.size} Cognito user(s) to delete:`, Array.from(cognitoUsernamesToDelete));
-
-      for (const username of cognitoUsernamesToDelete) {
-        try {
-          await cognitoClient.send(
-            new AdminDeleteUserCommand({
-              UserPoolId: userPoolId,
-              Username: username,
-            })
-          );
-          console.log(`[Cognito] Successfully deleted user UUID ${username} from User Pool ${userPoolId}`);
-        } catch (err: any) {
-          if (err.name === 'UserNotFoundException' || err.__type === 'UserNotFoundException') {
-            console.log(`[Cognito] User UUID "${username}" already removed from User Pool.`);
-          } else {
-            console.warn(`[Cognito] Failed to delete user UUID "${username}" from Cognito:`, err.message);
-          }
+        // Match by internal UUID, email, or registration number
+        if (
+          targets.has(username.toLowerCase()) ||
+          (email && targets.has(email)) ||
+          (regNo && targets.has(regNo))
+        ) {
+          cognitoUsernamesToDelete.add(username);
         }
       }
-    } catch (scanErr: any) {
-      console.warn('[Cognito] Error searching users to delete:', scanErr.message);
+
+      paginationToken = res.PaginationToken;
+    } while (paginationToken);
+
+    console.log(`[Cognito] Found ${cognitoUsernamesToDelete.size} Cognito user(s) to delete:`, Array.from(cognitoUsernamesToDelete));
+
+    for (const username of cognitoUsernamesToDelete) {
+      try {
+        await cognitoClient.send(
+          new AdminDeleteUserCommand({
+            UserPoolId: userPoolId,
+            Username: username,
+          })
+        );
+        console.log(`[Cognito] Successfully deleted user UUID ${username} from User Pool ${userPoolId}`);
+      } catch (err: any) {
+        if (err.name === 'UserNotFoundException' || err.__type === 'UserNotFoundException') {
+          console.log(`[Cognito] User UUID "${username}" already removed from User Pool.`);
+        } else {
+          console.warn(`[Cognito] Failed to delete user UUID "${username}" from Cognito:`, err.message);
+        }
+      }
     }
+  } catch (scanErr: any) {
+    console.warn('[Cognito] Error processing Cognito deletions:', scanErr.message);
   }
 
   // 2. Invalidate active sessions in user_sessions table

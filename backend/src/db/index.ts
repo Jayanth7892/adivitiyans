@@ -325,6 +325,17 @@ async function ensureSchema(p: Pool) {
     `INSERT INTO admin_accounts (email, name, password, created_by) VALUES
       ('admin@rgmcet.edu.in', 'College Administrator', 'admin@2026', 'System')
      ON CONFLICT (email) DO NOTHING;`,
+
+    // Single-session enforcement table — one active session per email
+    // Must exist before any delete route tries to clean up user_sessions
+    `CREATE TABLE IF NOT EXISTS user_sessions (
+      email VARCHAR(100) PRIMARY KEY,
+      session_token VARCHAR(255) NOT NULL,
+      role VARCHAR(20) NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      expires_at TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
+    );`,
   ];
 
   try {
