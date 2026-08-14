@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch: # Allows manual trigger from GitHub Actions UI
 
+concurrency:
+  group: aws-deployment
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Build & Deploy to AWS
