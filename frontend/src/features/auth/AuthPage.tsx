@@ -461,7 +461,9 @@ export const AuthPage: React.FC = () => {
         <div className="inline-flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-brand-primary text-white font-black text-xl sm:text-2xl shadow-lg shadow-brand-primary/30 mb-2 sm:mb-4">
           A
         </div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-textPrimary tracking-tight">Advitiyans</h2>
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-textPrimary tracking-tight">
+          <span>A</span><span className="text-brand-primary">D</span><span>VITIYAN</span><span className="text-brand-primary">S</span>
+        </h2>
         <p className="mt-1 sm:mt-1.5 text-xs sm:text-sm text-textSecondary">Student 360°, Faculty & Placement Cell Platform</p>
       </div>
 

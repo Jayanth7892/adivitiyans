@@ -56,7 +56,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
     { name: 'System Admin Dashboard', path: '/admin', category: 'Page' },
   ];
 
-  // Perform search with debounce to prevent race conditions
+  // Perform search with debounce + cancellation to prevent race conditions
   useEffect(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) {
@@ -68,13 +68,16 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
     setIsSearchOpen(true);
     setSearching(true);
 
+    // cancelled is a mutable object so the cleanup closure can reach it after
+    // the setTimeout fires — fixes the stale-response race condition
+    const guard = { cancelled: false };
+
     const debounceTimer = setTimeout(() => {
-      let cancelled = false;
       const matchedPages = SYSTEM_PAGES.filter(p => p.name.toLowerCase().includes(query));
 
       api.getAllStudents({ search: query })
         .then((students) => {
-          if (!cancelled) {
+          if (!guard.cancelled) {
             setSearchResults({
               students: students.slice(0, 5),
               pages: matchedPages,
@@ -82,7 +85,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
           }
         })
         .catch(() => {
-          if (!cancelled) {
+          if (!guard.cancelled) {
             setSearchResults({
               students: [],
               pages: matchedPages,
@@ -90,13 +93,14 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
           }
         })
         .finally(() => {
-          if (!cancelled) setSearching(false);
+          if (!guard.cancelled) setSearching(false);
         });
-
-      // Return cleanup for the inner scope (handled by outer return)
     }, 300);
 
-    return () => clearTimeout(debounceTimer);
+    return () => {
+      guard.cancelled = true;  // cancel any in-flight fetch from previous query
+      clearTimeout(debounceTimer);
+    };
   }, [searchQuery]);
 
   const handleLogout = () => {
@@ -111,7 +115,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuToggle}
-          className="lg:hidden p-2 rounded-lg text-textSecondary hover:bg-background transition-colors"
+          className="p-2 rounded-lg text-textSecondary hover:bg-background transition-colors"
           aria-label="Toggle Navigation Menu"
         >
           <Menu className="w-5 h-5" />
