@@ -581,7 +581,17 @@ app.get('/settings/semester-unlock', async (_req: Request, res: Response) => {
   }
 });
 
-// PUT /settings/semester-unlock — HOD/Admin unlocks next semesters for a year batch
+// Per-year minimum semester floors — HOD cannot unlock fewer than these
+const YEAR_MIN_SEMESTER: Record<string, number> = {
+  '1st Year': 0,
+  '2nd Year': 2,
+  '3rd Year': 4,
+  '4th Year': 6,
+};
+
+// PUT /settings/semester-unlock — HOD/Admin locks or unlocks semesters for a year batch
+// When decreasing max_semester, cascade-deletes all academics rows above the new max
+// for every student in that year batch (including CGPA recalculation trigger).
 app.put('/settings/semester-unlock', requireRole('hod', 'admin'), async (req: Request, res: Response) => {
   try {
     const { year_label, max_semester } = req.body;
@@ -592,10 +602,41 @@ app.put('/settings/semester-unlock', requireRole('hod', 'admin'), async (req: Re
     if (isNaN(newMax) || newMax < 0 || newMax > 8) {
       return res.status(400).json({ error: 'max_semester must be between 0 and 8' });
     }
-    if (db.isMock) {
-      mockSemesterUnlock[year_label] = newMax;
-      return res.json({ year_label, max_semester: newMax, updated_at: new Date().toISOString() });
+
+    // Enforce per-year minimum floor — prevents setting below the fixed minimum
+    const minFloor = YEAR_MIN_SEMESTER[year_label] ?? 0;
+    if (newMax < minFloor) {
+      return res.status(400).json({
+        error: `Cannot set max_semester below ${minFloor} for ${year_label}.`,
+      });
     }
+
+    if (db.isMock) {
+      const oldMax = mockSemesterUnlock[year_label] ?? 0;
+      mockSemesterUnlock[year_label] = newMax;
+      // In mock mode: also filter out academics above newMax
+      let deletedCount = 0;
+      if (newMax < oldMax) {
+        for (const [rollNo, recs] of db.mockStore.academics.entries()) {
+          const before = recs.length;
+          const filtered = recs.filter((r: any) => Number(r.semester) <= newMax);
+          if (filtered.length !== before) {
+            db.mockStore.academics.set(rollNo, filtered);
+            deletedCount += before - filtered.length;
+          }
+        }
+      }
+      return res.json({ year_label, max_semester: newMax, deleted_count: deletedCount, updated_at: new Date().toISOString() });
+    }
+
+    // Get the current max before updating so we know if we're decreasing
+    const currentRes = await db.query(
+      `SELECT max_semester FROM semester_unlock_settings WHERE year_label = $1`,
+      [year_label]
+    );
+    const oldMax = currentRes.rows.length > 0 ? Number(currentRes.rows[0].max_semester) : newMax;
+
+    // Upsert the new max
     const result = await db.query(
       `INSERT INTO semester_unlock_settings (year_label, max_semester, updated_at)
        VALUES ($1, $2, NOW())
@@ -603,7 +644,23 @@ app.put('/settings/semester-unlock', requireRole('hod', 'admin'), async (req: Re
        RETURNING *`,
       [year_label, newMax]
     );
-    res.json(result.rows[0]);
+
+    let deletedCount = 0;
+
+    // Cascade-delete academics above new max for all students in this year batch
+    if (newMax < oldMax) {
+      const deleteRes = await db.query(
+        `DELETE FROM academics
+         WHERE semester > $1
+           AND student_id IN (
+             SELECT roll_number FROM students WHERE year = $2
+           )`,
+        [newMax, year_label]
+      );
+      deletedCount = deleteRes.rowCount ?? 0;
+    }
+
+    res.json({ ...result.rows[0], deleted_count: deletedCount });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

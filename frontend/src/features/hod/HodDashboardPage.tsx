@@ -1309,14 +1309,33 @@ export const HodDashboardPage: React.FC = () => {
                 const handleLock = async (delta: 1 | 2) => {
                   const newMax = Math.max(current - delta, min);
                   if (newMax === current) return;
+
+                  // Build a clear warning: tell HOD exactly which semesters will be wiped
+                  const semsToDelete: number[] = [];
+                  for (let s = newMax + 1; s <= current; s++) semsToDelete.push(s);
+                  const semList = semsToDelete.map(s => `Sem ${s}`).join(', ');
+                  const confirmed = window.confirm(
+                    `⚠️ Lock Semesters for ${year}\n\n` +
+                    `This will permanently delete all SGPA records for ${semList} ` +
+                    `for all ${year} students.\n\n` +
+                    `• Students will no longer see those semester cards or chart points.\n` +
+                    `• CGPA will recalculate automatically.\n` +
+                    `• This cannot be undone.\n\n` +
+                    `Click OK to confirm deletion.`
+                  );
+                  if (!confirmed) return;
+
                   setUnlockSavingYear(year);
                   try {
                     const updated = await api.updateSemesterUnlock(year, newMax);
                     setUnlockSettings(prev => prev.map(s =>
                       s.year_label === year ? { ...s, max_semester: updated.max_semester } : s
                     ));
+                    if (updated.deleted_count && updated.deleted_count > 0) {
+                      alert(`✅ Done. Locked ${year} to Sem ${newMax}.\n${updated.deleted_count} academic record(s) deleted.`);
+                    }
                   } catch (e: any) {
-                    alert('Failed to update: ' + e.message);
+                    alert('Failed to lock semester: ' + e.message);
                   } finally {
                     setUnlockSavingYear(null);
                   }

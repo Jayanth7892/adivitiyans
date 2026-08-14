@@ -372,7 +372,7 @@ export const api = {
     return fetchWithAuth('/settings/semester-unlock');
   },
 
-  updateSemesterUnlock: async (yearLabel: string, maxSemester: number): Promise<{ year_label: string; max_semester: number }> => {
+  updateSemesterUnlock: async (yearLabel: string, maxSemester: number): Promise<{ year_label: string; max_semester: number; deleted_count?: number }> => {
     return fetchWithAuth('/settings/semester-unlock', {
       method: 'PUT',
       body: JSON.stringify({ year_label: yearLabel, max_semester: maxSemester }),
