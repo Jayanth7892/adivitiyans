@@ -17,6 +17,9 @@ import {
   RGMCET_EMAIL_REGEX,
 } from '../lib/validation';
 import { extractAuth, requireAuth, requireRole, requireOwnerOrRole } from '../lib/authMiddleware';
+import bcrypt from 'bcrypt';
+
+const BCRYPT_ROUNDS = 10;
 
 const app = express();
 app.use(cors());
@@ -159,6 +162,27 @@ app.get('/db-migrate', async (req: Request, res: Response) => {
     `).catch(() => {});
     results.push('performance indexes ensured');
 
+    // Migration 4: Rehash any plain-text student passwords to bcrypt
+    // Detects un-hashed entries (bcrypt hashes always start with '$2b$') and upgrades them.
+    // Safe to re-run: already-hashed passwords are skipped.
+    try {
+      const plainPasswords = await db.query(
+        `SELECT roll_number, password FROM student_passwords WHERE password NOT LIKE '$2b$%'`
+      );
+      let rehashed = 0;
+      for (const row of plainPasswords.rows) {
+        const hash = await bcrypt.hash(String(row.password), BCRYPT_ROUNDS);
+        await db.query(
+          `UPDATE student_passwords SET password = $1, updated_at = NOW() WHERE roll_number = $2`,
+          [hash, row.roll_number]
+        );
+        rehashed++;
+      }
+      results.push(`student_passwords: rehashed ${rehashed} plain-text password(s) to bcrypt`);
+    } catch {
+      results.push('student_passwords: bcrypt rehash skipped (table may not exist yet)');
+    }
+
     return res.json({ status: 'ok', migrations: results });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -240,14 +264,23 @@ app.post('/auth/admin-login', async (req: Request, res: Response) => {
       }
     }
 
-    // ── Priority 3: Legacy env-var admin (backwards compatible) ───────────────
-    const adminEmail = (process.env.ADMIN_MASTER_EMAIL || 'admin@rgmcet.edu.in').toLowerCase();
-    const adminPass  = process.env.ADMIN_MASTER_PASS || 'admin@2026';
-    const hodEmail   = (process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in').toLowerCase();
-    const hodPass    = process.env.HOD_MASTER_PASS || 'cseds@2026';
+    // ── Priority 3: Legacy env-var admin/HOD (fails closed if env vars not set) ──
+    const adminEmail = process.env.ADMIN_MASTER_EMAIL?.toLowerCase();
+    const adminPass  = process.env.ADMIN_MASTER_PASS;
+    const hodEmail   = process.env.HOD_MASTER_EMAIL?.toLowerCase();
+    const hodPass    = process.env.HOD_MASTER_PASS;
 
-    if (adminEmail && emailLower === adminEmail && adminPass && password === adminPass) {
-      return res.json({ valid: true, role: 'admin', isSuperAdmin: false, email: adminEmail });
+    // Brute-force protection: every failed branch now has a minimum 500ms delay
+    const failWithDelay = async (msg: string) => {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return res.status(401).json({ valid: false, error: msg });
+    };
+
+    if (adminEmail && emailLower === adminEmail) {
+      if (adminPass && password === adminPass) {
+        return res.json({ valid: true, role: 'admin', isSuperAdmin: false, email: adminEmail });
+      }
+      return failWithDelay('Invalid email or password.');
     }
 
     // Check DB-persisted HOD credentials first (takes precedence over env vars when set)
@@ -259,23 +292,24 @@ app.post('/auth/admin-login', async (req: Request, res: Response) => {
           if (emailLower === hodRow.email.toLowerCase() && password === hodRow.password) {
             return res.json({ valid: true, role: 'hod', email: hodRow.email });
           }
-          // If HOD credentials are in DB but don't match, fall through to error
-          await new Promise(resolve => setTimeout(resolve, 600));
-          return res.status(401).json({ valid: false, error: 'Invalid email or password.' });
+          // Email matched a DB HOD row but password wrong
+          return failWithDelay('Invalid email or password.');
         }
-      } catch (dbErr) {
+      } catch {
         // hod_credentials table may not exist yet — fall back to env vars
       }
     }
 
     // Fall back to env var HOD credentials
-    if (hodEmail && emailLower === hodEmail && hodPass && password === hodPass) {
-      return res.json({ valid: true, role: 'hod', email: hodEmail });
+    if (hodEmail && emailLower === hodEmail) {
+      if (hodPass && password === hodPass) {
+        return res.json({ valid: true, role: 'hod', email: hodEmail });
+      }
+      return failWithDelay('Invalid email or password.');
     }
 
-    // Small artificial delay to slow brute-force attempts
-    await new Promise(resolve => setTimeout(resolve, 600));
-    return res.status(401).json({ valid: false, error: 'Invalid email or password.' });
+    // Unknown email — delay then reject
+    return failWithDelay('Invalid email or password.');
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -422,21 +456,21 @@ app.put('/super-admin/my-password', requireRole('admin'), async (req: Request, r
 // POST /auth/hod-credentials/admin-reset — Admin resets HOD credentials (no current password needed)
 // ============================================================================
 
-// GET /auth/hod-credentials — returns current HOD email AND password (admin-facing)
+// GET /auth/hod-credentials — returns current HOD email only (password REDACTED for security)
 app.get('/auth/hod-credentials', requireRole('hod', 'admin'), async (_req: Request, res: Response) => {
   try {
-    const hodEmailEnv = (process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in');
-    const hodPassEnv  = (process.env.HOD_MASTER_PASS  || 'cseds@2026');
+    const hodEmailEnv = process.env.HOD_MASTER_EMAIL || null;
 
     if (db.isMock) {
-      return res.json({ email: hodEmailEnv, password: hodPassEnv, source: 'env', updated_at: null });
+      return res.json({ email: hodEmailEnv || 'hodcseds@rgmcet.edu.in', password: '••••••', source: 'env', updated_at: null });
     }
 
-    const result = await db.query('SELECT email, password, updated_at FROM hod_credentials LIMIT 1').catch(() => ({ rows: [] }));
+    const result = await db.query('SELECT email, updated_at FROM hod_credentials LIMIT 1').catch(() => ({ rows: [] }));
     if (result.rows.length > 0) {
-      return res.json({ email: result.rows[0].email, password: result.rows[0].password, source: 'database', updated_at: result.rows[0].updated_at });
+      // Return email + redacted password — never return actual password over API
+      return res.json({ email: result.rows[0].email, password: '••••••', source: 'database', updated_at: result.rows[0].updated_at });
     }
-    return res.json({ email: hodEmailEnv, source: 'env', updated_at: null });
+    return res.json({ email: hodEmailEnv, password: hodEmailEnv ? '••••••' : null, source: 'env', updated_at: null });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -450,17 +484,17 @@ app.put('/auth/hod-credentials', requireRole('hod', 'admin'), async (req: Reques
       return res.status(400).json({ error: 'Provide at least new_email or new_password to update' });
     }
 
-    const hodEmailEnv = (process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in').toLowerCase();
-    const hodPassEnv  = process.env.HOD_MASTER_PASS || 'cseds@2026';
+    const hodEmailEnv = process.env.HOD_MASTER_EMAIL?.toLowerCase() || null;
+    const hodPassEnv  = process.env.HOD_MASTER_PASS || null;
 
     if (db.isMock) {
-      return res.json({ success: true, message: 'HOD credentials updated.', email: new_email || hodEmailEnv });
+      return res.json({ success: true, message: 'HOD credentials updated.', email: new_email || hodEmailEnv || '' });
     }
 
     // Get existing row so we preserve whichever field isn't being changed
     const existing = await db.query('SELECT email, password FROM hod_credentials WHERE id = 1').catch(() => ({ rows: [] }));
-    const currentEmail    = existing.rows[0]?.email    || hodEmailEnv;
-    const currentPassword = existing.rows[0]?.password || hodPassEnv;
+    const currentEmail    = existing.rows[0]?.email    || hodEmailEnv || '';
+    const currentPassword = existing.rows[0]?.password || hodPassEnv || '';
 
     const updatedEmail    = new_email    || currentEmail;
     const updatedPassword = new_password || currentPassword;
@@ -486,16 +520,16 @@ app.post('/auth/hod-credentials/admin-reset', requireRole('admin'), async (req: 
       return res.status(400).json({ error: 'Provide at least new_email or new_password' });
     }
 
-    const hodEmailEnv = process.env.HOD_MASTER_EMAIL || 'hodcseds@rgmcet.edu.in';
-    const hodPassEnv  = process.env.HOD_MASTER_PASS  || 'cseds@2026';
+    const hodEmailEnv = process.env.HOD_MASTER_EMAIL || null;
+    const hodPassEnv  = process.env.HOD_MASTER_PASS  || null;
 
     if (db.isMock) {
-      return res.json({ success: true, message: 'Mock mode: HOD credentials reset.', email: new_email || hodEmailEnv });
+      return res.json({ success: true, message: 'Mock mode: HOD credentials reset.', email: new_email || hodEmailEnv || '' });
     }
 
     const existing = await db.query('SELECT email, password FROM hod_credentials WHERE id = 1').catch(() => ({ rows: [] }));
-    const currentEmail    = existing.rows[0]?.email    || hodEmailEnv;
-    const currentPassword = existing.rows[0]?.password || hodPassEnv;
+    const currentEmail    = existing.rows[0]?.email    || hodEmailEnv || '';
+    const currentPassword = existing.rows[0]?.password || hodPassEnv || '';
 
     const updatedEmail    = new_email    || currentEmail;
     const updatedPassword = new_password || currentPassword;
@@ -578,7 +612,7 @@ app.put('/settings/semester-unlock', requireRole('hod', 'admin'), async (req: Re
 // Admin: Student Password Management
 // ============================================================================
 
-// GET /admin/student-passwords — admin views all student passwords in plain text
+// GET /admin/student-passwords — admin views students who have passwords set (passwords are REDACTED)
 app.get('/admin/student-passwords', requireRole('admin'), async (_req: Request, res: Response) => {
   try {
     if (db.isMock) {
@@ -586,7 +620,7 @@ app.get('/admin/student-passwords', requireRole('admin'), async (_req: Request, 
     }
     const result = await db.query(`
       SELECT s.roll_number, s.name, s.email, s.year, s.section,
-             COALESCE(sp.password, '') as password,
+             CASE WHEN sp.password IS NOT NULL THEN '••••••' ELSE '' END as password,
              sp.updated_at as pwd_updated_at
       FROM students s
       LEFT JOIN student_passwords sp ON s.roll_number = sp.roll_number
@@ -598,7 +632,7 @@ app.get('/admin/student-passwords', requireRole('admin'), async (_req: Request, 
   }
 });
 
-// PUT /students/:id/password — admin sets a student's password
+// PUT /students/:id/password — admin sets a student's password (stored as bcrypt hash)
 app.put('/students/:id/password', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const rollNo = req.params.id.toUpperCase();
@@ -609,11 +643,13 @@ app.put('/students/:id/password', requireRole('admin'), async (req: Request, res
     if (db.isMock) {
       return res.json({ success: true, roll_number: rollNo });
     }
+    // Hash password before storage — plain text never hits the database
+    const hashedPassword = await bcrypt.hash(String(password), BCRYPT_ROUNDS);
     await db.query(
       `INSERT INTO student_passwords (roll_number, password, updated_at)
        VALUES ($1, $2, NOW())
        ON CONFLICT (roll_number) DO UPDATE SET password = $2, updated_at = NOW()`,
-      [rollNo, password]
+      [rollNo, hashedPassword]
     );
     res.json({ success: true, roll_number: rollNo });
   } catch (err: any) {
