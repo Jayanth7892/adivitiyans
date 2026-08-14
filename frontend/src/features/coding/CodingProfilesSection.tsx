@@ -33,14 +33,14 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
   const activeRollNo = studentRollNumber || user?.rollNumber || '';
 
   // Fetch real student profile from API
-  const { data: student } = useQuery({
+  const { data: student, isLoading: studentLoading } = useQuery({
     queryKey: ['studentProfile', activeRollNo],
     queryFn: () => api.getStudentProfile(activeRollNo),
     enabled: Boolean(activeRollNo),
   });
 
   // Fetch real linked handles from API
-  const { data: linkedProfiles = [], refetch: refetchCodingProfiles } = useQuery({
+  const { data: linkedProfiles = [], isLoading: profilesLoading, refetch: refetchCodingProfiles } = useQuery({
     queryKey: ['codingProfiles', activeRollNo],
     queryFn: () => api.getCodingProfiles(activeRollNo),
     enabled: Boolean(activeRollNo),
@@ -75,12 +75,42 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
   const [handleInput, setHandleInput] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Synchronize snapshots whenever linkedProfiles changes
+  // Synchronize snapshots whenever linkedProfiles or student data changes.
+  // IMPORTANT: skip the effect entirely while either query is still in-flight.
+  // Without this guard, the very first render fires with linkedProfiles=[] and
+  // student=undefined, shows the "link account" empty state, and then never
+  // re-shows the loading indicator — causing a permanent-looking blank screen
+  // until the page is refreshed.
   useEffect(() => {
+    // While either query is still loading, just show the loading spinner and wait.
+    // The effect will re-run once isLoading flips to false.
+    if (studentLoading || profilesLoading) {
+      setLoadingPlatform(true);
+      return;
+    }
+
     let isMounted = true;
 
     async function loadLiveSnapshots() {
-      const activeList = linkedProfiles && linkedProfiles.length > 0 ? linkedProfiles : [];
+      const activeList: any[] = linkedProfiles && linkedProfiles.length > 0 ? [...linkedProfiles] : [];
+
+      if (student) {
+        const checkAndAdd = (platformName: string, handleValue: any) => {
+          if (handleValue && handleValue !== 'Not Linked' && String(handleValue).trim() !== '') {
+            const cleanHandle = String(handleValue).trim();
+            const exists = activeList.some((p: any) => String(p.platform).toLowerCase() === platformName.toLowerCase());
+            if (!exists) {
+              activeList.push({ platform: platformName, handle: cleanHandle });
+            }
+          }
+        };
+        checkAndAdd('LeetCode', (student as any).leetcode_handle || (student as any).leetcode);
+        checkAndAdd('GitHub', (student as any).github_handle || (student as any).github);
+        checkAndAdd('Codeforces', (student as any).codeforces_handle || (student as any).codeforces);
+        checkAndAdd('CodeChef', (student as any).codechef_handle || (student as any).codechef);
+        checkAndAdd('GeeksforGeeks', (student as any).geeksforgeeks_handle || (student as any).geeksforgeeks);
+        checkAndAdd('HackerRank', (student as any).hackerrank_handle || (student as any).hackerrank);
+      }
 
       setLoadingPlatform(true);
       const newSnapshots: Partial<Record<PlatformId, PlatformStatsSnapshot>> = {};
@@ -128,13 +158,14 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
               color: config?.color || '#5B4FE9',
             });
 
-            mergedAwards.push(...snap.awards);
+            if (snap.awards) mergedAwards.push(...snap.awards);
+            if (snap.activity) mergedActivities.push(...snap.activity);
 
-            Object.entries(snap.heatmap).forEach(([d, c]) => {
-              mergedHeatmap[d] = (mergedHeatmap[d] || 0) + c;
-            });
-
-            mergedActivities.push(...snap.activity);
+            if (snap.heatmap) {
+              Object.entries(snap.heatmap).forEach(([dateStr, count]) => {
+                mergedHeatmap[dateStr] = (mergedHeatmap[dateStr] || 0) + Number(count || 0);
+              });
+            }
           }
         });
 
@@ -145,9 +176,8 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
           lastRefreshedAt: new Date().toISOString(),
           syncStatus: 'synced',
           kpis: [
-            { label: 'Total Problems Solved', value: grandTotalSolved },
-            { label: 'Platforms Linked', value: `${linkedKeys.length} / 6` },
-            { label: 'Student Profile', value: activeStudentName },
+            { label: 'Total Problems Solved Across Platforms', value: grandTotalSolved },
+            { label: 'Connected Profiles', value: linkedKeys.length },
           ],
           breakdown: breakdownItems,
           awards: mergedAwards,
@@ -170,7 +200,7 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [linkedProfiles, activeStudentName]);
+  }, [linkedProfiles, student, studentLoading, profilesLoading, activeStudentName]);
 
   const handleSelectPlatform = (id: PlatformId) => {
     setActivePlatform(id);

@@ -29,20 +29,31 @@ async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
 
   let token: string | null = sessionToken;
 
-  // Only fall back to Cognito if sessionStorage has nothing (fresh page load for students)
-  if (!token) {
-    try {
-      token = await getIdToken();
-    } catch { /* ignore */ }
-  }
-
   let userEmail = '';
+  let userRole = '';
   try {
     const savedUser = sessionStorage.getItem('advitiyans_auth_user');
     if (savedUser) {
-      userEmail = JSON.parse(savedUser).email || '';
+      const parsed = JSON.parse(savedUser);
+      userEmail = parsed.email || '';
+      userRole = parsed.role || '';
     }
   } catch { /* ignore */ }
+
+  // Only fall back to Cognito if sessionStorage has nothing (fresh page load for students)
+  if (!token) {
+    // HOD/Admin use demo tokens — Cognito would return null or a wrong-role token.
+    // Reconstruct the demo token directly from the saved user rather than hitting Cognito.
+    if ((userRole === 'hod' || userRole === 'admin') && userEmail) {
+      token = `demo_token_${userRole}_${encodeURIComponent(userEmail)}_${Date.now()}`;
+      // Restore it to sessionStorage so subsequent requests don't need to reconstruct
+      sessionStorage.setItem('advitiyans_jwt_token', token);
+    } else {
+      try {
+        token = await getIdToken();
+      } catch { /* ignore */ }
+    }
+  }
 
   const headers = {
     'Content-Type': 'application/json',

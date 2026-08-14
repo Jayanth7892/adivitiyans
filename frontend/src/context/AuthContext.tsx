@@ -122,9 +122,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               });
             }
 
-            // Silently refresh Cognito JWT in background — BUT ONLY for student/faculty.
-            // Admin/HOD use demo_token and must NOT have it overwritten by a stale Cognito session.
-            if (savedUser.role !== 'admin' && savedUser.role !== 'hod') {
+            // Ensure JWT token exists for admin/HOD, or silently refresh Cognito JWT for student/faculty.
+            if (savedUser.role === 'admin' || savedUser.role === 'hod') {
+              if (!sessionStorage.getItem(JWT_TOKEN_KEY)) {
+                sessionStorage.setItem(JWT_TOKEN_KEY, `demo_token_${savedUser.role}_${encodeURIComponent(savedUser.email)}_${Date.now()}`);
+              }
+            } else {
               getCurrentSession().then((cognitoSession) => {
                 if (cognitoSession) {
                   sessionStorage.setItem(JWT_TOKEN_KEY, cognitoSession.idToken);
@@ -151,9 +154,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user) {
       sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
       setRole(user.role);
-    } else {
-      sessionStorage.removeItem(AUTH_USER_KEY);
-      sessionStorage.removeItem(JWT_TOKEN_KEY);
     }
   }, [user]);
 
