@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../../context/AuthContext';
 import {
   Users, Search, Eye, X, GraduationCap, Trophy, TrendingUp,
   Award, ExternalLink, BookOpen, Code2, BarChart2, Building2,
@@ -150,7 +151,7 @@ function mapStudentToHodEntry(student: any, index: number, liveSolved?: number):
 }
 
 export const HodDashboardPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'students' | 'rankings' | 'placement' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'students' | 'rankings' | 'placement' | 'mentees' | 'settings'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Interactive Filter Slicers
@@ -161,6 +162,29 @@ export const HodDashboardPage: React.FC = () => {
 
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [syncingCron, setSyncingCron] = useState(false);
+
+  // HOD as mentor — fetch their own mentees
+  const { user } = useAuth();
+  const [hodFacultyId, setHodFacultyId] = useState<string | null>(null);
+  const [menteeYearFilter, setMenteeYearFilter] = useState('');
+  const [menteeSearch, setMenteeSearch] = useState('');
+  const [collapsedYears, setCollapsedYears] = useState<Set<string>>(new Set());
+  const toggleYear = (year: string) => setCollapsedYears(prev => {
+    const next = new Set(prev); if (next.has(year)) next.delete(year); else next.add(year); return next;
+  });
+
+  const { data: hodMentees = [] } = useQuery({
+    queryKey: ['hodMentees', hodFacultyId],
+    queryFn: () => hodFacultyId ? api.getFacultyMentees(hodFacultyId) : Promise.resolve([]),
+    enabled: Boolean(hodFacultyId),
+  });
+
+  useEffect(() => {
+    if (!user?.email) return;
+    api.getFacultyByEmail(user.email)
+      .then((fac: any) => { if (fac?.faculty_id) setHodFacultyId(fac.faculty_id); })
+      .catch(() => {});
+  }, [user?.email]);
 
   const [inspectStudent, setInspectStudent] = useState<HodStudentEntry | null>(null);
   const [inspectTab, setInspectTab] = useState('academics-graph');
@@ -185,7 +209,7 @@ export const HodDashboardPage: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
-    if (tab === 'overview' || tab === 'analytics' || tab === 'students' || tab === 'rankings' || tab === 'placement' || tab === 'settings') {
+    if (tab === 'overview' || tab === 'analytics' || tab === 'students' || tab === 'rankings' || tab === 'placement' || tab === 'mentees' || tab === 'settings') {
       setActiveTab(tab as any);
     }
   }, [location.search]);
@@ -751,6 +775,7 @@ export const HodDashboardPage: React.FC = () => {
           { key: 'placement', label: '🎯 Placement Eligibility Engine (T&P)' },
           { key: 'students', label: '👨‍🎓 Student Directory & Inspection' },
           { key: 'rankings', label: '🏆 Department Leaderboard' },
+          { key: 'mentees', label: `👤 My Mentees${hodMentees.length > 0 ? ` (${hodMentees.length})` : ''}` },
           { key: 'settings', label: '⚙️ Account Settings' },
         ].map((t) => (
           <button
@@ -768,6 +793,120 @@ export const HodDashboardPage: React.FC = () => {
       {/* ── TAB: Placement Eligibility Engine ── */}
       {activeTab === 'placement' && (
         <PlacementEligibilitySection students={mergedStudentDataset} />
+      )}
+
+      {/* ── TAB: My Mentees (HOD as Mentor) ── */}
+      {activeTab === 'mentees' && (
+        <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-base font-bold text-textPrimary">My Assigned Mentees</h3>
+              <p className="text-xs text-textSecondary">
+                {hodMentees.length > 0
+                  ? `${hodMentees.length} students assigned under you as mentor — grouped by academic year`
+                  : hodFacultyId
+                    ? 'No mentees assigned yet. Upload a mentor assignment CSV from Admin panel.'
+                    : 'Your email is not yet linked to a faculty record. Ask admin to link it.'}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-borderLine bg-background text-xs w-52">
+                <Search className="w-4 h-4 text-textSecondary shrink-0" />
+                <input type="text" value={menteeSearch} onChange={e => setMenteeSearch(e.target.value)}
+                  placeholder="Search name or roll no..." className="w-full bg-transparent focus:outline-none text-textPrimary" />
+              </div>
+              <select value={menteeYearFilter} onChange={e => setMenteeYearFilter(e.target.value)}
+                className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-medium">
+                <option value="">All Years</option>
+                {['4th Year','3rd Year','2nd Year','1st Year'].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {(() => {
+            const filtered = hodMentees.filter(m => {
+              const q = menteeSearch.toLowerCase();
+              const matchSearch = !q || m.name.toLowerCase().includes(q) || m.roll_number.toLowerCase().includes(q);
+              const matchYear = !menteeYearFilter || m.year === menteeYearFilter;
+              return matchSearch && matchYear;
+            });
+            const YEAR_ORDER = ['4th Year','3rd Year','2nd Year','1st Year'];
+            const groups = YEAR_ORDER.map(y => ({ year: y, list: filtered.filter(m => m.year === y) })).filter(g => g.list.length > 0);
+            const others = filtered.filter(m => !YEAR_ORDER.includes(m.year));
+            if (others.length > 0) groups.push({ year: 'Other', list: others });
+            if (filtered.length === 0) return <p className="text-center text-textSecondary text-xs py-10">No mentees found.</p>;
+            return (
+              <div className="space-y-4">
+                {groups.map(({ year, list }) => {
+                  const isCollapsed = collapsedYears.has(year);
+                  const atRisk = list.filter(m => Number((m as any).cgpa) > 0 && Number((m as any).cgpa) < 6.0).length;
+                  const validCgpa = list.filter(m => Number((m as any).cgpa) > 0);
+                  const avgCgpa = validCgpa.length > 0 ? (validCgpa.reduce((s,m) => s + Number((m as any).cgpa), 0) / validCgpa.length).toFixed(2) : '—';
+                  return (
+                    <div key={year} className="border border-borderLine rounded-xl overflow-hidden">
+                      <button onClick={() => toggleYear(year)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-brand-soft/10 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-bold text-textPrimary">{year}</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-brand-soft text-brand-primary font-semibold">{list.length} students</span>
+                          <span className="text-[11px] text-textSecondary">Avg CGPA: {avgCgpa}</span>
+                          {atRisk > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 font-semibold">⚠️ {atRisk} at risk</span>}
+                        </div>
+                        <span className="text-textSecondary text-sm">{isCollapsed ? '▶' : '▼'}</span>
+                      </button>
+                      {!isCollapsed && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
+                                <th className="py-3 px-4">Student</th>
+                                <th className="py-3 px-4">Roll No</th>
+                                <th className="py-3 px-4">Batch / Sec</th>
+                                <th className="py-3 px-4">CGPA</th>
+                                <th className="py-3 px-4">Standing</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-borderLine text-sm">
+                              {list.map(m => {
+                                const cgpa = Number((m as any).cgpa);
+                                const isAtRisk = cgpa > 0 && cgpa < 6.0;
+                                const initials = m.name.split(' ').map((n:string) => n[0]).join('');
+                                const standing = cgpa >= 9.0 ? 'Distinction' : cgpa >= 7.0 ? 'First Class' : cgpa >= 5.0 ? 'Second Class' : '—';
+                                return (
+                                  <tr key={m.roll_number} className={`hover:bg-background/50 transition-colors ${isAtRisk ? 'bg-red-50/30' : ''}`}>
+                                    <td className="py-3.5 px-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs ${isAtRisk ? 'bg-red-100 text-red-600' : 'bg-brand-primary text-white'}`}>{initials}</div>
+                                        <div>
+                                          <p className="font-semibold text-textPrimary leading-tight">{isAtRisk && <span title="CGPA below 6.0">⚠️ </span>}{m.name}</p>
+                                          <p className="text-[11px] text-textSecondary">{m.email}</p>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="py-3.5 px-4 font-bold text-brand-primary text-xs">{m.roll_number}</td>
+                                    <td className="py-3.5 px-4 text-xs">{m.batch} • Sec {m.section}</td>
+                                    <td className="py-3.5 px-4 text-sm font-bold">{cgpa > 0 ? cgpa.toFixed(2) : '—'}</td>
+                                    <td className="py-3.5 px-4">
+                                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                                        standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                        standing === 'First Class' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                        standing === 'Second Class' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                        'bg-background text-textSecondary border-borderLine'
+                                      }`}>{standing}</span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
       )}
 
       {/* ── TAB 1: Year-Wise Overview ── */}
