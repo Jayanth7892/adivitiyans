@@ -2525,24 +2525,29 @@ app.patch('/faculty/:id/name', requireRole('admin'), async (req: Request, res: R
   }
 });
 
-// DELETE /faculty/:id — Admin permanently removes a faculty record
+// DELETE /faculty/:id — Admin permanently removes a faculty record + Cognito user
 app.delete('/faculty/:id', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const facId = req.params.id.toUpperCase();
     if (db.isMock) return res.json({ message: 'Faculty deleted', faculty_id: facId });
 
-    // Safety: refuse if any students are still linked to this faculty
-    const linked = await db.query(
-      'SELECT COUNT(*)::int AS cnt FROM students WHERE UPPER(faculty_mentor_id) = $1',
+    // Resolve email BEFORE delete so we can clean Cognito
+    let facultyEmail: string | null = null;
+    const existing = await db.query(
+      'SELECT email, name FROM faculty WHERE UPPER(faculty_id) = $1',
       [facId]
     );
-    if ((linked.rows[0]?.cnt ?? 0) > 0) {
-      return res.status(409).json({
-        error: `Cannot delete: ${linked.rows[0].cnt} student(s) still linked to this faculty. Re-assign them first.`
-      });
+    if (existing.rows.length > 0) {
+      facultyEmail = existing.rows[0].email || null;
     }
 
-    // Remove any mentor_assignments rows for this faculty_id
+    // Unlink students that pointed to this faculty (set to NULL, not cascade-delete)
+    await db.query(
+      `UPDATE students SET faculty_mentor_id = NULL WHERE UPPER(faculty_mentor_id) = $1`,
+      [facId]
+    ).catch(() => {});
+
+    // Remove mentor_assignments for this faculty_id
     await db.query('DELETE FROM mentor_assignments WHERE UPPER(faculty_id) = $1', [facId]).catch(() => {});
 
     // Delete the faculty record itself
@@ -2552,7 +2557,17 @@ app.delete('/faculty/:id', requireRole('admin'), async (req: Request, res: Respo
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Faculty not found' });
 
-    res.json({ message: `Faculty ${result.rows[0].name} (${facId}) deleted successfully` });
+    const deletedName = result.rows[0].name;
+
+    // Cognito cleanup: fire-and-forget so Cognito errors never cause a 500
+    // Deleting from Cognito allows the faculty to re-register cleanly with the same email
+    if (facultyEmail && !facultyEmail.startsWith('pending_')) {
+      deleteCognitoUsers([facultyEmail]).catch((e: any) =>
+        console.warn(`[Cognito] Faculty Cognito cleanup failed for ${facultyEmail}:`, e.message)
+      );
+    }
+
+    res.json({ message: `Faculty ${deletedName} (${facId}) deleted successfully. They may re-register using the same email.` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
