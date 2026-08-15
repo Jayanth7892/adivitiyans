@@ -348,6 +348,14 @@ export const api = {
     });
   },
 
+  // Update faculty display name (admin)
+  patchFacultyName: async (facultyId: string, name: string): Promise<any> => {
+    return fetchWithAuth(`/faculty/${facultyId}/name`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    });
+  },
+
   // Upload mentor assignment CSV rows
   uploadMentorAssignments: async (rows: { roll1: string; roll2?: string; facultyName: string }[]): Promise<any> => {
     return fetchWithAuth(`/mentor-assignments/upload`, {

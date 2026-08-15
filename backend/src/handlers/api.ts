@@ -2425,6 +2425,29 @@ app.patch('/faculty/:id/email', requireRole('admin'), async (req: Request, res: 
   }
 });
 
+// PATCH /faculty/:id/name — Admin updates a faculty member's display name
+app.patch('/faculty/:id/name', requireRole('admin'), async (req: Request, res: Response) => {
+  try {
+    const facId = req.params.id.toUpperCase();
+    const { name } = req.body;
+    if (!name || !String(name).trim()) return res.status(400).json({ error: 'name is required' });
+    const cleanName = String(name).trim();
+
+    if (db.isMock) {
+      return res.json({ message: 'Name updated successfully', faculty_id: facId, name: cleanName });
+    }
+
+    const result = await db.query(
+      `UPDATE faculty SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE faculty_id = $2 RETURNING *`,
+      [cleanName, facId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Faculty not found' });
+    res.json({ message: 'Name updated successfully', faculty: result.rows[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /mentor-assignments/upload — Bulk assign students to faculty mentors from CSV data
 app.post('/mentor-assignments/upload', requireRole('admin'), async (req: Request, res: Response) => {
   try {
