@@ -163,9 +163,9 @@ export const HodDashboardPage: React.FC = () => {
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [syncingCron, setSyncingCron] = useState(false);
 
-  // HOD as mentor — fetch their own mentees
+  // HOD as mentor — fetch their own mentees directly by email
+  // Uses /faculty/mentees/by-email which resolves across ALL faculty records for this person
   const { user } = useAuth();
-  const [hodFacultyId, setHodFacultyId] = useState<string | null>(null);
   const [menteeYearFilter, setMenteeYearFilter] = useState('');
   const [menteeSearch, setMenteeSearch] = useState('');
   const [collapsedYears, setCollapsedYears] = useState<Set<string>>(new Set());
@@ -174,17 +174,10 @@ export const HodDashboardPage: React.FC = () => {
   });
 
   const { data: hodMentees = [] } = useQuery({
-    queryKey: ['hodMentees', hodFacultyId],
-    queryFn: () => hodFacultyId ? api.getFacultyMentees(hodFacultyId) : Promise.resolve([]),
-    enabled: Boolean(hodFacultyId),
+    queryKey: ['hodMentees', user?.email],
+    queryFn: () => user?.email ? api.getMenteesByEmail(user.email) : Promise.resolve([]),
+    enabled: Boolean(user?.email),
   });
-
-  useEffect(() => {
-    if (!user?.email) return;
-    api.getFacultyByEmail(user.email)
-      .then((fac: any) => { if (fac?.faculty_id) setHodFacultyId(fac.faculty_id); })
-      .catch(() => {});
-  }, [user?.email]);
 
   const [inspectStudent, setInspectStudent] = useState<HodStudentEntry | null>(null);
   const [inspectTab, setInspectTab] = useState('academics-graph');
@@ -804,9 +797,9 @@ export const HodDashboardPage: React.FC = () => {
               <p className="text-xs text-textSecondary">
                 {hodMentees.length > 0
                   ? `${hodMentees.length} students assigned under you as mentor — grouped by academic year`
-                  : hodFacultyId
+                  : user?.email
                     ? 'No mentees assigned yet. Upload a mentor assignment CSV from Admin panel.'
-                    : 'Your email is not yet linked to a faculty record. Ask admin to link it.'}
+                    : 'Loading...'}
               </p>
             </div>
             <div className="flex flex-wrap gap-3">

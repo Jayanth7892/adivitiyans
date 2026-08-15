@@ -2279,6 +2279,98 @@ app.get('/faculty/by-email/:email', async (req: Request, res: Response) => {
   }
 });
 
+// GET /faculty/mentees/by-email/:email — Returns ALL mentees across ALL faculty records for this person
+// Solves the multi-record problem (e.g., HOD_CSEDS + FAC_BBHASKARARAO both belong to Bhaskara Rao)
+app.get('/faculty/mentees/by-email/:email', async (req: Request, res: Response) => {
+  try {
+    const email = req.params.email.toLowerCase().trim();
+    if (db.isMock) return res.json([]);
+
+    // Ensure mentor_assignments table exists
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS mentor_assignments (
+        roll_number  TEXT        NOT NULL,
+        faculty_id   TEXT        NOT NULL,
+        assigned_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (roll_number, faculty_id)
+      )
+    `).catch(() => {});
+
+    // Step 1: Find primary faculty record by email
+    const byEmail = await db.query('SELECT * FROM faculty WHERE LOWER(email) = $1', [email]);
+    if (byEmail.rows.length === 0) return res.json([]);
+
+    const primaryFac = byEmail.rows[0];
+    const normalize = (s: string) => s.toLowerCase()
+      .replace(/^(dr|prof|mr|mrs|ms|er)\.?\s*/i, '')
+      .replace(/\b[a-z]\.\s*/g, '')   // strip single-letter initials like "B."
+      .replace(/[^a-z\s]/g, '')
+      .trim();
+
+    const primaryNorm = normalize(primaryFac.name);
+    // Extract significant words (length >= 4) from name for fuzzy matching
+    const sigWords = primaryNorm.split(/\s+/).filter((w: string) => w.length >= 4);
+
+    // Step 2: Find ALL faculty records whose name shares a significant word with primary faculty
+    const allFac = await db.query('SELECT faculty_id, name FROM faculty');
+    const matchingIds: string[] = [primaryFac.faculty_id];
+    for (const f of allFac.rows) {
+      if (f.faculty_id === primaryFac.faculty_id) continue;
+      const norm = normalize(f.name);
+      const matches = sigWords.some((w: string) => norm.includes(w));
+      if (matches) matchingIds.push(f.faculty_id);
+    }
+
+    // Step 3: Union mentees across all matching faculty_ids
+    const placeholders = matchingIds.map((_, i) => `$${i + 1}`).join(',');
+    const result = await db.query(
+      `SELECT
+         ma.roll_number,
+         ma.faculty_id AS assigned_faculty_id,
+         ma.assigned_at,
+         CASE WHEN s.roll_number IS NOT NULL THEN true ELSE false END AS registered,
+         s.name,
+         s.email,
+         s.year,
+         s.batch,
+         s.section,
+         s.department,
+         s.phone,
+         s.photo_url,
+         s.faculty_mentor_id,
+         COALESCE(ROUND(AVG(a.semester_gpa), 2), 0.00) AS cgpa,
+         MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.handle END) AS leetcode_handle,
+         COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.score_rating END), 0) AS leetcode_solved,
+         MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.handle END) AS github_handle,
+         COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.repositories_count END), 0) AS github_repos
+       FROM mentor_assignments ma
+       LEFT JOIN students s ON UPPER(s.roll_number) = UPPER(ma.roll_number)
+       LEFT JOIN academics a ON a.student_id = s.roll_number
+       LEFT JOIN coding_profiles c ON c.student_id = s.roll_number
+       WHERE UPPER(ma.faculty_id) IN (${placeholders})
+       GROUP BY
+         ma.roll_number, ma.faculty_id, ma.assigned_at,
+         s.roll_number, s.name, s.email, s.year, s.batch, s.section,
+         s.department, s.phone, s.photo_url, s.faculty_mentor_id
+       ORDER BY registered DESC, s.year DESC NULLS LAST, ma.roll_number`,
+      matchingIds.map(id => id.toUpperCase())
+    );
+
+    const rows = result.rows.map((r: any) => ({
+      ...r,
+      name: r.name || null,
+      department: r.department
+        ? (r.department === 'CSE' || r.department === 'Data Science' || r.department === 'CSE (Data Science)' ? 'CSE(Data Science)' : r.department)
+        : null,
+      registered: r.registered === true || r.registered === 't',
+    }));
+
+    res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /faculty — List all faculty with mentee counts (admin view)
 app.get('/faculty', requireRole('admin', 'hod'), async (_req: Request, res: Response) => {
   try {

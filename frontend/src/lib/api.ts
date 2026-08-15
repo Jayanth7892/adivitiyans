@@ -325,9 +325,14 @@ export const api = {
     return fetchWithAuth(`/faculty/by-email/${encodeURIComponent(email)}`);
   },
 
-  // Faculty Mentees
-  getFacultyMentees: async (facultyId: string): Promise<StudentProfile[]> => {
+  // Faculty Mentees — by faculty_id
+  getFacultyMentees: async (facultyId: string): Promise<any[]> => {
     return fetchWithAuth(`/faculty/${facultyId}/mentees`);
+  },
+
+  // Faculty Mentees — by email (resolves all records for same person across multiple faculty_ids)
+  getMenteesByEmail: async (email: string): Promise<any[]> => {
+    return fetchWithAuth(`/faculty/mentees/by-email/${encodeURIComponent(email)}`);
   },
 
   // Get all faculty with mentee counts (admin)
