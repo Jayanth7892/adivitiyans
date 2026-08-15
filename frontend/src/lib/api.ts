@@ -356,9 +356,29 @@ export const api = {
     });
   },
 
-  // Delete a faculty record (admin)
+  // Delete a faculty record (admin) — also blocks their email
   deleteFaculty: async (facultyId: string): Promise<any> => {
     return fetchWithAuth(`/faculty/${facultyId}`, { method: 'DELETE' });
+  },
+
+  // Get detailed mentee list for a specific faculty (admin)
+  getFacultyMenteeList: async (facultyId: string): Promise<any[]> => {
+    return fetchWithAuth(`/faculty/${encodeURIComponent(facultyId)}/mentees-detail`);
+  },
+
+  // Unblock a faculty email so they can re-register (admin)
+  unblockFaculty: async (email: string): Promise<any> => {
+    return fetchWithAuth(`/faculty/unblock/${encodeURIComponent(email)}`, { method: 'POST' });
+  },
+
+  // Get list of all blocked emails (admin)
+  getBlockedEmails: async (): Promise<any[]> => {
+    return fetchWithAuth(`/faculty/blocked`);
+  },
+
+  // Unassign a student from a faculty mentor (admin)
+  unassignMentee: async (facultyId: string, rollNumber: string): Promise<any> => {
+    return fetchWithAuth(`/mentor-assignments/${encodeURIComponent(facultyId)}/${encodeURIComponent(rollNumber)}`, { method: 'DELETE' });
   },
 
   // Upload mentor assignment CSV rows

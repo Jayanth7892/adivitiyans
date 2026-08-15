@@ -2525,20 +2525,22 @@ app.patch('/faculty/:id/name', requireRole('admin'), async (req: Request, res: R
   }
 });
 
-// DELETE /faculty/:id — Admin permanently removes a faculty record + Cognito user
+// DELETE /faculty/:id — Admin permanently removes a faculty record + Cognito user + blocks email
 app.delete('/faculty/:id', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const facId = req.params.id.toUpperCase();
     if (db.isMock) return res.json({ message: 'Faculty deleted', faculty_id: facId });
 
-    // Resolve email BEFORE delete so we can clean Cognito
+    // Resolve email BEFORE delete so we can block + clean Cognito
     let facultyEmail: string | null = null;
+    let facultyName: string = facId;
     const existing = await db.query(
       'SELECT email, name FROM faculty WHERE UPPER(faculty_id) = $1',
       [facId]
     );
     if (existing.rows.length > 0) {
       facultyEmail = existing.rows[0].email || null;
+      facultyName = existing.rows[0].name || facId;
     }
 
     // Unlink students that pointed to this faculty (set to NULL, not cascade-delete)
@@ -2557,17 +2559,99 @@ app.delete('/faculty/:id', requireRole('admin'), async (req: Request, res: Respo
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Faculty not found' });
 
-    const deletedName = result.rows[0].name;
-
-    // Cognito cleanup: fire-and-forget so Cognito errors never cause a 500
-    // Deleting from Cognito allows the faculty to re-register cleanly with the same email
+    // Block the email so they cannot re-register until admin unblocks
     if (facultyEmail && !facultyEmail.startsWith('pending_')) {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS blocked_emails (
+          email      TEXT PRIMARY KEY,
+          blocked_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          reason     TEXT
+        )
+      `).catch(() => {});
+      await db.query(
+        `INSERT INTO blocked_emails (email, reason) VALUES ($1, $2) ON CONFLICT (email) DO UPDATE SET blocked_at = CURRENT_TIMESTAMP, reason = $2`,
+        [facultyEmail, `Deleted by admin: ${facultyName} (${facId})`]
+      ).catch(() => {});
+
+      // Cognito cleanup: fire-and-forget
       deleteCognitoUsers([facultyEmail]).catch((e: any) =>
         console.warn(`[Cognito] Faculty Cognito cleanup failed for ${facultyEmail}:`, e.message)
       );
     }
 
-    res.json({ message: `Faculty ${deletedName} (${facId}) deleted successfully. They may re-register using the same email.` });
+    res.json({ message: `Faculty ${facultyName} deleted. Their email is now blocked from re-registration.` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /faculty/unblock/:email — Admin removes email from blocked list (allows re-registration)
+app.post('/faculty/unblock/:email', requireRole('admin'), async (req: Request, res: Response) => {
+  try {
+    const email = decodeURIComponent(req.params.email).toLowerCase().trim();
+    if (db.isMock) return res.json({ message: 'Email unblocked', email });
+    await db.query('DELETE FROM blocked_emails WHERE email = $1', [email]).catch(() => {});
+    res.json({ message: `${email} has been unblocked and may now re-register.` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /faculty/blocked — Admin lists all blocked emails
+app.get('/faculty/blocked', requireRole('admin'), async (_req: Request, res: Response) => {
+  try {
+    if (db.isMock) return res.json([]);
+    await db.query(`CREATE TABLE IF NOT EXISTS blocked_emails (email TEXT PRIMARY KEY, blocked_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, reason TEXT)`).catch(() => {});
+    const result = await db.query('SELECT * FROM blocked_emails ORDER BY blocked_at DESC');
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /faculty/:id/mentees-detail — Full mentee list for one faculty (for admin directory)
+app.get('/faculty/:id/mentees-detail', requireRole('admin'), async (req: Request, res: Response) => {
+  try {
+    const facId = req.params.id.toUpperCase();
+    if (db.isMock) return res.json([]);
+
+    await db.query(`CREATE TABLE IF NOT EXISTS mentor_assignments (roll_number TEXT NOT NULL, faculty_id TEXT NOT NULL, assigned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (roll_number, faculty_id))`).catch(() => {});
+
+    const result = await db.query(
+      `SELECT
+         ma.roll_number,
+         ma.faculty_id,
+         ma.assigned_at,
+         CASE WHEN s.roll_number IS NOT NULL THEN true ELSE false END AS registered,
+         s.name,
+         s.email,
+         s.year,
+         s.batch,
+         s.section,
+         s.department,
+         s.phone,
+         s.cgpa
+       FROM mentor_assignments ma
+       LEFT JOIN students s ON UPPER(s.roll_number) = UPPER(ma.roll_number)
+       WHERE UPPER(ma.faculty_id) = $1
+       ORDER BY registered DESC, ma.roll_number`,
+      [facId]
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /mentor-assignments/:facultyId/:rollNumber — Unassign a student from a faculty
+app.delete('/mentor-assignments/:facultyId/:rollNumber', requireRole('admin'), async (req: Request, res: Response) => {
+  try {
+    const facId = req.params.facultyId.toUpperCase();
+    const roll = req.params.rollNumber.toUpperCase();
+    if (db.isMock) return res.json({ message: 'Unassigned' });
+    await db.query('DELETE FROM mentor_assignments WHERE UPPER(faculty_id) = $1 AND UPPER(roll_number) = $2', [facId, roll]);
+    await db.query(`UPDATE students SET faculty_mentor_id = NULL WHERE UPPER(roll_number) = $1 AND UPPER(faculty_mentor_id) = $2`, [roll, facId]).catch(() => {});
+    res.json({ message: `${roll} unassigned from ${facId}` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
