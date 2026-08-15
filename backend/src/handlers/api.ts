@@ -2448,6 +2448,39 @@ app.patch('/faculty/:id/name', requireRole('admin'), async (req: Request, res: R
   }
 });
 
+// DELETE /faculty/:id — Admin permanently removes a faculty record
+app.delete('/faculty/:id', requireRole('admin'), async (req: Request, res: Response) => {
+  try {
+    const facId = req.params.id.toUpperCase();
+    if (db.isMock) return res.json({ message: 'Faculty deleted', faculty_id: facId });
+
+    // Safety: refuse if any students are still linked to this faculty
+    const linked = await db.query(
+      'SELECT COUNT(*)::int AS cnt FROM students WHERE UPPER(faculty_mentor_id) = $1',
+      [facId]
+    );
+    if ((linked.rows[0]?.cnt ?? 0) > 0) {
+      return res.status(409).json({
+        error: `Cannot delete: ${linked.rows[0].cnt} student(s) still linked to this faculty. Re-assign them first.`
+      });
+    }
+
+    // Remove any mentor_assignments rows for this faculty_id
+    await db.query('DELETE FROM mentor_assignments WHERE UPPER(faculty_id) = $1', [facId]).catch(() => {});
+
+    // Delete the faculty record itself
+    const result = await db.query(
+      'DELETE FROM faculty WHERE UPPER(faculty_id) = $1 RETURNING faculty_id, name',
+      [facId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Faculty not found' });
+
+    res.json({ message: `Faculty ${result.rows[0].name} (${facId}) deleted successfully` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /mentor-assignments/upload — Bulk assign students to faculty mentors from CSV data
 app.post('/mentor-assignments/upload', requireRole('admin'), async (req: Request, res: Response) => {
   try {

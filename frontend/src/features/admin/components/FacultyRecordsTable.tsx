@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../lib/api';
-import { Mail, Users, Pencil, Check, X } from 'lucide-react';
+import { Mail, Users, Pencil, Check, X, Trash2 } from 'lucide-react';
 
 interface Props {
   onLinkEmail: (facultyId: string) => void;
@@ -30,6 +30,33 @@ export const FacultyRecordsTable: React.FC<Props> = ({ onLinkEmail }) => {
       setRenamingId(null);
     } catch (e: any) { setRenameError(e.message || 'Failed to update name'); }
     finally { setRenameSaving(false); }
+  };
+
+  // Delete state: first click = confirm pending, second click = execute
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<Record<string, string>>({});
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteClick = (facultyId: string) => {
+    if (confirmDeleteId === facultyId) {
+      // Second click — execute delete
+      setDeleting(true);
+      api.deleteFaculty(facultyId)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['adminFaculty'] });
+          setConfirmDeleteId(null);
+        })
+        .catch((e: any) => {
+          setDeleteError(prev => ({ ...prev, [facultyId]: e.message || 'Delete failed' }));
+          setConfirmDeleteId(null);
+        })
+        .finally(() => setDeleting(false));
+    } else {
+      // First click — show confirm state
+      setConfirmDeleteId(facultyId);
+      // Auto-cancel confirm after 4 seconds
+      setTimeout(() => setConfirmDeleteId(prev => prev === facultyId ? null : prev), 4000);
+    }
   };
 
   if (isLoading) {
@@ -83,6 +110,7 @@ export const FacultyRecordsTable: React.FC<Props> = ({ onLinkEmail }) => {
                       <>
                         <p className="font-semibold text-textPrimary text-sm">{fac.name}</p>
                         <p className="text-[11px] text-textSecondary">{fac.faculty_id}</p>
+                        {deleteError[fac.faculty_id] && <p className="text-[11px] text-red-500 mt-0.5">{deleteError[fac.faculty_id]}</p>}
                       </>
                     )}
                   </td>
@@ -122,6 +150,19 @@ export const FacultyRecordsTable: React.FC<Props> = ({ onLinkEmail }) => {
                           <button onClick={() => onLinkEmail(fac.faculty_id)}
                             className="px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-borderLine hover:bg-brand-soft hover:text-brand-primary hover:border-brand-primary transition-colors">
                             ✏️ {isLinked ? 'Update Email' : 'Link Email'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(fac.faculty_id)}
+                            disabled={deleting && confirmDeleteId === fac.faculty_id}
+                            className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg border transition-colors ${
+                              confirmDeleteId === fac.faculty_id
+                                ? 'bg-red-600 text-white border-red-600 hover:bg-red-700 animate-pulse'
+                                : 'border-borderLine text-red-500 hover:bg-red-50 hover:border-red-300'
+                            }`}
+                            title={confirmDeleteId === fac.faculty_id ? 'Click again to confirm deletion' : 'Delete faculty record'}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            {confirmDeleteId === fac.faculty_id ? 'Confirm?' : 'Delete'}
                           </button>
                         </>
                       )}

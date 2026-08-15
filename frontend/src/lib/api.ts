@@ -356,6 +356,11 @@ export const api = {
     });
   },
 
+  // Delete a faculty record (admin)
+  deleteFaculty: async (facultyId: string): Promise<any> => {
+    return fetchWithAuth(`/faculty/${facultyId}`, { method: 'DELETE' });
+  },
+
   // Upload mentor assignment CSV rows
   uploadMentorAssignments: async (rows: { roll1: string; roll2?: string; facultyName: string }[]): Promise<any> => {
     return fetchWithAuth(`/mentor-assignments/upload`, {
