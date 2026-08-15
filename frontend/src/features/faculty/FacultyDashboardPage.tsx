@@ -65,11 +65,12 @@ export const FacultyDashboardPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
 
-  // Fetch mentees for the logged-in faculty
+  // Fetch mentees by email — resolves across ALL faculty records for this person
+  // Handles the case where CSV created FAC_KRATHI but registration created a different faculty_id
   const { data: mentees = [], refetch } = useQuery({
-    queryKey: ['facultyMentees', facultyId],
-    queryFn: () => api.getFacultyMentees(facultyId),
-    enabled: Boolean(facultyId),
+    queryKey: ['facultyMentees', user?.email],
+    queryFn: () => user?.email ? api.getMenteesByEmail(user.email) : Promise.resolve([]),
+    enabled: Boolean(user?.email),
   });
 
   const { data: deptReport } = useQuery({
