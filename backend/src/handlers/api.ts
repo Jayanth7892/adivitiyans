@@ -1227,6 +1227,65 @@ app.post('/reports/cron-sync', requireRole('admin', 'hod'), async (_req: Request
   }
 });
 
+// GET /student/mentor — Returns the logged-in student's assigned mentor details + remarks
+app.get('/student/mentor', async (req: Request, res: Response) => {
+  try {
+    // Identify the student from Authorization header (email or roll_number)
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace('Bearer ', '').trim();
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+    if (db.isMock) return res.json({ assigned: false });
+
+    // Decode JWT sub claim (Cognito UUID) — we'll match by email attribute
+    let studentEmail = '';
+    let studentRoll = '';
+    try {
+      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+      studentEmail = (payload.email || '').toLowerCase();
+      studentRoll  = (payload['custom:reg_no'] || payload['cognito:username'] || '').toLowerCase();
+    } catch (_) { /* ignore decode errors */ }
+
+    // Find student record
+    let student: any = null;
+    if (studentEmail) {
+      const byEmail = await db.query('SELECT * FROM students WHERE LOWER(email) = $1 LIMIT 1', [studentEmail]);
+      if (byEmail.rows.length > 0) student = byEmail.rows[0];
+    }
+    if (!student && studentRoll) {
+      const byRoll = await db.query('SELECT * FROM students WHERE LOWER(roll_number) = $1 LIMIT 1', [studentRoll]);
+      if (byRoll.rows.length > 0) student = byRoll.rows[0];
+    }
+    if (!student) return res.json({ assigned: false });
+
+    const mentorId = student.faculty_mentor_id;
+    if (!mentorId) return res.json({ assigned: false, remarks: student.faculty_remarks || null });
+
+    // Fetch faculty details
+    const facResult = await db.query(
+      'SELECT faculty_id, name, email, department, role FROM faculty WHERE UPPER(faculty_id) = $1 LIMIT 1',
+      [mentorId.toUpperCase()]
+    );
+
+    if (facResult.rows.length === 0) {
+      return res.json({ assigned: false, remarks: student.faculty_remarks || null });
+    }
+
+    const mentor = facResult.rows[0];
+    return res.json({
+      assigned: true,
+      faculty_id: mentor.faculty_id,
+      name: mentor.name,
+      email: (mentor.email && !mentor.email.startsWith('pending_')) ? mentor.email : null,
+      department: mentor.department,
+      role: mentor.role,
+      remarks: student.faculty_remarks || null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /students/by-email/:email — Lookup Student by Email
 app.get('/students/by-email/:email', async (req: Request, res: Response) => {
   try {

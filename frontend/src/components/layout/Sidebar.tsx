@@ -13,6 +13,7 @@ import {
   BarChart2,
   PieChart,
   Building2,
+  UserCheck,
   LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -68,6 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
       title: 'STUDENT PROFILE',
       items: [
         { label: 'My 360° Profile', path: '/profile?tab=personal-info', icon: User },
+        { label: 'My Mentor', path: '/mentor', icon: UserCheck },
         { label: 'Certificates', path: '/profile?tab=certifications', icon: CheckCircle2 },
         { label: 'Resume Builder', path: '/resume-builder', icon: FileText, soon: true },
       ],

@@ -17,6 +17,7 @@ const HodDashboardPage = lazy(() => import('./features/hod/HodDashboardPage').th
 const CodingAnalyticsPage = lazy(() => import('./features/coding/CodingAnalyticsPage').then(m => ({ default: m.CodingAnalyticsPage })));
 const PlatformStatsRedirect = lazy(() => import('./features/coding/PlatformStatsRedirect').then(m => ({ default: m.PlatformStatsRedirect })));
 const FacultyManagementPage = lazy(() => import('./features/admin/FacultyManagementPage'));
+const MyMentorPage = lazy(() => import('./features/mentor/MyMentorPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -147,6 +148,7 @@ export const App: React.FC = () => {
               <Route path="/faculty/dashboard" element={<FacultyDashboardPage />} />
               <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
               <Route path="/admin/faculty" element={<FacultyManagementPage />} />
+              <Route path="/mentor" element={<MyMentorPage />} />
               <Route path="/hod/dashboard" element={<HodDashboardPage />} />
               <Route path="/coding-analytics" element={<CodingAnalyticsPage />} />
               <Route path="*" element={<RoleDashboardRedirect />} />

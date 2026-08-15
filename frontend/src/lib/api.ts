@@ -84,6 +84,19 @@ export const api = {
     return fetchWithAuth(`/auth/check-availability?type=${type}&value=${encodeURIComponent(value)}`);
   },
 
+  // My Mentor — student-facing: returns assigned mentor details + faculty remarks
+  getMyMentor: async (): Promise<{
+    assigned: boolean;
+    faculty_id?: string;
+    name?: string;
+    email?: string | null;
+    department?: string;
+    role?: string;
+    remarks?: string | null;
+  }> => {
+    return fetchWithAuth('/student/mentor');
+  },
+
   // Single-Session Enforcement
   // Called immediately after login to register the session token with the backend.
   // This overwrites any existing session for this email, kicking out other devices.
