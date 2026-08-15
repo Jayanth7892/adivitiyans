@@ -2226,20 +2226,92 @@ app.post('/faculty', async (req: Request, res: Response) => {
   try {
     const { faculty_id, name, email, department, role } = req.body;
     const facId = (faculty_id || `FAC${Date.now().toString().slice(-4)}`).toUpperCase();
+    const cleanEmail = String(email || '').toLowerCase().trim();
 
     if (db.isMock) {
-      const newFaculty = { faculty_id: facId, name, email, department: department || 'CSE', role: role || 'mentor' };
+      const newFaculty = { faculty_id: facId, name, email: cleanEmail, department: department || 'CSE', role: role || 'mentor' };
       return res.status(201).json({ message: 'Faculty registered successfully', faculty: newFaculty });
     }
 
+    // Upsert the new faculty record (on email conflict, update name/dept/role)
     const result = await db.query(
       `INSERT INTO faculty (faculty_id, name, email, department, role)
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (email) DO UPDATE SET name=$2, department=$4, role=$5
        RETURNING *`,
-      [facId, name, email.toLowerCase(), department || 'CSE', role || 'mentor']
+      [facId, name, cleanEmail, department || 'CSE', role || 'mentor']
     );
-    res.status(201).json({ message: 'Faculty registered successfully', faculty: result.rows[0] });
+    const newFac = result.rows[0];
+    const finalId = newFac.faculty_id.toUpperCase();
+
+    // ── Auto-merge: find placeholder CSV records for this same person ──────────
+    // Normalize: strip titles, strip single-char initials, keep alpha+spaces
+    const normName = (s: string) => s.toLowerCase()
+      .replace(/^(dr|prof|mr|mrs|ms|er)\.?\s*/i, '')
+      .replace(/\b[a-z]\.\s*/g, '')
+      .replace(/[^a-z\s]/g, '')
+      .trim();
+
+    const myNorm = normName(name || '');
+    // Significant words: length >= 4, sorted longest-first (most discriminating)
+    const myWords = myNorm.split(/\s+/)
+      .filter((w: string) => w.length >= 4)
+      .sort((a: string, b: string) => b.length - a.length);
+
+    if (myWords.length > 0) {
+      const allFac = await db.query('SELECT faculty_id, name, email FROM faculty');
+      const placeholders = allFac.rows.filter((f: any) => {
+        if (f.faculty_id.toUpperCase() === finalId) return false;
+        // Only consider placeholder records (unlinked email)
+        if (f.email && !f.email.startsWith('pending_')) return false;
+        const theirNorm = normName(f.name || '');
+        const theirWords = theirNorm.split(/\s+/).filter((w: string) => w.length >= 4);
+        // ALL of my significant words must appear in their normalized name (AND match)
+        return myWords.every((w: string) => theirNorm.includes(w))
+          || theirWords.every((w: string) => myNorm.includes(w));
+      });
+
+      for (const old of placeholders) {
+        const oldId = old.faculty_id.toUpperCase();
+        try {
+          // Migrate mentor_assignments to the new (registered) faculty_id
+          await db.query(
+            `INSERT INTO mentor_assignments (roll_number, faculty_id, assigned_at)
+             SELECT roll_number, $1, assigned_at FROM mentor_assignments WHERE UPPER(faculty_id) = $2
+             ON CONFLICT (roll_number, faculty_id) DO NOTHING`,
+            [finalId, oldId]
+          ).catch(() => {});
+          await db.query('DELETE FROM mentor_assignments WHERE UPPER(faculty_id) = $1', [oldId]).catch(() => {});
+
+          // Update any students still pointing to old faculty_id
+          await db.query(
+            'UPDATE students SET faculty_mentor_id = $1 WHERE UPPER(faculty_mentor_id) = $2',
+            [finalId, oldId]
+          ).catch(() => {});
+
+          // Delete the placeholder faculty record
+          await db.query('DELETE FROM faculty WHERE UPPER(faculty_id) = $1', [oldId]).catch(() => {});
+
+          console.log(`[Faculty] Auto-merged placeholder ${oldId} into ${finalId} for "${name}"`);
+        } catch (mergeErr: any) {
+          console.warn(`[Faculty] Merge failed for ${oldId} → ${finalId}:`, mergeErr.message);
+        }
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────────
+
+    // Also check mentor_assignments for this faculty_id (in case CSV was already correct)
+    await db.query(
+      `UPDATE students s
+       SET faculty_mentor_id = $1
+       FROM mentor_assignments ma
+       WHERE UPPER(ma.roll_number) = UPPER(s.roll_number)
+         AND UPPER(ma.faculty_id) = $1
+         AND (s.faculty_mentor_id IS NULL OR s.faculty_mentor_id = '')`,
+      [finalId]
+    ).catch(() => {});
+
+    res.status(201).json({ message: 'Faculty registered successfully', faculty: newFac });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -2311,14 +2383,19 @@ app.get('/faculty/mentees/by-email/:email', async (req: Request, res: Response) 
     // Extract significant words (length >= 4) from name for fuzzy matching
     const sigWords = primaryNorm.split(/\s+/).filter((w: string) => w.length >= 4);
 
-    // Step 2: Find ALL faculty records whose name shares a significant word with primary faculty
+    // Step 2: Find ALL faculty records whose name is a genuine alias for this person
+    // Uses AND-match: ALL of my significant words must appear in their name OR vice versa
+    // This prevents false positives (e.g. "basha" shared by Suleman Basha and Karimulla Basha)
     const allFac = await db.query('SELECT faculty_id, name FROM faculty');
     const matchingIds: string[] = [primaryFac.faculty_id];
     for (const f of allFac.rows) {
       if (f.faculty_id === primaryFac.faculty_id) continue;
       const norm = normalize(f.name);
-      const matches = sigWords.some((w: string) => norm.includes(w));
-      if (matches) matchingIds.push(f.faculty_id);
+      const theirWords = norm.split(/\s+/).filter((w: string) => w.length >= 4);
+      // Match if: ALL my sig words appear in their name, OR all their words appear in my name
+      const iMatch = sigWords.length > 0 && sigWords.every((w: string) => norm.includes(w));
+      const theyMatch = theirWords.length > 0 && theirWords.every((w: string) => primaryNorm.includes(w));
+      if (iMatch || theyMatch) matchingIds.push(f.faculty_id);
     }
 
     // Step 3: Union mentees across all matching faculty_ids
