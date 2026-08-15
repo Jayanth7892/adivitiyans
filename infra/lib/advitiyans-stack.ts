@@ -260,6 +260,8 @@ export class AdvitiyansStack extends cdk.Stack {
         HOD_MASTER_PASS:    process.env.HOD_MASTER_PASS    || '',
         // Secret for protecting /db-init and /db-migrate endpoints
         ADMIN_SECRET: process.env.ADMIN_SECRET || '',
+        // Faculty registration security key — required for faculty/HOD self-registration
+        FACULTY_SECRET_KEY: process.env.FACULTY_SECRET_KEY || '',
         BUILD_TIMESTAMP: new Date().toISOString(),
       },
     });
