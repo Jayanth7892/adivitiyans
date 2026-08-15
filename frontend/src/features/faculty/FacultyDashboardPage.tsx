@@ -316,6 +316,11 @@ export const FacultyDashboardPage: React.FC = () => {
                           ⚠️ {atRiskCount} at risk
                         </span>
                       )}
+                      {yearMentees.filter(m => !(m as any).registered).length > 0 && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-semibold">
+                          🕐 {yearMentees.filter(m => !(m as any).registered).length} not registered
+                        </span>
+                      )}
                     </div>
                     <span className="text-textSecondary text-sm">{isCollapsed ? '▶' : '▼'}</span>
                   </button>
@@ -336,6 +341,37 @@ export const FacultyDashboardPage: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-borderLine text-sm">
                           {yearMentees.map((mentee) => {
+                            const isRegistered = (mentee as any).registered !== false;
+
+                            // Unregistered student row
+                            if (!isRegistered) {
+                              return (
+                                <tr key={mentee.roll_number} className="bg-amber-50/30 hover:bg-amber-50/50 transition-colors">
+                                  <td className="py-3.5 px-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 font-bold flex items-center justify-center text-xs">?</div>
+                                      <div>
+                                        <p className="font-semibold text-amber-700 leading-tight text-xs">Not Registered Yet</p>
+                                        <p className="text-[11px] text-amber-500">Student has not created an account</p>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-3.5 px-4 font-bold text-amber-600 text-xs">{mentee.roll_number}</td>
+                                  <td className="py-3.5 px-4 text-xs text-textSecondary">—</td>
+                                  <td className="py-3.5 px-4 text-xs text-textSecondary">—</td>
+                                  <td className="py-3.5 px-4">
+                                    <span className="px-2.5 py-1 rounded-full text-xs font-bold border bg-amber-50 text-amber-600 border-amber-200">
+                                      🕐 Pending Registration
+                                    </span>
+                                  </td>
+                                  <td className="py-3.5 px-4 text-right">
+                                    <span className="text-[11px] text-textSecondary italic">No profile yet</span>
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            // Registered student row
                             const cgpa = Number((mentee as any).cgpa);
                             const isAtRisk = cgpa > 0 && cgpa < 6.0;
                             return (

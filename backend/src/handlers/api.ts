@@ -1085,6 +1085,23 @@ app.post('/students', async (req: Request, res: Response) => {
       ON CONFLICT (student_id, platform) DO NOTHING;
     `, [regNo, regNo.toLowerCase()]).catch(() => {/* ignore */});
 
+    // Auto-link mentor from mentor_assignments if a pre-assignment exists
+    if (!db.isMock) {
+      try {
+        const ma = await db.query(
+          `SELECT faculty_id FROM mentor_assignments WHERE UPPER(roll_number) = $1 LIMIT 1`,
+          [regNo]
+        );
+        if (ma.rows.length > 0) {
+          await db.query(
+            `UPDATE students SET faculty_mentor_id = $1, updated_at = CURRENT_TIMESTAMP WHERE roll_number = $2`,
+            [ma.rows[0].faculty_id, regNo]
+          );
+          createdStudent.faculty_mentor_id = ma.rows[0].faculty_id;
+        }
+      } catch (_) { /* mentor_assignments table may not exist yet — safe to ignore */ }
+    }
+
     res.status(201).json({ message: 'Student created successfully', student: createdStudent });
   } catch (err: any) {
     res.status(400).json({ error: err.message || err });
@@ -1168,6 +1185,20 @@ app.post('/students/bulk-import', requireRole('admin'), async (req: Request, res
          ON CONFLICT (student_id, platform) DO NOTHING;`,
         [rawRoll, rawRoll.toLowerCase()]
       ).catch(() => {});
+
+      // Auto-link mentor from mentor_assignments if a pre-assignment exists
+      try {
+        const ma = await db.query(
+          `SELECT faculty_id FROM mentor_assignments WHERE UPPER(roll_number) = $1 LIMIT 1`,
+          [rawRoll]
+        );
+        if (ma.rows.length > 0) {
+          await db.query(
+            `UPDATE students SET faculty_mentor_id = $1, updated_at = CURRENT_TIMESTAMP WHERE roll_number = $2`,
+            [ma.rows[0].faculty_id, rawRoll]
+          );
+        }
+      } catch (_) { /* mentor_assignments table may not exist yet */ }
 
       importedCount++;
     }
@@ -2364,7 +2395,19 @@ app.post('/mentor-assignments/upload', requireRole('admin'), async (req: Request
       autoCreatedFaculty.push(rawName);
     }
 
-    // Now assign students
+    // Ensure mentor_assignments table exists
+    if (!db.isMock) {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS mentor_assignments (
+          roll_number  TEXT        NOT NULL,
+          faculty_id   TEXT        NOT NULL,
+          assigned_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (roll_number, faculty_id)
+        )
+      `).catch(() => {});
+    }
+
+    // Now assign students — upsert into mentor_assignments AND update students if they exist
     for (const row of rows) {
       const facId = facultyCache[normalize(row.facultyName.trim())];
       if (!facId) continue;
@@ -2379,6 +2422,15 @@ app.post('/mentor-assignments/upload', requireRole('admin'), async (req: Request
           continue;
         }
 
+        // Always persist the assignment (even if student hasn't registered yet)
+        await db.query(
+          `INSERT INTO mentor_assignments (roll_number, faculty_id)
+           VALUES ($1, $2)
+           ON CONFLICT (roll_number, faculty_id) DO NOTHING`,
+          [cleanRoll, facId]
+        );
+
+        // Also update students table if the student already exists
         const r = await db.query(
           `UPDATE students SET faculty_mentor_id = $1, updated_at = CURRENT_TIMESTAMP
            WHERE UPPER(roll_number) = $2 RETURNING roll_number`,
@@ -2413,27 +2465,64 @@ app.get('/faculty/:id/mentees', async (req: Request, res: Response) => {
       const students = Array.from(db.mockStore.students.values()).filter(
         (s) => s.faculty_mentor_id === facultyId || facultyId === 'FAC001'
       );
-      return res.json(students);
+      return res.json(students.map(s => ({ ...s, registered: true })));
     }
 
+    // Ensure mentor_assignments table exists before querying
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS mentor_assignments (
+        roll_number  TEXT        NOT NULL,
+        faculty_id   TEXT        NOT NULL,
+        assigned_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (roll_number, faculty_id)
+      )
+    `).catch(() => {});
+
+    // LEFT JOIN: returns ALL assigned roll numbers, registered or not
     const result = await db.query(
-      `SELECT s.*,
-              COALESCE(ROUND(AVG(a.semester_gpa), 2), 0.00) AS cgpa,
-              MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.handle END) AS leetcode_handle,
-              COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.score_rating END), 0) AS leetcode_solved,
-              MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.handle END) AS github_handle,
-              COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.repositories_count END), 0) AS github_repos
-       FROM students s
+      `SELECT
+         ma.roll_number,
+         ma.faculty_id AS assigned_faculty_id,
+         ma.assigned_at,
+         CASE WHEN s.roll_number IS NOT NULL THEN true ELSE false END AS registered,
+         s.name,
+         s.email,
+         s.year,
+         s.batch,
+         s.section,
+         s.department,
+         s.phone,
+         s.photo_url,
+         s.linkedin_url,
+         s.faculty_mentor_id,
+         COALESCE(ROUND(AVG(a.semester_gpa), 2), 0.00) AS cgpa,
+         MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.handle END) AS leetcode_handle,
+         COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'leetcode' THEN c.score_rating END), 0) AS leetcode_solved,
+         MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.handle END) AS github_handle,
+         COALESCE(MAX(CASE WHEN LOWER(c.platform) = 'github' THEN c.repositories_count END), 0) AS github_repos
+       FROM mentor_assignments ma
+       LEFT JOIN students s ON UPPER(s.roll_number) = UPPER(ma.roll_number)
        LEFT JOIN academics a ON a.student_id = s.roll_number
        LEFT JOIN coding_profiles c ON c.student_id = s.roll_number
-       WHERE s.faculty_mentor_id = $1
-       GROUP BY s.roll_number, s.name, s.email, s.year, s.phone, s.address, s.native_place, s.department, s.batch, s.section, s.hostel_day_scholar, s.driving_license, s.passport, s.relocation_willingness, s.family_business, s.financial_background, s.faculty_mentor_id, s.photo_url, s.resume_url, s.linkedin_url, s.linkedin_updated, s.created_at, s.updated_at
-       ORDER BY s.roll_number`,
+       WHERE UPPER(ma.faculty_id) = $1
+       GROUP BY
+         ma.roll_number, ma.faculty_id, ma.assigned_at,
+         s.roll_number, s.name, s.email, s.year, s.batch, s.section,
+         s.department, s.phone, s.photo_url, s.linkedin_url, s.faculty_mentor_id
+       ORDER BY
+         registered DESC,
+         s.year DESC NULLS LAST,
+         ma.roll_number`,
       [facultyId]
     );
+
     const formattedRows = result.rows.map((r: any) => ({
       ...r,
-      department: (!r.department || r.department === 'CSE' || r.department === 'Data Science' || r.department === 'CSE (Data Science)') ? 'CSE(Data Science)' : r.department,
+      name: r.name || null,
+      department: r.department
+        ? ((!r.department || r.department === 'CSE' || r.department === 'Data Science' || r.department === 'CSE (Data Science)') ? 'CSE(Data Science)' : r.department)
+        : null,
+      registered: r.registered === true || r.registered === 't',
     }));
     res.json(formattedRows);
   } catch (err: any) {

@@ -826,30 +826,33 @@ export const HodDashboardPage: React.FC = () => {
           {(() => {
             const filtered = hodMentees.filter(m => {
               const q = menteeSearch.toLowerCase();
-              const matchSearch = !q || m.name.toLowerCase().includes(q) || m.roll_number.toLowerCase().includes(q);
+              const matchSearch = !q || (m.name || '').toLowerCase().includes(q) || m.roll_number.toLowerCase().includes(q);
               const matchYear = !menteeYearFilter || m.year === menteeYearFilter;
               return matchSearch && matchYear;
             });
             const YEAR_ORDER = ['4th Year','3rd Year','2nd Year','1st Year'];
-            const groups = YEAR_ORDER.map(y => ({ year: y, list: filtered.filter(m => m.year === y) })).filter(g => g.list.length > 0);
-            const others = filtered.filter(m => !YEAR_ORDER.includes(m.year));
-            if (others.length > 0) groups.push({ year: 'Other', list: others });
+            // Unregistered students have no year — group them under 'Unregistered'
+            const groups = YEAR_ORDER.map(y => ({ year: y, list: filtered.filter(m => (m as any).registered !== false && m.year === y) })).filter(g => g.list.length > 0);
+            const unregistered = filtered.filter(m => (m as any).registered === false);
+            if (unregistered.length > 0) groups.push({ year: 'Unregistered', list: unregistered });
             if (filtered.length === 0) return <p className="text-center text-textSecondary text-xs py-10">No mentees found.</p>;
             return (
               <div className="space-y-4">
                 {groups.map(({ year, list }) => {
                   const isCollapsed = collapsedYears.has(year);
+                  const isUnregGroup = year === 'Unregistered';
                   const atRisk = list.filter(m => Number((m as any).cgpa) > 0 && Number((m as any).cgpa) < 6.0).length;
                   const validCgpa = list.filter(m => Number((m as any).cgpa) > 0);
                   const avgCgpa = validCgpa.length > 0 ? (validCgpa.reduce((s,m) => s + Number((m as any).cgpa), 0) / validCgpa.length).toFixed(2) : '—';
                   return (
                     <div key={year} className="border border-borderLine rounded-xl overflow-hidden">
-                      <button onClick={() => toggleYear(year)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-brand-soft/10 transition-colors">
+                      <button onClick={() => toggleYear(year)} className={`w-full flex items-center justify-between px-4 py-3 transition-colors ${isUnregGroup ? 'bg-amber-50/50 hover:bg-amber-50' : 'bg-background hover:bg-brand-soft/10'}`}>
                         <div className="flex items-center gap-3">
-                          <span className="text-sm font-bold text-textPrimary">{year}</span>
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-brand-soft text-brand-primary font-semibold">{list.length} students</span>
-                          <span className="text-[11px] text-textSecondary">Avg CGPA: {avgCgpa}</span>
+                          <span className="text-sm font-bold text-textPrimary">{isUnregGroup ? '🕐 Not Yet Registered' : year}</span>
+                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${isUnregGroup ? 'bg-amber-100 text-amber-700' : 'bg-brand-soft text-brand-primary'}`}>{list.length} students</span>
+                          {!isUnregGroup && <span className="text-[11px] text-textSecondary">Avg CGPA: {avgCgpa}</span>}
                           {atRisk > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 font-semibold">⚠️ {atRisk} at risk</span>}
+                          {isUnregGroup && <span className="text-[11px] text-amber-600">Students assigned but not yet signed up</span>}
                         </div>
                         <span className="text-textSecondary text-sm">{isCollapsed ? '▶' : '▼'}</span>
                       </button>
@@ -867,9 +870,37 @@ export const HodDashboardPage: React.FC = () => {
                             </thead>
                             <tbody className="divide-y divide-borderLine text-sm">
                               {list.map(m => {
+                                const isReg = (m as any).registered !== false;
+
+                                // Not registered row
+                                if (!isReg) {
+                                  return (
+                                    <tr key={m.roll_number} className="bg-amber-50/30 hover:bg-amber-50/50 transition-colors">
+                                      <td className="py-3.5 px-4">
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 font-bold flex items-center justify-center text-xs">?</div>
+                                          <div>
+                                            <p className="font-semibold text-amber-700 leading-tight text-xs">Not Registered Yet</p>
+                                            <p className="text-[11px] text-amber-500">Student has not created an account</p>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="py-3.5 px-4 font-bold text-amber-600 text-xs">{m.roll_number}</td>
+                                      <td className="py-3.5 px-4 text-xs text-textSecondary">—</td>
+                                      <td className="py-3.5 px-4 text-xs text-textSecondary">—</td>
+                                      <td className="py-3.5 px-4">
+                                        <span className="px-2.5 py-1 rounded-full text-xs font-bold border bg-amber-50 text-amber-600 border-amber-200">
+                                          🕐 Pending Registration
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+
+                                // Registered row
                                 const cgpa = Number((m as any).cgpa);
                                 const isAtRisk = cgpa > 0 && cgpa < 6.0;
-                                const initials = m.name.split(' ').map((n:string) => n[0]).join('');
+                                const initials = (m.name || '?').split(' ').map((n:string) => n[0]).join('');
                                 const standing = cgpa >= 9.0 ? 'Distinction' : cgpa >= 7.0 ? 'First Class' : cgpa >= 5.0 ? 'Second Class' : '—';
                                 return (
                                   <tr key={m.roll_number} className={`hover:bg-background/50 transition-colors ${isAtRisk ? 'bg-red-50/30' : ''}`}>
