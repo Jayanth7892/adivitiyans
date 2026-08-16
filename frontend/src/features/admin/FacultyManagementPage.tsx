@@ -96,31 +96,44 @@ export default function FacultyManagementPage() {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: '24px', minHeight: '100vh', background: '#f8f9fb' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+    <div className="flex flex-col gap-6 p-6 min-h-screen bg-background transition-colors duration-200">
+
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: '#1a1a2e' }}>Faculty Management</h1>
-          <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 14 }}>{faculty.length} faculty members — select a row to view their assigned mentees</p>
+          <h1 className="text-2xl font-bold text-textPrimary">Faculty Management</h1>
+          <p className="mt-1 text-sm text-textSecondary">
+            {faculty.length} faculty members — select a row to view their assigned mentees
+          </p>
         </div>
-        <button onClick={() => setShowBlocked(p => !p)}
-          style={{ padding: '8px 18px', borderRadius: 8, border: '1.5px solid #ef4444', background: showBlocked ? '#ef4444' : 'white', color: showBlocked ? 'white' : '#ef4444', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+        <button
+          onClick={() => setShowBlocked(p => !p)}
+          className={`px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+            showBlocked
+              ? 'bg-alert border-alert text-white'
+              : 'bg-surface border-alert text-alert hover:bg-alert/10'
+          }`}
+        >
           {showBlocked ? 'Hide' : 'Show'} Blocked Emails
         </button>
       </div>
 
+      {/* Blocked Emails panel */}
       {showBlocked && (
-        <div style={{ background: '#fff5f5', border: '1.5px solid #fecaca', borderRadius: 12, padding: 20 }}>
-          <h3 style={{ margin: '0 0 12px', color: '#dc2626', fontSize: 15 }}>Blocked Emails ({blocked.length})</h3>
+        <div className="bg-alert-soft border border-alert/30 rounded-xl p-5">
+          <h3 className="text-sm font-bold text-alert mb-3">Blocked Emails ({blocked.length})</h3>
           {blocked.length === 0 ? (
-            <p style={{ color: '#64748b', margin: 0, fontSize: 13 }}>No blocked emails.</p>
+            <p className="text-sm text-textSecondary">No blocked emails.</p>
           ) : blocked.map(b => (
-            <div key={b.email} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'white', borderRadius: 8, padding: '10px 14px', border: '1px solid #fecaca', marginBottom: 6 }}>
-              <div style={{ flex: 1 }}>
-                <span style={{ fontWeight: 600, color: '#dc2626', fontSize: 13 }}>{b.email}</span>
-                <span style={{ marginLeft: 10, color: '#94a3b8', fontSize: 12 }}>{b.reason}</span>
+            <div key={b.email} className="flex items-center gap-3 bg-surface border border-alert/20 rounded-lg px-3.5 py-2.5 mb-1.5">
+              <div className="flex-1 min-w-0">
+                <span className="font-semibold text-alert text-sm">{b.email}</span>
+                <span className="ml-2.5 text-textSecondary text-xs">{b.reason}</span>
               </div>
-              <button onClick={() => unblockMut.mutate(b.email)}
-                style={{ padding: '5px 14px', borderRadius: 6, border: '1.5px solid #22c55e', background: 'white', color: '#16a34a', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>
+              <button
+                onClick={() => unblockMut.mutate(b.email)}
+                className="px-3.5 py-1 rounded-md border border-green-500 bg-surface text-green-600 font-semibold text-xs hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+              >
                 Unblock
               </button>
             </div>
@@ -128,70 +141,129 @@ export default function FacultyManagementPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      {/* Main grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
         {/* LEFT — Faculty list */}
-        <div style={{ background: 'white', borderRadius: 16, border: '1.5px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '75vh' }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9' }}>
-            <input placeholder="Search name, email, ID..." value={search} onChange={e => setSearch(e.target.value)}
-              style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+        <div className="bg-surface border border-borderLine rounded-2xl overflow-hidden flex flex-col max-h-[75vh]">
+          <div className="px-4 py-3.5 border-b border-borderLine">
+            <input
+              placeholder="Search name, email, ID..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-borderLine bg-background text-sm text-textPrimary placeholder:text-textSecondary focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary transition-all"
+            />
           </div>
-          <div style={{ overflowY: 'auto', flex: 1 }}>
-            {facLoading ? <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Loading...</div>
-              : filtered.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>No faculty found</div>
+          <div className="overflow-y-auto flex-1">
+            {facLoading
+              ? <div className="p-10 text-center text-textSecondary text-sm">Loading...</div>
+              : filtered.length === 0
+              ? <div className="p-10 text-center text-textSecondary text-sm">No faculty found</div>
               : filtered.map(f => {
                 const sel = selectedFaculty?.faculty_id === f.faculty_id;
                 const isLinked = f.email && !f.email.startsWith('pending_');
                 const isDeleting = deleteConfirm === f.faculty_id;
                 return (
-                  <div key={f.faculty_id} onClick={() => setSelectedFaculty(f)}
-                    style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: sel ? '#faf5ff' : 'white', borderLeft: sel ? '3px solid #7c3aed' : '3px solid transparent' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    key={f.faculty_id}
+                    onClick={() => setSelectedFaculty(f)}
+                    className={`px-4 py-3.5 border-b border-borderLine cursor-pointer transition-colors border-l-[3px] ${
+                      sel ? 'bg-brand-soft border-l-brand-primary' : 'bg-surface border-l-transparent hover:bg-background'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center gap-2">
+                      <div className="flex-1 min-w-0">
                         {renameId === f.faculty_id ? (
-                          <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
-                            <input autoFocus value={renameValue} onChange={e => setRenameValue(e.target.value)}
-                              style={{ flex: 1, padding: '3px 8px', borderRadius: 6, border: '1.5px solid #7c3aed', fontSize: 13, outline: 'none' }}
-                              onKeyDown={e => { if (e.key === 'Enter') renameMut.mutate({ id: f.faculty_id, name: renameValue }); if (e.key === 'Escape') setRenameId(null); }} />
-                            <button onClick={() => renameMut.mutate({ id: f.faculty_id, name: renameValue })} style={{ padding: '3px 9px', borderRadius: 6, background: '#7c3aed', color: 'white', border: 'none', cursor: 'pointer', fontSize: 12 }}>Save</button>
-                            <button onClick={() => setRenameId(null)} style={{ padding: '3px 7px', borderRadius: 6, background: '#f1f5f9', color: '#64748b', border: 'none', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                          <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
+                            <input
+                              autoFocus
+                              value={renameValue}
+                              onChange={e => setRenameValue(e.target.value)}
+                              className="flex-1 px-2 py-1 rounded-md border border-brand-primary bg-background text-sm text-textPrimary focus:outline-none"
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') renameMut.mutate({ id: f.faculty_id, name: renameValue });
+                                if (e.key === 'Escape') setRenameId(null);
+                              }}
+                            />
+                            <button
+                              onClick={() => renameMut.mutate({ id: f.faculty_id, name: renameValue })}
+                              className="px-2.5 py-1 rounded-md bg-brand-primary text-white text-xs font-semibold"
+                            >Save</button>
+                            <button
+                              onClick={() => setRenameId(null)}
+                              className="px-2 py-1 rounded-md bg-background text-textSecondary text-xs border border-borderLine"
+                            >✕</button>
                           </div>
                         ) : (
-                          <div style={{ fontWeight: 600, fontSize: 14, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                          <div className="font-semibold text-sm text-textPrimary truncate">{f.name}</div>
                         )}
-                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{f.faculty_id}</div>
+                        <div className="text-[11px] text-textSecondary mt-0.5">{f.faculty_id}</div>
                       </div>
-                      <span style={{ background: '#f0f9ff', color: '#0369a1', borderRadius: 20, padding: '2px 10px', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>{f.mentee_count ?? 0} mentees</span>
+                      <span className="bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap">
+                        {f.mentee_count ?? 0} mentees
+                      </span>
                     </div>
-                    <div style={{ marginTop: 5 }}>
+
+                    <div className="mt-1.5">
                       {linkEmailId === f.faculty_id ? (
-                        <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
-                          <input autoFocus value={linkEmailValue} onChange={e => setLinkEmailValue(e.target.value)} placeholder="email@rgmcet.edu.in"
-                            style={{ flex: 1, padding: '3px 8px', borderRadius: 6, border: '1.5px solid #0ea5e9', fontSize: 12, outline: 'none' }}
-                            onKeyDown={e => { if (e.key === 'Enter') linkEmailMut.mutate({ id: f.faculty_id, email: linkEmailValue }); if (e.key === 'Escape') setLinkEmailId(null); }} />
-                          <button onClick={() => linkEmailMut.mutate({ id: f.faculty_id, email: linkEmailValue })} style={{ padding: '3px 9px', borderRadius: 6, background: '#0ea5e9', color: 'white', border: 'none', cursor: 'pointer', fontSize: 12 }}>Link</button>
-                          <button onClick={() => setLinkEmailId(null)} style={{ padding: '3px 7px', borderRadius: 6, background: '#f1f5f9', color: '#64748b', border: 'none', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                        <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
+                          <input
+                            autoFocus
+                            value={linkEmailValue}
+                            onChange={e => setLinkEmailValue(e.target.value)}
+                            placeholder="email@rgmcet.edu.in"
+                            className="flex-1 px-2 py-1 rounded-md border border-sky-400 bg-background text-xs text-textPrimary focus:outline-none"
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') linkEmailMut.mutate({ id: f.faculty_id, email: linkEmailValue });
+                              if (e.key === 'Escape') setLinkEmailId(null);
+                            }}
+                          />
+                          <button
+                            onClick={() => linkEmailMut.mutate({ id: f.faculty_id, email: linkEmailValue })}
+                            className="px-2.5 py-1 rounded-md bg-sky-500 text-white text-xs font-semibold"
+                          >Link</button>
+                          <button
+                            onClick={() => setLinkEmailId(null)}
+                            className="px-2 py-1 rounded-md bg-background text-textSecondary text-xs border border-borderLine"
+                          >✕</button>
                         </div>
                       ) : (
-                        <span style={{ fontSize: 12, color: isLinked ? '#16a34a' : '#f59e0b' }}>{isLinked ? `✉ ${f.email}` : '⚠ Not linked'}</span>
+                        <span className={`text-xs font-medium ${isLinked ? 'text-green-600' : 'text-amber-500'}`}>
+                          {isLinked ? `✉ ${f.email}` : '⚠ Not linked'}
+                        </span>
                       )}
                     </div>
-                    {actionError[f.faculty_id] && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 3 }}>{actionError[f.faculty_id]}</div>}
-                    <div style={{ display: 'flex', gap: 5, marginTop: 9, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-                      <button onClick={() => { setRenameId(f.faculty_id); setRenameValue(f.name); }}
-                        style={{ padding: '3px 10px', borderRadius: 6, border: '1.5px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>✏ Rename</button>
-                      <button onClick={() => { setLinkEmailId(f.faculty_id); setLinkEmailValue(f.email || ''); }}
-                        style={{ padding: '3px 10px', borderRadius: 6, border: '1.5px solid #0ea5e9', background: 'white', color: '#0369a1', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>{isLinked ? '📧 Update Email' : '🔗 Link Email'}</button>
+
+                    {actionError[f.faculty_id] && (
+                      <div className="text-[11px] text-alert mt-1">{actionError[f.faculty_id]}</div>
+                    )}
+
+                    <div className="flex gap-1.5 mt-2.5 flex-wrap" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => { setRenameId(f.faculty_id); setRenameValue(f.name); }}
+                        className="px-2.5 py-1 rounded-md border border-borderLine bg-surface text-textSecondary text-xs font-semibold hover:bg-background transition-colors"
+                      >✏ Rename</button>
+                      <button
+                        onClick={() => { setLinkEmailId(f.faculty_id); setLinkEmailValue(f.email || ''); }}
+                        className="px-2.5 py-1 rounded-md border border-sky-400 bg-surface text-sky-600 text-xs font-semibold hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-colors"
+                      >{isLinked ? '📧 Update Email' : '🔗 Link Email'}</button>
                       {isDeleting ? (
                         <>
-                          <button onClick={() => deleteMut.mutate(f.faculty_id)} disabled={deleteMut.isPending}
-                            style={{ padding: '3px 10px', borderRadius: 6, border: 'none', background: '#dc2626', color: 'white', fontWeight: 700, cursor: 'pointer', fontSize: 12 }}>
-                            {deleteMut.isPending ? '...' : '⚠ Confirm Delete'}
-                          </button>
-                          <button onClick={() => setDeleteConfirm(null)} style={{ padding: '3px 7px', borderRadius: 6, background: '#f1f5f9', color: '#64748b', border: 'none', cursor: 'pointer', fontSize: 12 }}>Cancel</button>
+                          <button
+                            onClick={() => deleteMut.mutate(f.faculty_id)}
+                            disabled={deleteMut.isPending}
+                            className="px-2.5 py-1 rounded-md bg-alert text-white text-xs font-bold disabled:opacity-60"
+                          >{deleteMut.isPending ? '...' : '⚠ Confirm Delete'}</button>
+                          <button
+                            onClick={() => setDeleteConfirm(null)}
+                            className="px-2 py-1 rounded-md bg-background text-textSecondary text-xs border border-borderLine"
+                          >Cancel</button>
                         </>
                       ) : (
-                        <button onClick={() => setDeleteConfirm(f.faculty_id)}
-                          style={{ padding: '3px 10px', borderRadius: 6, border: '1.5px solid #fca5a5', background: 'white', color: '#dc2626', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>🗑 Delete</button>
+                        <button
+                          onClick={() => setDeleteConfirm(f.faculty_id)}
+                          className="px-2.5 py-1 rounded-md border border-alert/40 bg-surface text-alert text-xs font-semibold hover:bg-alert-soft transition-colors"
+                        >🗑 Delete</button>
                       )}
                     </div>
                   </div>
@@ -201,49 +273,60 @@ export default function FacultyManagementPage() {
         </div>
 
         {/* RIGHT — Mentee directory */}
-        <div style={{ background: 'white', borderRadius: 16, border: '1.5px solid #e2e8f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '75vh' }}>
+        <div className="bg-surface border border-borderLine rounded-2xl overflow-hidden flex flex-col max-h-[75vh]">
           {!selectedFaculty ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', gap: 12, padding: 40 }}>
-              <span style={{ fontSize: 48 }}>👈</span>
-              <p style={{ margin: 0, fontSize: 15, fontWeight: 500, textAlign: 'center' }}>Select a faculty member to view their assigned mentees</p>
+            <div className="flex-1 flex flex-col items-center justify-center text-textSecondary gap-3 p-10 text-center">
+              <span className="text-5xl">👈</span>
+              <p className="text-sm font-medium">Select a faculty member to view their assigned mentees</p>
             </div>
           ) : (
             <>
-              <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9', background: 'linear-gradient(135deg,#ede9fe,#f0f9ff)' }}>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1e293b' }}>{selectedFaculty.name}</h3>
-                <p style={{ margin: '2px 0 0', fontSize: 13, color: '#64748b' }}>{selectedFaculty.faculty_id} · {mentees.length} assigned mentees</p>
+              <div className="px-4 py-3.5 border-b border-borderLine bg-background">
+                <h3 className="text-sm font-bold text-textPrimary">{selectedFaculty.name}</h3>
+                <p className="text-xs text-textSecondary mt-0.5">
+                  {selectedFaculty.faculty_id} · {mentees.length} assigned mentees
+                </p>
               </div>
-              <div style={{ overflowY: 'auto', flex: 1 }}>
-                {menteesLoading ? <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Loading mentees...</div>
-                  : mentees.length === 0 ? <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>No mentees assigned.</div>
+              <div className="overflow-y-auto flex-1">
+                {menteesLoading
+                  ? <div className="p-10 text-center text-textSecondary text-sm">Loading mentees...</div>
+                  : mentees.length === 0
+                  ? <div className="p-10 text-center text-textSecondary text-sm">No mentees assigned.</div>
                   : mentees.map(m => (
-                    <div key={m.roll_number} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 18px', borderBottom: '1px solid #f8fafc' }}>
-                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: m.registered ? '#22c55e' : '#f59e0b', flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b' }}>{m.name || m.roll_number}</div>
-                        <div style={{ fontSize: 12, color: '#64748b', display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+                    <div key={m.roll_number} className="flex items-center gap-3 px-4 py-3 border-b border-borderLine">
+                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${m.registered ? 'bg-green-500' : 'bg-amber-400'}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-textPrimary">{m.name || m.roll_number}</div>
+                        <div className="text-xs text-textSecondary flex gap-2 flex-wrap mt-0.5">
                           <span>{m.roll_number}</span>
                           {m.year && <span>Y{m.year}</span>}
                           {m.section && <span>Sec {m.section}</span>}
                           {m.cgpa != null && <span>CGPA {m.cgpa}</span>}
                         </div>
-                        {!m.registered && <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600 }}>Not yet registered</span>}
+                        {!m.registered && (
+                          <span className="text-[11px] text-amber-500 font-semibold">Not yet registered</span>
+                        )}
                       </div>
-                      <button onClick={() => unassignMut.mutate({ facId: selectedFaculty.faculty_id, roll: m.roll_number })}
+                      <button
+                        onClick={() => unassignMut.mutate({ facId: selectedFaculty.faculty_id, roll: m.roll_number })}
                         disabled={unassignMut.isPending}
-                        style={{ padding: '4px 10px', borderRadius: 6, border: '1.5px solid #fca5a5', background: 'white', color: '#dc2626', fontWeight: 600, cursor: 'pointer', fontSize: 12 }}>
-                        Unassign
-                      </button>
+                        className="px-2.5 py-1 rounded-md border border-alert/40 bg-surface text-alert text-xs font-semibold hover:bg-alert-soft transition-colors disabled:opacity-50"
+                      >Unassign</button>
                     </div>
                   ))}
               </div>
-              <div style={{ padding: '10px 18px', borderTop: '1px solid #f1f5f9', display: 'flex', gap: 14, fontSize: 11, color: '#94a3b8' }}>
-                <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#22c55e', marginRight: 4 }}/>Registered</span>
-                <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#f59e0b', marginRight: 4 }}/>Pending</span>
+              <div className="px-4 py-2.5 border-t border-borderLine flex gap-4 text-[11px] text-textSecondary">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />Registered
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />Pending
+                </span>
               </div>
             </>
           )}
         </div>
+
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 
@@ -28,119 +28,89 @@ export default function MyMentorPage() {
   });
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg,#f8f9fb 0%,#f0f4ff 100%)', padding: '32px 24px' }}>
-      {/* Header */}
-      <div style={{ maxWidth: 900, margin: '0 auto' }}>
-        <div style={{ marginBottom: 28 }}>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: '#1a1a2e', letterSpacing: '-0.5px' }}>
-            My Mentor
-          </h1>
-          <p style={{ margin: '6px 0 0', color: '#64748b', fontSize: 15 }}>
+    <div className="min-h-screen bg-background px-6 py-8 transition-colors duration-200">
+      <div className="max-w-3xl mx-auto">
+
+        {/* Header */}
+        <div className="mb-7">
+          <h1 className="text-2xl font-extrabold text-textPrimary tracking-tight">My Mentor</h1>
+          <p className="mt-1.5 text-sm text-textSecondary">
             Your assigned faculty mentor and academic guidance
           </p>
         </div>
 
+        {/* Loading Skeleton */}
         {isLoading && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="flex flex-col gap-4">
             {[1, 2].map(i => (
-              <div key={i} style={{ background: 'white', borderRadius: 16, height: 120, border: '1.5px solid #e2e8f0', animation: 'pulse 1.5s infinite' }} />
+              <div key={i} className="bg-surface border border-borderLine rounded-2xl h-28 animate-pulse" />
             ))}
           </div>
         )}
 
+        {/* Error */}
         {error && (
-          <div style={{ background: '#fff5f5', border: '1.5px solid #fecaca', borderRadius: 16, padding: 24, color: '#dc2626', textAlign: 'center' }}>
+          <div className="bg-alert-soft border border-alert/30 rounded-2xl p-6 text-alert text-center text-sm font-medium">
             Failed to load mentor details. Please try again later.
           </div>
         )}
 
         {!isLoading && !error && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="flex flex-col gap-5">
 
             {/* ── Mentor Card ── */}
             {mentor?.assigned ? (
-              <div style={{
-                background: 'white',
-                borderRadius: 20,
-                border: '1.5px solid #e2e8f0',
-                overflow: 'hidden',
-                boxShadow: '0 4px 24px rgba(124,58,237,0.07)',
-              }}>
+              <div className="bg-surface border border-borderLine rounded-2xl overflow-hidden shadow-sm">
                 {/* Purple gradient banner */}
-                <div style={{ height: 80, background: 'linear-gradient(135deg,#7c3aed,#0ea5e9)', position: 'relative' }} />
+                <div className="h-20 bg-gradient-to-r from-violet-600 to-sky-500" />
 
-                <div style={{ padding: '0 28px 28px' }}>
+                <div className="px-7 pb-7">
                   {/* Avatar overlapping banner */}
-                  <div style={{ marginTop: -44, marginBottom: 16, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-                    <div style={{
-                      width: 80, height: 80, borderRadius: '50%',
-                      background: avatarColor(mentor.name || 'M'),
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 28, fontWeight: 800, color: 'white',
-                      border: '4px solid white',
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-                      flexShrink: 0,
-                    }}>
+                  <div className="-mt-11 mb-4 flex items-end justify-between">
+                    <div
+                      className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-black text-white border-4 border-surface shadow-md shrink-0"
+                      style={{ background: avatarColor(mentor.name || 'M') }}
+                    >
                       {getInitials(mentor.name || 'M')}
                     </div>
                     {/* Role badge */}
-                    <span style={{
-                      padding: '6px 16px', borderRadius: 20,
-                      background: mentor.role === 'hod' ? 'linear-gradient(135deg,#7c3aed,#5b21b6)' : 'linear-gradient(135deg,#0ea5e9,#0369a1)',
-                      color: 'white', fontWeight: 700, fontSize: 13,
-                    }}>
+                    <span
+                      className="px-4 py-1.5 rounded-full text-white font-bold text-xs"
+                      style={{
+                        background: mentor.role === 'hod'
+                          ? 'linear-gradient(135deg,#7c3aed,#5b21b6)'
+                          : 'linear-gradient(135deg,#0ea5e9,#0369a1)',
+                      }}
+                    >
                       {mentor.role === 'hod' ? '👑 Head of Department' : '🎓 Faculty Mentor'}
                     </span>
                   </div>
 
                   {/* Name & details */}
-                  <h2 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, color: '#1e293b' }}>
-                    {mentor.name}
-                  </h2>
-                  <p style={{ margin: '0 0 20px', color: '#64748b', fontSize: 14 }}>
+                  <h2 className="text-xl font-extrabold text-textPrimary mb-1">{mentor.name}</h2>
+                  <p className="text-sm text-textSecondary mb-5">
                     {mentor.department || 'CSE (Data Science)'}
                   </p>
 
                   {/* Info grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                    <InfoCard
-                      icon="🏛️"
-                      label="Department"
-                      value={mentor.department || 'CSE (Data Science)'}
-                    />
-                    <InfoCard
-                      icon="👤"
-                      label="Designation"
-                      value={mentor.role === 'hod' ? 'Head of Department' : 'Faculty Mentor'}
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <InfoCard icon="🏛️" label="Department" value={mentor.department || 'CSE (Data Science)'} />
+                    <InfoCard icon="👤" label="Designation" value={mentor.role === 'hod' ? 'Head of Department' : 'Faculty Mentor'} />
                     {mentor.email && (
-                      <InfoCard
-                        icon="✉️"
-                        label="Email"
-                        value={mentor.email}
-                        href={`mailto:${mentor.email}`}
-                      />
+                      <InfoCard icon="✉️" label="Email" value={mentor.email} href={`mailto:${mentor.email}`} />
                     )}
-                    <InfoCard
-                      icon="🆔"
-                      label="Faculty ID"
-                      value={mentor.faculty_id || '—'}
-                    />
+                    <InfoCard icon="🆔" label="Faculty ID" value={mentor.faculty_id || '—'} />
                   </div>
                 </div>
               </div>
             ) : (
               /* Not assigned state */
-              <div style={{
-                background: 'white', borderRadius: 20, border: '1.5px dashed #c4b5fd',
-                padding: 48, textAlign: 'center',
-                boxShadow: '0 4px 24px rgba(124,58,237,0.05)',
-              }}>
-                <div style={{ fontSize: 56, marginBottom: 16 }}>🎓</div>
-                <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700, color: '#4c1d95' }}>
+              <div className="bg-surface border-2 border-dashed border-violet-300 dark:border-violet-800 rounded-2xl p-12 text-center shadow-sm">
+                <div className="text-5xl mb-4">🎓</div>
+                <h3 className="text-lg font-bold text-violet-700 dark:text-violet-400 mb-2">
                   No Mentor Assigned Yet
                 </h3>
-                <p style={{ margin: 0, color: '#64748b', fontSize: 15, lineHeight: 1.6 }}>
+                <p className="text-sm text-textSecondary leading-relaxed">
                   Your faculty mentor will be assigned by the department admin.<br />
                   Please check back later or contact your HOD.
                 </p>
@@ -148,61 +118,42 @@ export default function MyMentorPage() {
             )}
 
             {/* ── Faculty Remarks ── */}
-            <div style={{
-              background: 'white', borderRadius: 20, border: '1.5px solid #e2e8f0',
-              overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.04)',
-            }}>
-              <div style={{
-                padding: '20px 28px', borderBottom: '1px solid #f1f5f9',
-                background: 'linear-gradient(135deg,#faf5ff,#f0f9ff)',
-                display: 'flex', alignItems: 'center', gap: 10,
-              }}>
-                <span style={{ fontSize: 20 }}>📝</span>
+            <div className="bg-surface border border-borderLine rounded-2xl overflow-hidden shadow-sm">
+              <div className="px-7 py-5 border-b border-borderLine bg-background flex items-center gap-3">
+                <span className="text-xl">📝</span>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
-                    Faculty Remarks
-                  </h3>
-                  <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>
+                  <h3 className="text-sm font-bold text-textPrimary">Faculty Remarks</h3>
+                  <p className="text-xs text-textSecondary mt-0.5">
                     Academic feedback and notes from your mentor
                   </p>
                 </div>
               </div>
 
-              <div style={{ padding: 28 }}>
+              <div className="p-7">
                 {mentor?.remarks ? (
-                  <div style={{
-                    background: 'linear-gradient(135deg,#faf5ff,#f0f9ff)',
-                    borderRadius: 12, padding: 24,
-                    borderLeft: '4px solid #7c3aed',
-                  }}>
-                    <p style={{ margin: '0 0 16px', fontSize: 15, color: '#1e293b', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                  <div className="bg-background rounded-xl p-6 border-l-4 border-violet-500">
+                    <p className="text-sm text-textPrimary leading-relaxed mb-4 whitespace-pre-wrap">
                       "{mentor.remarks}"
                     </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div className="flex items-center gap-3">
                       {mentor.assigned && mentor.name && (
-                        <div style={{
-                          width: 32, height: 32, borderRadius: '50%',
-                          background: avatarColor(mentor.name),
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 13, fontWeight: 700, color: 'white',
-                        }}>
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                          style={{ background: avatarColor(mentor.name) }}
+                        >
                           {getInitials(mentor.name)}
                         </div>
                       )}
-                      <span style={{ color: '#7c3aed', fontWeight: 700, fontSize: 14 }}>
+                      <span className="text-violet-600 font-bold text-sm">
                         — {mentor?.name || 'Your Mentor'}
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: '32px 0', color: '#94a3b8' }}>
-                    <div style={{ fontSize: 40, marginBottom: 12 }}>✍️</div>
-                    <p style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>
-                      No remarks added yet
-                    </p>
-                    <p style={{ margin: '6px 0 0', fontSize: 13 }}>
-                      Your mentor's feedback and academic notes will appear here
-                    </p>
+                  <div className="text-center py-8 text-textSecondary">
+                    <div className="text-4xl mb-3">✍️</div>
+                    <p className="text-sm font-medium">No remarks added yet</p>
+                    <p className="text-xs mt-1.5">Your mentor's feedback and academic notes will appear here</p>
                   </div>
                 )}
               </div>
@@ -219,19 +170,16 @@ function InfoCard({ icon, label, value, href }: {
   icon: string; label: string; value: string; href?: string;
 }) {
   return (
-    <div style={{
-      background: '#f8fafc', borderRadius: 12, padding: '14px 16px',
-      border: '1.5px solid #f1f5f9',
-    }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+    <div className="bg-background border border-borderLine rounded-xl px-4 py-3.5">
+      <div className="text-[10px] font-bold text-textSecondary uppercase tracking-wider mb-1.5">
         {icon} {label}
       </div>
       {href ? (
-        <a href={href} style={{ fontSize: 14, fontWeight: 600, color: '#7c3aed', textDecoration: 'none' }}>
+        <a href={href} className="text-sm font-semibold text-brand-primary hover:underline">
           {value}
         </a>
       ) : (
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{value}</div>
+        <div className="text-sm font-semibold text-textPrimary">{value}</div>
       )}
     </div>
   );
