@@ -108,6 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
         { label: 'Department Overview', path: '/hod/dashboard?tab=overview', icon: Building2 },
         { label: 'Student Directory', path: '/hod/dashboard?tab=students', icon: Users },
         { label: 'CGPA & Rankings', path: '/hod/dashboard?tab=rankings', icon: Award },
+        { label: 'My Mentees', path: '/hod/dashboard?tab=mentees', icon: UserCheck },
         { label: 'Coding Leaderboard', path: '/coding-analytics', icon: BarChart2 },
       ],
     },

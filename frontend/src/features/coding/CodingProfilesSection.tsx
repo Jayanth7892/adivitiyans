@@ -251,16 +251,48 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
       const platformName = platformConfig?.name || 'LeetCode';
       const finalPlatformEnum = validPlatformEnumMap[targetId.toLowerCase()] || (platformName === 'Coding Stats' ? 'LeetCode' : platformName);
 
+      // ── Sanitize handle: strip full profile URLs, keep only the username ──────
+      // Users sometimes paste the full profile URL (e.g. https://github.com/user)
+      // instead of just the username. Strip known URL prefixes for all platforms.
+      const urlStripPatterns: Record<string, RegExp[]> = {
+        github:        [/^https?:\/\/(www\.)?github\.com\//i],
+        leetcode:      [/^https?:\/\/(www\.)?leetcode\.com\//i],
+        geeksforgeeks: [
+          /^https?:\/\/(www\.)?geeksforgeeks\.org\/profile\//i,
+          /^https?:\/\/(www\.)?geeksforgeeks\.org\/user\//i,
+          /^https?:\/\/auth\.geeksforgeeks\.org\/user\//i,
+        ],
+        codeforces:    [/^https?:\/\/(www\.)?codeforces\.com\/profile\//i],
+        codechef:      [/^https?:\/\/(www\.)?codechef\.com\/users\//i],
+        hackerrank:    [
+          /^https?:\/\/(www\.)?hackerrank\.com\/profile\//i,
+          /^https?:\/\/(www\.)?hackerrank\.com\//i,
+        ],
+        kaggle:        [/^https?:\/\/(www\.)?kaggle\.com\//i],
+      };
+
+      let sanitizedHandle = handleInput.trim().replace(/^@/, '');
+      const patterns = urlStripPatterns[targetId.toLowerCase()] || [];
+      for (const p of patterns) { sanitizedHandle = sanitizedHandle.replace(p, ''); }
+      sanitizedHandle = sanitizedHandle.replace(/\/$/, '').trim();
+
+      if (!sanitizedHandle) {
+        alert('Please enter a valid username (not just a URL).');
+        setSaving(false);
+        return;
+      }
+
       // Persist to backend API
       await api.saveCodingProfile(activeRollNo, {
         platform: finalPlatformEnum as any,
-        handle: handleInput.trim(),
+        handle: sanitizedHandle,
         streak: 0,
         repositories_count: 0,
         commits_count: 0,
         prs_merged: 0,
         score_rating: 0,
       });
+
 
       // Refetch profiles to update UI dynamically
       await refetchCodingProfiles();

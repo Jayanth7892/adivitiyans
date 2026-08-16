@@ -34,14 +34,14 @@ function fetchHttpsJson(url: string, headers: Record<string, string> = {}): Prom
   });
 }
 
-// Fetch live LeetCode stats via public API
+// Fetch live LeetCode stats via alfa-leetcode-api (Heroku API is dead — 503)
 async function fetchLeetCodeStats(handle: string): Promise<{ solved: number; easy: number; medium: number; hard: number } | null> {
   try {
     const cleanHandle = handle.replace(/^@/, '').trim();
     if (!cleanHandle || cleanHandle === 'Not Linked') return null;
 
-    const data = await fetchHttpsJson(`https://leetcode-stats-api.herokuapp.com/${cleanHandle}`);
-    if (data && data.status === 'success') {
+    const data = await fetchHttpsJson(`https://alfa-leetcode-api.onrender.com/userProfile/${cleanHandle}`);
+    if (data && !data.errors && !data.error && (data.totalSolved !== undefined || data.easySolved !== undefined)) {
       return {
         solved: data.totalSolved || 0,
         easy: data.easySolved || 0,
@@ -49,8 +49,11 @@ async function fetchLeetCodeStats(handle: string): Promise<{ solved: number; eas
         hard: data.hardSolved || 0,
       };
     }
-  } catch (e) {
-    // Fallback if proxy rate-limited
+  } catch (e: any) {
+    // Silently skip rate-limited (429) or transient errors
+    if (!e.message?.includes('429')) {
+      console.warn(`[CronSync] LeetCode fetch failed for ${handle}:`, e.message);
+    }
   }
   return null;
 }

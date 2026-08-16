@@ -2,100 +2,69 @@ import { PlatformId, PlatformStatsSnapshot } from './platformData';
 
 // ─── Real Live API Fetchers ───────────────────────────────────────────────────
 
+const BACKEND_API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://caam6j4dbh.execute-api.ap-south-1.amazonaws.com/prod';
+
 /**
- * Fetches real LeetCode stats via public API endpoints.
- * Throws if the user does not exist.
+ * Fetches real LeetCode stats.
+ *
+ * API chain (most-to-least reliable):
+ *   1. Backend proxy  /proxy/leetcode/:handle  — server-side LeetCode GraphQL call,
+ *      avoids CORS and Cloudflare blocks. Most reliable.
+ *   2. alfa-leetcode-api.onrender.com           — public fallback (may 429 under load).
+ *
+ * Previously used endpoints that are now DEAD:
+ *   ✗ leetcode-api-faisalshohag.vercel.app      — 404 DEPLOYMENT_NOT_FOUND
+ *   ✗ leetcode-stats-api.herokuapp.com          — 503 Server Unavailable
  */
 export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSnapshot> {
   const cleanHandle = handle.replace(/^@/, '').trim();
-  const VERCEL_API = `https://leetcode-api-faisalshohag.vercel.app/${encodeURIComponent(cleanHandle)}`;
-  const ALFA_API = `https://alfa-leetcode-api.onrender.com/userProfile/${encodeURIComponent(cleanHandle)}`;
 
   let profileData: any = null;
   let calendarObj: Record<string, number> = {};
   let contestData: any = {};
-  let topicAnalysis: { label: string; count: number }[] = [];
   let recentActivities: any[] = [];
 
-  // Primary: Try Vercel fast LeetCode API endpoint
+  // ── Primary: backend proxy (server-side LeetCode GraphQL) ────────────────
   try {
-    const res = await fetch(VERCEL_API);
+    const token = sessionStorage.getItem('advitiyans_jwt_token') || '';
+    const res = await fetch(`${BACKEND_API_BASE}/proxy/leetcode/${encodeURIComponent(cleanHandle)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
     if (res.ok) {
       const data = await res.json();
-
-      // Detect non-existent user — API returns errors array or completely empty object
-      if (data?.errors || data?.error) {
+      if (data?.error && String(data.error).toLowerCase().includes('not found')) {
         throw new Error(`LeetCode user "${cleanHandle}" not found.`);
       }
-
-      if (data && (data.totalSolved !== undefined || data.matchedUserStats)) {
-        let easy = data.easySolved ?? 0;
-        let medium = data.mediumSolved ?? 0;
-        let hard = data.hardSolved ?? 0;
-        let total = data.totalSolved ?? (easy + medium + hard);
-
-        // Extract from matchedUserStats if top-level fields are missing
-        if (!total && data.matchedUserStats?.acSubmissionNum) {
-          const stats = data.matchedUserStats.acSubmissionNum;
-          easy = stats.find((s: any) => s.difficulty === 'Easy')?.count || 0;
-          medium = stats.find((s: any) => s.difficulty === 'Medium')?.count || 0;
-          hard = stats.find((s: any) => s.difficulty === 'Hard')?.count || 0;
-          total = stats.find((s: any) => s.difficulty === 'All')?.count || (easy + medium + hard);
-        }
-
+      if (data && data.totalSolved !== undefined) {
         profileData = {
-          totalSolved: total,
-          easySolved: easy,
-          mediumSolved: medium,
-          hardSolved: hard,
+          totalSolved: data.totalSolved ?? 0,
+          easySolved: data.easySolved ?? 0,
+          mediumSolved: data.mediumSolved ?? 0,
+          hardSolved: data.hardSolved ?? 0,
           ranking: data.ranking ?? 0,
-          acceptanceRate: data.acceptanceRate ?? 0,
-          totalEasy: data.totalEasy || 857,
-          totalMedium: data.totalMedium || 1756,
-          totalHard: data.totalHard || 799,
+          totalEasy: 857,
+          totalMedium: 1756,
+          totalHard: 799,
         };
-
-        // Parse submission calendar (epoch seconds → YYYY-MM-DD)
-        const rawCalField = data.submissionCalendar ?? data.submissionCalendarJSON;
-        if (rawCalField) {
-          try {
-            const rawCal = typeof rawCalField === 'string'
-              ? JSON.parse(rawCalField)
-              : rawCalField;
-            Object.entries(rawCal).forEach(([epochStr, count]) => {
-              const dateStr = new Date(Number(epochStr) * 1000).toISOString().slice(0, 10);
-              calendarObj[dateStr] = (calendarObj[dateStr] || 0) + Number(count);
-            });
-          } catch {
-            // ignore calendar parse errors
-          }
-        }
-
-        // Recent submissions — vercel API uses recentAcSubmissionNum or recentSubmissions
-        const recentList = data.recentSubmissions ?? data.recentAcSubmissionNum ?? [];
-        if (Array.isArray(recentList)) {
-          recentActivities = recentList.slice(0, 15).map((sub: any) => ({
-            date: sub.timestamp
-              ? new Date(Number(sub.timestamp) * 1000).toISOString().slice(0, 10)
-              : new Date().toISOString().slice(0, 10),
-            title: sub.title ?? sub.titleSlug ?? 'Problem',
-            status: sub.statusDisplay ?? sub.status ?? 'Accepted',
-            type: 'submission',
-          }));
-        }
+        contestData = {
+          attendedContestsCount: data.attendedContestsCount ?? 0,
+          rating: data.contestRating ?? 0,
+        };
       }
+    } else if (res.status === 404) {
+      throw new Error(`LeetCode user "${cleanHandle}" not found.`);
     }
   } catch (e: any) {
-    // Re-throw explicit "not found" errors
     if (e.message?.includes('not found')) throw e;
-    console.warn('Primary Vercel LeetCode API fallback triggered:', e);
+    console.warn('[LeetCode] Backend proxy failed, trying fallback:', e.message);
   }
 
-  // Secondary Fallback: Alfa LeetCode API if primary yielded no data
-  if (!profileData || (profileData.totalSolved === 0 && profileData.easySolved === 0 && profileData.mediumSolved === 0)) {
+  // ── Fallback: alfa-leetcode-api (public, may rate-limit) ─────────────────
+  if (!profileData) {
     try {
       const [profileRes, contestRes] = await Promise.allSettled([
-        fetch(ALFA_API),
+        fetch(`https://alfa-leetcode-api.onrender.com/userProfile/${encodeURIComponent(cleanHandle)}`),
         fetch(`https://alfa-leetcode-api.onrender.com/userContestRankingInfo/${encodeURIComponent(cleanHandle)}`),
       ]);
 
@@ -114,17 +83,40 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
           totalMedium: 1756,
           totalHard: 799,
         };
+
+        const rawCalField = data.submissionCalendar ?? data.submissionCalendarJSON;
+        if (rawCalField) {
+          try {
+            const rawCal = typeof rawCalField === 'string' ? JSON.parse(rawCalField) : rawCalField;
+            Object.entries(rawCal).forEach(([epochStr, count]) => {
+              const dateStr = new Date(Number(epochStr) * 1000).toISOString().slice(0, 10);
+              calendarObj[dateStr] = (calendarObj[dateStr] || 0) + Number(count);
+            });
+          } catch { /* ignore */ }
+        }
+
+        const recentList = data.recentSubmissions ?? data.recentAcSubmissionNum ?? [];
+        if (Array.isArray(recentList)) {
+          recentActivities = recentList.slice(0, 15).map((sub: any) => ({
+            date: sub.timestamp
+              ? new Date(Number(sub.timestamp) * 1000).toISOString().slice(0, 10)
+              : new Date().toISOString().slice(0, 10),
+            title: sub.title ?? sub.titleSlug ?? 'Problem',
+            status: sub.statusDisplay ?? sub.status ?? 'Accepted',
+            type: 'submission',
+          }));
+        }
       } else if (profileRes.status === 'fulfilled' && profileRes.value.status === 404) {
         throw new Error(`LeetCode user "${cleanHandle}" not found.`);
       }
 
       if (contestRes.status === 'fulfilled' && contestRes.value.ok) {
         const contestJson = await contestRes.value.json();
-        contestData = contestJson?.userContestRanking || {};
+        contestData = contestJson?.userContestRanking || contestData;
       }
     } catch (e: any) {
       if (e.message?.includes('not found')) throw e;
-      console.warn('Alfa LeetCode API fallback failed:', e);
+      console.warn('[LeetCode] Alfa fallback also failed:', e.message);
     }
   }
 
@@ -154,7 +146,7 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
       icon: '🏅',
       earnedAt: b.creationDate ? new Date(b.creationDate).toISOString().slice(0, 10) : undefined,
     })),
-    topicAnalysis: topicAnalysis.length > 0 ? topicAnalysis : [
+    topicAnalysis: [
       { label: 'Arrays (Est.)', count: Math.max(1, Math.round(easySolved * 0.4)) },
       { label: 'Strings (Est.)', count: Math.max(1, Math.round(easySolved * 0.3)) },
       { label: 'DP (Est.)', count: Math.max(1, Math.round(mediumSolved * 0.4)) },
@@ -165,98 +157,134 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
     heatmap: calendarObj,
   };
 }
+/**
+ * Sanitizes a platform handle — strips leading @ and full profile URLs so that
+ * users who paste a full URL (e.g. https://github.com/user) get just the username.
+ */
+function sanitizeHandle(handle: string, patterns: RegExp[]): string {
+  let h = handle.replace(/^@/, '').trim();
+  for (const pattern of patterns) {
+    h = h.replace(pattern, '');
+  }
+  return h.replace(/\/$/, '').trim();
+}
 
 /**
- * Fetches real GitHub user profile & repositories via GitHub REST API.
- * Throws if the user does not exist.
+ * Fetches real GitHub user profile & repositories.
+ *
+ * API chain:
+ *   1. Backend proxy /proxy/github/:handle — server-side, uses GITHUB_PAT env var (5000 req/hr).
+ *   2. Direct GitHub REST API — 60 req/hr unauthenticated; 403/429 treated as rate-limited
+ *      (graceful degradation, NOT an error thrown to the user).
+ *
+ * Handle sanitization: strips full GitHub URLs if pasted instead of just the username.
  */
 export async function fetchLiveGitHub(handle: string): Promise<PlatformStatsSnapshot> {
-  const cleanHandle = handle.replace(/^@/, '').trim();
-  const headers = { 'Accept': 'application/vnd.github+json' };
+  const cleanHandle = sanitizeHandle(handle, [/^https?:\/\/(www\.)?github\.com\//i]);
 
-  // Validate user first — throw immediately for non-existent handles
-  const userRes = await fetch(`https://api.github.com/users/${encodeURIComponent(cleanHandle)}`, { headers });
-  if (userRes.status === 404) {
-    throw new Error(`GitHub user "${cleanHandle}" not found.`);
-  }
-  if (!userRes.ok) {
-    throw new Error(`GitHub API error: ${userRes.status}`);
-  }
-  const user = await userRes.json();
-  if (!user?.login) {
-    throw new Error(`GitHub user "${cleanHandle}" not found.`);
+  let user: any = null;
+  let repos: any[] = [];
+  let events: any[] = [];
+  let isRateLimited = false;
+
+  // Primary: backend proxy (server-side, optionally authenticated via GITHUB_PAT)
+  try {
+    const token = sessionStorage.getItem('advitiyans_jwt_token') || '';
+    const res = await fetch(`${BACKEND_API_BASE}/proxy/github/${encodeURIComponent(cleanHandle)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.error && String(data.error).toLowerCase().includes('not found')) {
+        throw new Error(`GitHub user "${cleanHandle}" not found.`);
+      }
+      if (data?.login || data?.public_repos !== undefined) {
+        user = data;
+        repos = data.repos || [];
+        events = data.events || [];
+      }
+    } else if (res.status === 404) {
+      throw new Error(`GitHub user "${cleanHandle}" not found.`);
+    }
+  } catch (e: any) {
+    if (e.message?.includes('not found')) throw e;
+    console.warn('[GitHub] Backend proxy failed, trying direct API:', e.message);
   }
 
-  // Fetch repos and events in parallel
-  const [reposRes, eventsRes] = await Promise.allSettled([
-    fetch(`https://api.github.com/users/${encodeURIComponent(cleanHandle)}/repos?sort=updated&per_page=100`, { headers }),
-    fetch(`https://api.github.com/users/${encodeURIComponent(cleanHandle)}/events/public?per_page=30`, { headers }),
-  ]);
-
-  const repos: any[] = reposRes.status === 'fulfilled' && reposRes.value.ok ? await reposRes.value.json() : [];
-  const events: any[] = eventsRes.status === 'fulfilled' && eventsRes.value.ok ? await eventsRes.value.json() : [];
+  // Fallback: direct GitHub REST API (unauthenticated, 60 req/hr limit)
+  if (!user) {
+    try {
+      const headers = { 'Accept': 'application/vnd.github+json' };
+      const userRes = await fetch(`https://api.github.com/users/${encodeURIComponent(cleanHandle)}`, { headers });
+      if (userRes.status === 404) {
+        throw new Error(`GitHub user "${cleanHandle}" not found.`);
+      }
+      if (userRes.status === 403 || userRes.status === 429) {
+        // Rate limited — degrade gracefully instead of throwing to avoid noisy error UI
+        console.warn(`[GitHub] Rate limited (${userRes.status}) for ${cleanHandle}`);
+        isRateLimited = true;
+      } else if (userRes.ok) {
+        user = await userRes.json();
+        if (!user?.login) throw new Error(`GitHub user "${cleanHandle}" not found.`);
+        const [reposRes, eventsRes] = await Promise.allSettled([
+          fetch(`https://api.github.com/users/${encodeURIComponent(cleanHandle)}/repos?sort=updated&per_page=100`, { headers }),
+          fetch(`https://api.github.com/users/${encodeURIComponent(cleanHandle)}/events/public?per_page=30`, { headers }),
+        ]);
+        repos = reposRes.status === 'fulfilled' && reposRes.value.ok ? await reposRes.value.json() : [];
+        events = eventsRes.status === 'fulfilled' && eventsRes.value.ok ? await eventsRes.value.json() : [];
+      }
+    } catch (e: any) {
+      if (e.message?.includes('not found')) throw e;
+      console.warn('[GitHub] Direct API also failed:', e.message);
+    }
+  }
 
   const langCounts: Record<string, number> = {};
   let totalStars = 0;
-
-  repos.forEach((r) => {
-    totalStars += r.stargazers_count || 0;
-    if (r.language) {
-      langCounts[r.language] = (langCounts[r.language] || 0) + 1;
-    }
-  });
-
   const heatmap: Record<string, number> = {};
   const activities: any[] = [];
 
-  events.forEach((ev) => {
+  repos.forEach((r: any) => {
+    totalStars += r.stargazers_count || 0;
+    if (r.language) langCounts[r.language] = (langCounts[r.language] || 0) + 1;
+  });
+
+  events.forEach((ev: any) => {
     if (!ev.created_at) return;
     const dateStr = new Date(ev.created_at).toISOString().slice(0, 10);
     heatmap[dateStr] = (heatmap[dateStr] || 0) + 1;
-
     if (ev.type === 'PushEvent') {
       const repoName = ev.repo?.name || 'repository';
       const commitCount = ev.payload?.commits?.length || 1;
-      activities.push({
-        date: dateStr,
-        title: `Pushed ${commitCount} commit(s) to ${repoName}`,
-        status: `${commitCount} commits`,
-        type: 'push',
-      });
+      activities.push({ date: dateStr, title: `Pushed ${commitCount} commit(s) to ${repoName}`, status: `${commitCount} commits`, type: 'push' });
     } else if (ev.type === 'PullRequestEvent') {
       const action = ev.payload?.action || 'opened';
-      const prTitle = ev.payload?.pull_request?.title || 'Pull Request';
-      activities.push({
-        date: dateStr,
-        title: `PR ${action}: ${prTitle}`,
-        status: action,
-        type: 'pr',
-      });
+      activities.push({ date: dateStr, title: `PR ${action}: ${ev.payload?.pull_request?.title || 'Pull Request'}`, status: action, type: 'pr' });
     }
   });
 
-  const topicAnalysis = Object.entries(langCounts)
-    .map(([label, count]) => ({ label, count }))
-    .sort((a, b) => b.count - a.count);
+  const topicAnalysis = Object.entries(langCounts).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
+  const publicRepos = user?.public_repos ?? repos.length;
+  const followers = user?.followers ?? 0;
 
   return {
     platform: 'github',
     handle: cleanHandle,
-    profileUrl: user.html_url || `https://github.com/${cleanHandle}`,
+    profileUrl: user?.html_url || `https://github.com/${cleanHandle}`,
     lastRefreshedAt: new Date().toISOString(),
-    syncStatus: 'synced',
+    syncStatus: isRateLimited ? 'rate_limited' : 'synced',
     kpis: [
-      { label: 'Public Repositories', value: user.public_repos ?? repos.length },
+      { label: 'Public Repositories', value: publicRepos },
       { label: 'Total Stars Earned', value: totalStars },
-      { label: 'Followers', value: user.followers ?? 0 },
+      { label: 'Followers', value: followers },
       { label: 'User name', value: cleanHandle, isLink: true },
     ],
     awards: [
-      { title: 'Public Contributor', icon: '🐙' },
-      ...(user.followers > 10 ? [{ title: 'Popular Dev (10+ Followers)', icon: '⭐' }] : []),
-      ...(user.public_repos >= 10 ? [{ title: 'Active Creator', icon: '🚀' }] : []),
+      { title: isRateLimited ? 'GitHub (Rate Limited — Retry Later)' : 'Public Contributor', icon: '🙌' },
+      ...(followers > 10 ? [{ title: 'Popular Dev (10+ Followers)', icon: '⭐' }] : []),
+      ...(publicRepos >= 10 ? [{ title: 'Active Creator', icon: '🚀' }] : []),
     ],
-    topicAnalysis: topicAnalysis.length > 0 ? topicAnalysis : [{ label: 'Repositories', count: repos.length }],
+    topicAnalysis: topicAnalysis.length > 0 ? topicAnalysis : [{ label: 'Repositories', count: publicRepos }],
     activity: activities,
     heatmap,
   };
@@ -345,8 +373,8 @@ export async function fetchLiveCodeforces(handle: string): Promise<PlatformStats
     ],
     ratingHistory,
     awards: [
-      { title: userInfo.rank ? `Title: ${userInfo.rank}` : 'Codeforces Competitor', icon: '🔵' },
-      ...(userInfo.maxRating >= 1400 ? [{ title: 'Specialist Achievement', icon: '⭐' }] : []),
+      { title: userInfo.rank ? `Title: ${userInfo.rank}` : 'Codeforces Competitor', icon: 'ðŸ”µ' },
+      ...(userInfo.maxRating >= 1400 ? [{ title: 'Specialist Achievement', icon: 'â­' }] : []),
     ],
     topicAnalysis,
     activity: activities,
@@ -360,55 +388,57 @@ export async function fetchLiveCodeforces(handle: string): Promise<PlatformStats
  * Gracefully degrades to profile link if API is unreachable.
  */
 export async function fetchLiveGeeksforGeeks(handle: string): Promise<PlatformStatsSnapshot> {
-  const cleanHandle = handle.replace(/^@/, '').trim();
+  // Strip full GFG profile URLs — users sometimes paste the full URL as their handle
+  // e.g. 'https://www.geeksforgeeks.org/profile/dineshkumarvyyp' -> 'dineshkumarvyyp'
+  const cleanHandle = sanitizeHandle(handle, [
+    /^https?:\/\/(www\.)?geeksforgeeks\.org\/profile\//i,
+    /^https?:\/\/(www\.)?geeksforgeeks\.org\/user\//i,
+    /^https?:\/\/auth\.geeksforgeeks\.org\/user\//i,
+  ]).replace(/\?.*$/, ''); // strip query params like ?from=explore
 
-  // Primary unofficial GFG stats API
-  const GFG_API = `https://geeks-for-geeks-stats-api.vercel.app/?raw=Y&userName=${encodeURIComponent(cleanHandle)}`;
-  // Fallback unofficial GFG API
-  const GFG_API_2 = `https://gfgapi.vercel.app/api/${encodeURIComponent(cleanHandle)}`;
 
   let userData: any = null;
 
+  // ── Primary: backend proxy (server-side, avoids browser rate limits) ─────────
   try {
-    const res = await fetch(GFG_API);
-    if (res.status === 404) {
-      throw new Error(`GeeksforGeeks user "${cleanHandle}" not found.`);
-    }
-    // GFG returns 400 (not 404) for missing users — read body to check
-    if (res.status === 400) {
-      const errData = await res.json().catch(() => ({}));
-      const msg = errData?.error || '';
-      // Only throw "not found" if the API explicitly says so
-      if (msg.toLowerCase().includes('does not exist')) {
-        throw new Error(`GeeksforGeeks user "${cleanHandle}" not found.`);
-      }
-      // Otherwise (e.g. 0 problems solved) fall through and show 0 data
-    } else if (res.ok) {
+    const token = sessionStorage.getItem('advitiyans_jwt_token') || '';
+    const res = await fetch(`${BACKEND_API_BASE}/proxy/gfg/${encodeURIComponent(cleanHandle)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (res.ok) {
       const data = await res.json();
-      if (data?.error) {
+      if (data?.error && String(data.error).toLowerCase().includes('not found')) {
         throw new Error(`GeeksforGeeks user "${cleanHandle}" not found.`);
       }
-      if (data?.info) {
-        userData = data;
-      }
+      if (data?.info) userData = data;
+    } else if (res.status === 404) {
+      throw new Error(`GeeksforGeeks user "${cleanHandle}" not found.`);
     }
   } catch (e: any) {
     if (e.message?.includes('not found')) throw e;
-    console.warn('GFG primary API failed, trying fallback:', e);
+    console.warn('[GFG] Backend proxy failed, trying direct API:', e.message);
   }
 
-  if (!userData) {
-    try {
-      const res = await fetch(GFG_API_2);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && !data.error) {
-          userData = data;
-        }
+  // ── Backend proxy scrapes GFG profile page directly (no broken 3rd-party APIs) ──
+  try {
+    const token = sessionStorage.getItem('advitiyans_jwt_token') || '';
+    const res = await fetch(`${BACKEND_API_BASE}/proxy/gfg/${encodeURIComponent(cleanHandle)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.error && String(data.error).toLowerCase().includes('not found')) {
+        throw new Error(`GeeksforGeeks user "${cleanHandle}" not found.`);
       }
-    } catch (e) {
-      console.warn('GFG fallback API also failed:', e);
+      if (data?.info) userData = data;
+    } else if (res.status === 404) {
+      throw new Error(`GeeksforGeeks user "${cleanHandle}" not found.`);
+    } else if (res.status === 503) {
+      throw new Error(`GFG profile timed out. Try again shortly.`);
     }
+  } catch (e: any) {
+    if (e.message?.includes('not found') || e.message?.includes('timed out')) throw e;
+    console.warn('[GFG] Backend proxy failed:', e.message);
   }
 
   const info = userData?.info || {};
@@ -423,7 +453,8 @@ export async function fetchLiveGeeksforGeeks(handle: string): Promise<PlatformSt
   const codingScore = Number(info.codingScore) || 0;
   const streak = Number(info.streak) || 0;
   const instituteRank = info.instituteRank ?? 'N/A';
-  const monthlyScore = Number(info.monthlyCodingScore) || 0;
+  // Backend returns monthlyScore; old 3rd-party API used monthlyCodingScore — handle both
+  const monthlyScore = Number(info.monthlyScore) || Number(info.monthlyCodingScore) || 0;
 
   const topicList = [
     { label: 'School', count: school },
@@ -452,12 +483,12 @@ export async function fetchLiveGeeksforGeeks(handle: string): Promise<PlatformSt
       { label: 'Hard', solved: hard, total: Math.max(hard + 10, 80), color: '#15803d' },
     ],
     awards: [
-      { title: 'GFG Coder', icon: '🌿' },
-      ...(streak > 0 ? [{ title: `${streak}-Day Streak`, icon: '🔥' }] : []),
+      { title: 'GFG Coder', icon: 'ðŸŒ¿' },
+      ...(streak > 0 ? [{ title: `${streak}-Day Streak`, icon: 'ðŸ”¥' }] : []),
       ...(typeof instituteRank === 'number' && instituteRank <= 100
-        ? [{ title: `Institute Rank #${instituteRank}`, icon: '🏆' }]
+        ? [{ title: `Institute Rank #${instituteRank}`, icon: 'ðŸ†' }]
         : []),
-      ...(monthlyScore > 0 ? [{ title: `Monthly Score: ${monthlyScore}`, icon: '📅' }] : []),
+      ...(monthlyScore > 0 ? [{ title: `Monthly Score: ${monthlyScore}`, icon: 'ðŸ“…' }] : []),
     ],
     topicAnalysis: topicList.length > 0 ? topicList : [{ label: 'Practice', count: 0 }],
     activity: [],
@@ -475,7 +506,7 @@ export async function fetchLiveGeeksforGeeks(handle: string): Promise<PlatformSt
 export async function fetchLiveCodeChef(handle: string): Promise<PlatformStatsSnapshot> {
   const cleanHandle = handle.replace(/^@/, '').trim();
 
-  // CodeChef.com has no CORS headers — browsers cannot fetch it directly.
+  // CodeChef.com has no CORS headers â€” browsers cannot fetch it directly.
   // Route through corsproxy.io which adds the required CORS headers.
   // Note: User-Agent is a forbidden browser header and cannot be set manually.
   const CC_DIRECT = `https://www.codechef.com/users/${encodeURIComponent(cleanHandle)}`;
@@ -531,19 +562,19 @@ export async function fetchLiveCodeChef(handle: string): Promise<PlatformStatsSn
 
   // Stars follow CodeChef's official rating tier thresholds
   const getStars = (rating: number) => {
-    if (rating >= 2500) return '7★';
-    if (rating >= 2200) return '6★';
-    if (rating >= 2000) return '5★';
-    if (rating >= 1800) return '4★';
-    if (rating >= 1600) return '3★';
-    if (rating >= 1400) return '2★';
-    if (rating >= 1) return '1★';
-    return '0★';
+    if (rating >= 2500) return '7â˜…';
+    if (rating >= 2200) return '6â˜…';
+    if (rating >= 2000) return '5â˜…';
+    if (rating >= 1800) return '4â˜…';
+    if (rating >= 1600) return '3â˜…';
+    if (rating >= 1400) return '2â˜…';
+    if (rating >= 1) return '1â˜…';
+    return '0â˜…';
   };
 
   // Try to read stars directly from the HTML profile section
-  const starsHtmlMatch = html.match(/>(\d)(?:&#9733;|★)/);
-  const stars = starsHtmlMatch ? `${starsHtmlMatch[1]}★` : getStars(currentRating);
+  const starsHtmlMatch = html.match(/>(\d)(?:&#9733;|â˜…)/);
+  const stars = starsHtmlMatch ? `${starsHtmlMatch[1]}â˜…` : getStars(currentRating);
 
   return {
     platform: 'codechef',
@@ -558,10 +589,10 @@ export async function fetchLiveCodeChef(handle: string): Promise<PlatformStatsSn
     ],
     ratingHistory,
     awards: [
-      { title: `${stars} CodeChef`, icon: '🍴' },
-      ...(currentRating >= 1400 ? [{ title: '2★ Achiever', icon: '⭐' }] : []),
-      ...(currentRating >= 1600 ? [{ title: '3★ Expert', icon: '🏆' }] : []),
-      ...(currentRating >= 1800 ? [{ title: '4★ Master', icon: '💎' }] : []),
+      { title: `${stars} CodeChef`, icon: 'ðŸ´' },
+      ...(currentRating >= 1400 ? [{ title: '2â˜… Achiever', icon: 'â­' }] : []),
+      ...(currentRating >= 1600 ? [{ title: '3â˜… Expert', icon: 'ðŸ†' }] : []),
+      ...(currentRating >= 1800 ? [{ title: '4â˜… Master', icon: 'ðŸ’Ž' }] : []),
     ],
     topicAnalysis: [
       { label: 'Current Rating', count: currentRating },
@@ -593,7 +624,7 @@ export async function fetchLiveHackerRank(handle: string): Promise<PlatformStats
     ]);
 
     if (profileRes.status === 'fulfilled') {
-      // Do NOT throw on 404 — HackerRank's CORS block also returns 404,
+      // Do NOT throw on 404 â€” HackerRank's CORS block also returns 404,
       // so we cannot distinguish "user not found" from "CORS blocked".
       // Gracefully degrade to 0 data instead.
       if (profileRes.value.ok) {
@@ -634,10 +665,10 @@ export async function fetchLiveHackerRank(handle: string): Promise<PlatformStats
     ],
     breakdown: [],
     awards: [
-      { title: 'HackerRank Connected', icon: '🏆' },
+      { title: 'HackerRank Connected', icon: 'ðŸ†' },
       ...badges.slice(0, 4).map((b: any) => ({
         title: b.badge_name || b.name || 'Badge',
-        icon: '⭐',
+        icon: 'â­',
       })),
     ],
     topicAnalysis: topicAnalysis.length > 0 ? topicAnalysis : [{ label: 'Practice', count: 0 }],
@@ -647,7 +678,7 @@ export async function fetchLiveHackerRank(handle: string): Promise<PlatformStats
 }
 
 /**
- * Universal live fetcher — routes to the correct platform-specific fetcher.
+ * Universal live fetcher â€” routes to the correct platform-specific fetcher.
  * All platforms now have real API implementations.
  */
 export async function fetchLivePlatformSnapshot(
@@ -675,7 +706,7 @@ export async function fetchLivePlatformSnapshot(
       { label: 'User name', value: cleanHandle, isLink: true },
     ],
     breakdown: [],
-    awards: [{ title: `${platformId} Connected`, icon: '🏆' }],
+    awards: [{ title: `${platformId} Connected`, icon: 'ðŸ†' }],
     topicAnalysis: [{ label: 'General Practice', count: 0 }],
     activity: [],
     heatmap: {},

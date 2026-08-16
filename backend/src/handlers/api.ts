@@ -4,6 +4,7 @@ import serverless from 'serverless-http';
 import { db } from '../db';
 import { calculateEmployabilityScore } from '../services/employability';
 import { runCodingProfileCronSync } from '../services/cronSync';
+import { cachedFetch } from '../services/platformCache';
 import { deleteCognitoUsers, deleteAllCognitoUsers } from '../services/cognitoService';
 import {
   studentProfileSchema,
@@ -52,6 +53,89 @@ app.get('/health', async (_req: Request, res: Response) => {
     service: 'advitiyans-api',
     database: dbHealth,
   });
+});
+
+// ONE-TIME: Clean up coding_profiles handles stored as full URLs
+// Protected by ADMIN_SECRET header OR a fixed one-time token.
+app.post('/admin/cleanup-handles', async (req: Request, res: Response) => {
+  const secret = String(req.headers['x-admin-secret'] || '');
+  const adminSecret = process.env.ADMIN_SECRET || 'advitiyans-cleanup-2026';
+  if (secret !== adminSecret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    // Preview before cleanup
+    const preview = await db.query(
+      `SELECT student_id, platform, handle FROM coding_profiles WHERE handle LIKE 'http%' ORDER BY platform`,
+      []
+    );
+
+    if (!db.isMock) {
+      await db.query(`
+        UPDATE coding_profiles
+        SET handle = TRIM(TRAILING '/' FROM
+          REGEXP_REPLACE(REGEXP_REPLACE(REGEXP_REPLACE(handle,
+            'https?://(www\\.)?geeksforgeeks\\.org/profile/', '', 'gi'),
+            'https?://(www\\.)?geeksforgeeks\\.org/user/', '', 'gi'),
+            'https?://auth\\.geeksforgeeks\\.org/user/', '', 'gi'))
+        WHERE LOWER(platform) = 'geeksforgeeks' AND handle LIKE 'http%'
+      `, []);
+
+      await db.query(`
+        UPDATE coding_profiles
+        SET handle = TRIM(TRAILING '/' FROM REGEXP_REPLACE(handle, 'https?://(www\\.)?github\\.com/', '', 'gi'))
+        WHERE LOWER(platform) = 'github' AND handle LIKE 'http%'
+      `, []);
+
+      await db.query(`
+        UPDATE coding_profiles
+        SET handle = TRIM(TRAILING '/' FROM REGEXP_REPLACE(handle, 'https?://(www\\.)?leetcode\\.com/', '', 'gi'))
+        WHERE LOWER(platform) = 'leetcode' AND handle LIKE 'http%'
+      `, []);
+
+      await db.query(`
+        UPDATE coding_profiles
+        SET handle = TRIM(TRAILING '/' FROM REGEXP_REPLACE(handle, 'https?://(www\\.)?codeforces\\.com/profile/', '', 'gi'))
+        WHERE LOWER(platform) = 'codeforces' AND handle LIKE 'http%'
+      `, []);
+
+      await db.query(`
+        UPDATE coding_profiles
+        SET handle = TRIM(TRAILING '/' FROM REGEXP_REPLACE(handle, 'https?://(www\\.)?codechef\\.com/users/', '', 'gi'))
+        WHERE LOWER(platform) = 'codechef' AND handle LIKE 'http%'
+      `, []);
+
+      await db.query(`
+        UPDATE coding_profiles
+        SET handle = TRIM(TRAILING '/' FROM REGEXP_REPLACE(REGEXP_REPLACE(handle,
+          'https?://(www\\.)?hackerrank\\.com/profile/', '', 'gi'),
+          'https?://(www\\.)?hackerrank\\.com/', '', 'gi'))
+        WHERE LOWER(platform) = 'hackerrank' AND handle LIKE 'http%'
+      `, []);
+
+      // Catch-all: delete any remaining records where the handle is still a full URL
+      // (these are wrong-platform entries, e.g., a GitHub URL stored under LeetCode)
+      await db.query(`
+        DELETE FROM coding_profiles
+        WHERE handle LIKE 'http%'
+      `, []);
+    }
+
+    // Verify: remaining URL handles
+    const remaining = await db.query(
+      `SELECT student_id, platform, handle FROM coding_profiles WHERE handle LIKE 'http%'`,
+      []
+    );
+
+    res.json({
+      message: 'Handle cleanup complete',
+      fixedCount: preview.rows.length,
+      fixed: preview.rows,
+      remainingUrlHandles: remaining.rows.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Database Initialization Endpoint
@@ -1756,89 +1840,252 @@ app.delete('/students/:id/coding-profiles/:platform', requireOwnerOrRole('id', '
 app.get('/proxy/leetcode/:handle', async (req: Request, res: Response) => {
   try {
     const handle = String(req.params.handle).trim();
-    if (!handle) {
-      return res.status(400).json({ error: 'Handle is required' });
-    }
+    if (!handle) return res.status(400).json({ error: 'Handle is required' });
 
-    const query = `
-      query userProblemsSolved($username: String!) {
-        matchedUser(username: $username) {
-          username
-          submitStats: submitStatsGlobal {
-            acSubmissionNum {
-              difficulty
-              count
-              submissions
+    // ── Cache-first (2-hour TTL) ──────────────────────────────────────────────
+    const { data: result, fromCache } = await cachedFetch('leetcode', handle, async () => {
+      const gql = `
+        query userProblemsSolved($username: String!) {
+          matchedUser(username: $username) {
+            username
+            submitStats: submitStatsGlobal {
+              acSubmissionNum { difficulty count submissions }
             }
+            profile { ranking reputation }
           }
-          profile {
-            ranking
-            reputation
-          }
+          userContestRanking(username: $username) { rating globalRanking attendedContestsCount }
         }
-        userContestRanking(username: $username) {
-          rating
-          globalRanking
-          attendedContestsCount
-        }
+      `;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      let lcFetch: Awaited<ReturnType<typeof fetch>>;
+      try {
+        lcFetch = await fetch('https://leetcode.com/graphql', {
+          method: 'POST', signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36',
+            'Referer': 'https://leetcode.com', 'Origin': 'https://leetcode.com',
+            'Accept': 'application/json', 'Accept-Language': 'en-US,en;q=0.9',
+          },
+          body: JSON.stringify({ query: gql, variables: { username: handle } }),
+        });
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') throw Object.assign(new Error('timeout'), { isTimeout: true });
+        throw fetchErr;
       }
-    `;
+      clearTimeout(timeoutId);
 
-    const response = await fetch('https://leetcode.com/graphql', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://leetcode.com',
-      },
-      body: JSON.stringify({ query, variables: { username: handle } }),
+      if (!lcFetch.ok) throw Object.assign(new Error(`LC_HTTP_${lcFetch.status}`), { httpStatus: lcFetch.status });
+
+      const json: any = await lcFetch.json();
+      const matchedUser = json?.data?.matchedUser;
+      if (!matchedUser) throw Object.assign(new Error('not_found'), { isNotFound: true });
+
+      const stats = matchedUser.submitStats?.acSubmissionNum || [];
+      let easySolved = 0, mediumSolved = 0, hardSolved = 0, totalSolved = 0;
+      stats.forEach((s: any) => {
+        if (s.difficulty === 'Easy')   easySolved   = s.count || 0;
+        if (s.difficulty === 'Medium') mediumSolved = s.count || 0;
+        if (s.difficulty === 'Hard')   hardSolved   = s.count || 0;
+        if (s.difficulty === 'All')    totalSolved  = s.count || 0;
+      });
+      if (!totalSolved) totalSolved = easySolved + mediumSolved + hardSolved;
+      const contestInfo = json?.data?.userContestRanking || {};
+      return { handle: matchedUser.username || handle, totalSolved, easySolved, mediumSolved, hardSolved,
+               ranking: matchedUser.profile?.ranking || 0, reputation: matchedUser.profile?.reputation || 0,
+               contestRating: Math.round(contestInfo.rating || 0), attendedContestsCount: contestInfo.attendedContestsCount || 0 };
     });
 
-    if (!response.ok) {
-      return res.status(502).json({ error: `LeetCode API HTTP ${response.status}` });
-    }
 
-    const json: any = await response.json();
-    const matchedUser = json?.data?.matchedUser;
-    if (!matchedUser) {
-      return res.status(404).json({ error: 'LeetCode profile not found' });
-    }
-
-    const stats = matchedUser.submitStats?.acSubmissionNum || [];
-    let easySolved = 0;
-    let mediumSolved = 0;
-    let hardSolved = 0;
-    let totalSolved = 0;
-
-    stats.forEach((s: any) => {
-      if (s.difficulty === 'Easy') easySolved = s.count || 0;
-      if (s.difficulty === 'Medium') mediumSolved = s.count || 0;
-      if (s.difficulty === 'Hard') hardSolved = s.count || 0;
-      if (s.difficulty === 'All') totalSolved = s.count || 0;
-    });
-
-    if (!totalSolved) {
-      totalSolved = easySolved + mediumSolved + hardSolved;
-    }
-
-    const contestInfo = json?.data?.userContestRanking || {};
-
-    res.json({
-      handle: matchedUser.username || handle,
-      totalSolved,
-      easySolved,
-      mediumSolved,
-      hardSolved,
-      ranking: matchedUser.profile?.ranking || 0,
-      reputation: matchedUser.profile?.reputation || 0,
-      contestRating: Math.round(contestInfo.rating || 0),
-      attendedContestsCount: contestInfo.attendedContestsCount || 0,
-    });
+    res.set('X-Cache', fromCache ? 'HIT' : 'MISS');
+    res.json(result);
   } catch (err: any) {
+    if (err.isTimeout || err.name === 'AbortError') return res.status(503).json({ error: 'LeetCode API timed out — may be rate limiting this server. Try again shortly.' });
+    if (err.isNotFound) return res.status(404).json({ error: `LeetCode user "${req.params.handle}" not found` });
+    if (err.message?.startsWith('LC_HTTP_')) return res.status(502).json({ error: `LeetCode API HTTP ${err.message.replace('LC_HTTP_','')}` });
     res.status(500).json({ error: err.message || 'Failed to fetch LeetCode profile' });
   }
 });
 
+// GET /proxy/github/:handle — Server-side GitHub proxy; uses GITHUB_PAT if set → 5000 req/hr
+app.get('/proxy/github/:handle', async (req: Request, res: Response) => {
+  try {
+    const rawHandle = String(req.params.handle).trim();
+    if (!rawHandle) return res.status(400).json({ error: 'Handle is required' });
+    const handle = rawHandle.replace(/^https?:\/\/(www\.)?github\.com\//i, '').replace(/\/$/, '').trim();
+
+    const { data: result, fromCache } = await cachedFetch('github', handle, async () => {
+      const headers: Record<string, string> = { 'Accept': 'application/vnd.github+json', 'User-Agent': 'Advitiyans-App/1.0' };
+      if (process.env.GITHUB_PAT) headers['Authorization'] = `Bearer ${process.env.GITHUB_PAT}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const [userRes, reposRes, eventsRes] = await Promise.allSettled([
+        fetch(`https://api.github.com/users/${encodeURIComponent(handle)}`, { headers, signal: controller.signal }),
+        fetch(`https://api.github.com/users/${encodeURIComponent(handle)}/repos?sort=updated&per_page=100`, { headers }),
+        fetch(`https://api.github.com/users/${encodeURIComponent(handle)}/events/public?per_page=30`, { headers }),
+      ]);
+      clearTimeout(timeoutId);
+
+      if (userRes.status !== 'fulfilled') {
+        const isAbort = (userRes.reason as any)?.name === 'AbortError';
+        throw Object.assign(new Error(isAbort ? 'timeout' : 'network'), { isTimeout: isAbort });
+      }
+      if (!userRes.value.ok) {
+        const s = userRes.value.status;
+        if (s === 404) throw Object.assign(new Error('not_found'), { isNotFound: true });
+        if (s === 403 || s === 429) throw Object.assign(new Error('rate_limited'), { isRateLimit: true });
+        throw Object.assign(new Error(`GH_HTTP_${s}`), { httpStatus: s });
+      }
+      const user: any = await userRes.value.json();
+      if (!user?.login) throw Object.assign(new Error('not_found'), { isNotFound: true });
+
+      const repos  = reposRes.status  === 'fulfilled' && reposRes.value.ok  ? await reposRes.value.json()  : [];
+      const events = eventsRes.status === 'fulfilled' && eventsRes.value.ok ? await eventsRes.value.json() : [];
+
+      return { login: user.login, html_url: user.html_url, public_repos: user.public_repos ?? 0,
+               followers: user.followers ?? 0, following: user.following ?? 0, avatar_url: user.avatar_url,
+               repos: Array.isArray(repos) ? repos : [], events: Array.isArray(events) ? events : [] };
+    });
+
+    res.set('X-Cache', fromCache ? 'HIT' : 'MISS');
+    res.json(result);
+  } catch (err: any) {
+    if (err.isTimeout)    return res.status(503).json({ error: 'GitHub API timed out. Try again shortly.' });
+    if (err.isNotFound)   return res.status(404).json({ error: `GitHub user "${req.params.handle}" not found` });
+    if (err.isRateLimit)  return res.status(429).json({ error: 'GitHub rate limited. Add GITHUB_PAT to Lambda env to raise limit to 5000/hr.', retryAfter: 60 });
+    if (err.message?.startsWith('GH_HTTP_')) return res.status(502).json({ error: `GitHub API HTTP ${err.message.replace('GH_HTTP_','')}` });
+    res.status(500).json({ error: err.message || 'Failed to fetch GitHub profile' });
+  }
+});
+
+// GET /proxy/gfg/:handle — Scrapes GFG's own profile page for accurate stats
+// GFG embeds all user data in Next.js RSC __next_f.push() calls in the HTML
+app.get('/proxy/gfg/:handle', async (req: Request, res: Response) => {
+  try {
+    const rawHandle = String(req.params.handle).trim();
+    if (!rawHandle) return res.status(400).json({ error: 'Handle is required' });
+    const handle = rawHandle
+      .replace(/^https?:\/\/(www\.)?geeksforgeeks\.org\/profile\//i, '')
+      .replace(/^https?:\/\/(www\.)?geeksforgeeks\.org\/user\//i, '')
+      .replace(/^https?:\/\/auth\.geeksforgeeks\.org\/user\//i, '')
+      .replace(/\?.*$/, '')   // strip query params like ?from=explore
+      .replace(/\/$/, '').trim();
+    if (!handle) return res.status(400).json({ error: 'Invalid handle' });
+
+    const { data: result, fromCache } = await cachedFetch('gfg', handle, async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      let gfgFetch: Awaited<ReturnType<typeof fetch>>;
+      try {
+        // Scrape GFG's own profile page — it embeds all stats in Next.js RSC data
+        gfgFetch = await fetch(`https://www.geeksforgeeks.org/profile/${encodeURIComponent(handle)}`, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml',
+            'Accept-Language': 'en-US,en;q=0.9',
+          },
+        });
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') throw Object.assign(new Error('timeout'), { isTimeout: true });
+        throw fetchErr;
+      }
+      clearTimeout(timeoutId);
+
+      if (gfgFetch.status === 404) throw Object.assign(new Error('not_found'), { isNotFound: true });
+      if (!gfgFetch.ok) throw Object.assign(new Error(`GFG_HTTP_${gfgFetch.status}`), { httpStatus: gfgFetch.status });
+
+      const html = await gfgFetch.text();
+
+      // GFG is a Next.js app — user stats are embedded as RSC data in __next_f.push() script tags
+      // Extract all push payloads and find the one with articleCount / total_problems_solved
+      const pushRegex = /self\.__next_f\.push\(\[1,"(.*?)"\]\)/gs;
+      let articleCount: any = null;
+      let mentor: any = null;
+      let match;
+
+      while ((match = pushRegex.exec(html)) !== null) {
+        try {
+          // Unescape the JSON string value
+          const raw = match[1].replace(/\\"/g, '"').replace(/\\n/g, '').replace(/\\\\/g, '\\');
+          if (raw.includes('total_problems_solved') || raw.includes('totalProblemsSolved')) {
+            // Find the JSON object with the stats
+            const jsonStart = raw.indexOf('"articleCount":{');
+            if (jsonStart !== -1) {
+              // Extract just the articleCount object by finding matching braces
+              let depth = 0;
+              let start = raw.indexOf('{', jsonStart + '"articleCount":'.length);
+              let end = start;
+              for (let i = start; i < raw.length; i++) {
+                if (raw[i] === '{') depth++;
+                else if (raw[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+              }
+              articleCount = JSON.parse(raw.substring(start, end + 1));
+            }
+            // Also find mentor object for profile info
+            const mentorStart = raw.indexOf('"mentor":{');
+            if (mentorStart !== -1) {
+              let depth = 0;
+              let start = raw.indexOf('{', mentorStart + '"mentor":'.length);
+              let end = start;
+              for (let i = start; i < raw.length; i++) {
+                if (raw[i] === '{') depth++;
+                else if (raw[i] === '}') { depth--; if (depth === 0) { end = i; break; } }
+              }
+              mentor = JSON.parse(raw.substring(start, end + 1));
+            }
+          }
+        } catch { /* skip malformed chunks */ }
+        if (articleCount) break;
+      }
+
+      // If no __next_f data, check if user not found (page shows 404 content)
+      if (!articleCount) {
+        if (html.includes('404.png') || html.includes('not-found') || html.includes('notFound')) {
+          throw Object.assign(new Error('not_found'), { isNotFound: true });
+        }
+        // Profile exists but no stats yet (brand new account)
+        return {
+          info: { totalProblemsSolved: 0, codingScore: 0, streak: 0, monthlyScore: 0, globalRank: '' },
+          solvedStats: {},
+          handle,
+        };
+      }
+
+      // Normalize to our expected format (compatible with liveFetchers.ts GFG parser)
+      return {
+        info: {
+          totalProblemsSolved: articleCount.total_problems_solved ?? 0,
+          codingScore:         articleCount.score ?? 0,
+          monthlyScore:        articleCount.monthly_score ?? 0,
+          streak:              articleCount.pod_solved_current_streak ?? 0,
+          longestStreak:       articleCount.pod_solved_longest_streak ?? 0,
+          globalLongestStreak: articleCount.pod_solved_global_longest_streak ?? 0,
+          instituteRank:       articleCount.institute_rank || '',
+          articlesPublished:   articleCount.total_articles_published ?? 0,
+          userName:            handle,
+          fullName:            mentor?.name || articleCount.name || handle,
+          profilePicture:      mentor?.profile_image_url || '',
+        },
+        solvedStats: {},
+        handle,
+      };
+    });
+
+    res.set('X-Cache', fromCache ? 'HIT' : 'MISS');
+    res.json(result);
+  } catch (err: any) {
+    if (err.isTimeout)   return res.status(503).json({ error: 'GFG profile page timed out. Try again shortly.' });
+    if (err.isNotFound)  return res.status(404).json({ error: `GeeksforGeeks user "${req.params.handle}" not found` });
+    if (err.message?.startsWith('GFG_HTTP_')) return res.status(502).json({ error: `GFG HTTP ${err.message.replace('GFG_HTTP_','')}` });
+    res.status(500).json({ error: err.message || 'Failed to fetch GFG profile' });
+  }
+});
 // ============================================================================
 // Tech Skills
 // ============================================================================

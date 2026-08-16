@@ -14,7 +14,7 @@ export interface PlatformStatsSnapshot {
   handle: string;
   profileUrl: string;
   lastRefreshedAt: string | null;
-  syncStatus: 'synced' | 'pending' | 'failed';
+  syncStatus: 'synced' | 'pending' | 'failed' | 'rate_limited';
   kpis: { label: string; value: string | number; isLink?: boolean }[];
   breakdown?: { label: string; solved: number; total: number; color: string }[];
   ratingHistory?: { date: string; rating: number; contestName?: string }[];

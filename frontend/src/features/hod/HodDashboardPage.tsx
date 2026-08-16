@@ -896,7 +896,16 @@ export const HodDashboardPage: React.FC = () => {
                                 const initials = (m.name || '?').split(' ').map((n:string) => n[0]).join('');
                                 const standing = cgpa >= 9.0 ? 'Distinction' : cgpa >= 7.0 ? 'First Class' : cgpa >= 5.0 ? 'Second Class' : '—';
                                 return (
-                                  <tr key={m.roll_number} className={`hover:bg-background/50 transition-colors ${isAtRisk ? 'bg-red-50/30' : ''}`}>
+                                  <tr key={m.roll_number}
+                                    className={`hover:bg-brand-soft/20 transition-colors cursor-pointer ${isAtRisk ? 'bg-red-50/30' : ''}`}
+                                    title="Click to view full student profile"
+                                    onClick={() => {
+                                      // Map StudentProfile-shaped mentee to HodStudentEntry so the inspect panel can load it
+                                      const entry: HodStudentEntry = mapStudentToHodEntry(m, 0);
+                                      setInspectStudent(entry);
+                                      setInspectTab('academics-graph');
+                                    }}
+                                  >
                                     <td className="py-3.5 px-4">
                                       <div className="flex items-center gap-3">
                                         <div className={`w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs ${isAtRisk ? 'bg-red-100 text-red-600' : 'bg-brand-primary text-white'}`}>{initials}</div>
@@ -907,15 +916,18 @@ export const HodDashboardPage: React.FC = () => {
                                       </div>
                                     </td>
                                     <td className="py-3.5 px-4 font-bold text-brand-primary text-xs">{m.roll_number}</td>
-                                    <td className="py-3.5 px-4 text-xs">{m.batch} • Sec {m.section}</td>
+                                    <td className="py-3.5 px-4 text-xs">{(m as any).batch} • Sec {m.section}</td>
                                     <td className="py-3.5 px-4 text-sm font-bold">{cgpa > 0 ? cgpa.toFixed(2) : '—'}</td>
                                     <td className="py-3.5 px-4">
-                                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
-                                        standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                        standing === 'First Class' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                        standing === 'Second Class' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                        'bg-background text-textSecondary border-borderLine'
-                                      }`}>{standing}</span>
+                                      <div className="flex items-center gap-2">
+                                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                                          standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                          standing === 'First Class' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                          standing === 'Second Class' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                          'bg-background text-textSecondary border-borderLine'
+                                        }`}>{standing}</span>
+                                        <Eye className="w-3.5 h-3.5 text-textSecondary opacity-50" />
+                                      </div>
                                     </td>
                                   </tr>
                                 );
