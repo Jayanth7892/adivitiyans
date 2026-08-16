@@ -244,7 +244,7 @@ export const AuthPage: React.FC = () => {
         console.warn('[DB HOD Create Notice]:', dbErr.message);
       });
 
-      login(data.email, 'hod', generatedHodId, `${data.fullName} (HOD ${data.department})`, jwtToken);
+      login(data.email, 'hod', generatedHodId, data.fullName, jwtToken);
       registerSession(data.email, 'hod');
       navigate('/hod/dashboard');
     } catch (err: any) {
@@ -255,10 +255,16 @@ export const AuthPage: React.FC = () => {
   // Helper to decode JWT payload (base64url) for role validation
   const decodeJwtPayload = (token: string): Record<string, any> => {
     try {
-      const parts = token.split('.');
-      if (parts.length !== 3) return {};
-      const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      return JSON.parse(atob(payload));
+      const base64Url = token.split('.')[1];
+      if (!base64Url) return {};
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
     } catch {
       return {};
     }
@@ -317,7 +323,7 @@ export const AuthPage: React.FC = () => {
         if (!hod) {
           await api.createFaculty({
             faculty_id: 'HOD_CSEDS',
-            name: 'Dr. HOD (CSE & Data Science)',
+            name: 'Dr. HOD',
             email: hodLoginEmail,
             department: 'Data Science',
             role: 'hod',
@@ -326,7 +332,7 @@ export const AuthPage: React.FC = () => {
         }
 
         rollNo = 'HOD_CSEDS';
-        displayName = hod ? `${hod.name} (HOD ${hod.department})` : 'Dr. HOD (CSE & Data Science)';
+        displayName = hod ? hod.name : 'Dr. HOD';
         login(hodLoginEmail, 'hod', rollNo, displayName, jwtToken);
         registerSession(hodLoginEmail, 'hod'); // non-blocking
         navigate('/hod/dashboard');
@@ -947,7 +953,7 @@ export const AuthPage: React.FC = () => {
                     {activeTab === 'faculty'
                       ? 'Access assigned mentees, view student 360° analytics, and update mentor remarks.'
                       : activeTab === 'hod'
-                      ? 'Official HOD Portal. Fixed Credentials: hodcseds@rgmcet.edu.in'
+                      ? 'Official HOD Portal for Department Head.'
                       : 'Full administrative authority to manage student directory CRUD, placement analytics & CSV export.'}
                   </p>
                 </div>
@@ -962,7 +968,6 @@ export const AuthPage: React.FC = () => {
                   <input
                     {...registerLogin('email')}
                     type="email"
-                    placeholder={activeTab === 'hod' ? 'hodcseds@rgmcet.edu.in' : `${activeTab}@rgmcet.edu.in`}
                     className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary font-medium"
                   />
                   {loginErrors.email && (

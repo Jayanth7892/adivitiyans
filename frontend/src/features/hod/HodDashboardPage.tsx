@@ -1452,7 +1452,7 @@ export const HodDashboardPage: React.FC = () => {
                 { year: '4th Year', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', min: 6, max: 8 },
               ] as const).map(({ year, color, min, max }) => {
                 const setting = unlockSettings.find(s => s.year_label === year);
-                const current = setting?.max_semester ?? 0;
+                const current = setting?.max_semester ?? min;
                 const isSaving = unlockSavingYear === year;
                 const handleUnlock = async (delta: 1 | 2) => {
                   // Cap at per-year maximum (1st→2, 2nd→4, 3rd→6, 4th→8)

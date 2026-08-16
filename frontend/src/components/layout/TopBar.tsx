@@ -25,13 +25,21 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
   const profileRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  const displayName = user?.name || (user?.email ? user.email.split('@')[0] : 'User');
-  const initials = displayName
-    .split(' ')
-    .filter(Boolean)
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase() || 'U';
+  const rawDisplayName = user?.name || (user?.email ? user.email.split('@')[0] : 'User');
+  // Strip trailing bracketed suffix like (HOD ...) or (HOD CSE(Data Science))
+  const displayName = rawDisplayName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+
+  // For HOD role, avatar circle displays 'HOD' (clearly visible)
+  const avatarText = user?.role === 'hod'
+    ? 'HOD'
+    : displayName
+        .split(' ')
+        .filter(Boolean)
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase() || 'U';
+
+  const roleLabel = user?.role === 'hod' ? 'HOD(CSEDS)' : (user?.role?.toUpperCase() || 'STUDENT');
 
   // Close dropdowns on click outside
   useEffect(() => {
@@ -229,14 +237,14 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
             className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-background transition-all focus:outline-none"
           >
             <div className="w-9 h-9 rounded-full bg-brand-primary text-white font-bold flex items-center justify-center text-xs shadow-sm ring-2 ring-brand-soft">
-              {initials}
+              {avatarText}
             </div>
             <div className="hidden sm:block text-left">
               <div className="flex items-center gap-1">
                 <p className="text-xs font-bold text-textPrimary leading-tight">{displayName}</p>
                 <ChevronDown className={`w-3.5 h-3.5 text-textSecondary transition-transform ${isProfileOpen ? 'rotate-180' : ''}`} />
               </div>
-              <p className="text-[10px] text-brand-primary font-bold tracking-wider">{user?.role?.toUpperCase() || 'STUDENT'}</p>
+              <p className="text-[10px] text-brand-primary font-bold tracking-wider">{roleLabel}</p>
             </div>
           </button>
 
@@ -245,13 +253,13 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
             <div className="absolute right-0 mt-2 w-64 bg-surface border border-borderLine rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
               <div className="p-4 bg-background/50 border-b border-borderLine flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-brand-primary text-white font-bold flex items-center justify-center text-sm shadow-sm">
-                  {initials}
+                  {avatarText}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-textPrimary truncate">{displayName}</p>
                   <p className="text-[11px] text-textSecondary truncate">{user?.email}</p>
                   <span className="inline-block mt-1 text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-brand-soft text-brand-primary border border-brand-primary/20">
-                    {user?.role || 'student'}
+                    {roleLabel}
                   </span>
                 </div>
               </div>

@@ -297,17 +297,17 @@ async function ensureSchema(p: Pool) {
     );`,
 
     // Seed/correct semester unlock settings.
-    // DO UPDATE resets any year whose stored value equals or exceeds the per-year CEILING
-    // back to the FLOOR. This corrects the 'all years = 8' stale default from old deployments.
-    // Years with valid in-range values (e.g. 4th Year at 7) are left unchanged.
+    // DO UPDATE enforces per-year maximum ceilings so legacy rows with invalid values (e.g. 8 for 1st Year)
+    // get reset to the floor (0/2/4/6). Valid unlocked values (e.g. 1st Year at 1 or 2, 4th Year at 7 or 8)
+    // are preserved.
     `INSERT INTO semester_unlock_settings (year_label, max_semester) VALUES
       ('1st Year', 0), ('2nd Year', 2), ('3rd Year', 4), ('4th Year', 6)
      ON CONFLICT (year_label) DO UPDATE
        SET max_semester = CASE
-         WHEN semester_unlock_settings.year_label = '1st Year' AND semester_unlock_settings.max_semester >= 2 THEN 0
-         WHEN semester_unlock_settings.year_label = '2nd Year' AND semester_unlock_settings.max_semester >= 4 THEN 2
-         WHEN semester_unlock_settings.year_label = '3rd Year' AND semester_unlock_settings.max_semester >= 6 THEN 4
-         WHEN semester_unlock_settings.year_label = '4th Year' AND semester_unlock_settings.max_semester >= 8 THEN 6
+         WHEN semester_unlock_settings.year_label = '1st Year' AND semester_unlock_settings.max_semester > 2 THEN 0
+         WHEN semester_unlock_settings.year_label = '2nd Year' AND semester_unlock_settings.max_semester > 4 THEN 2
+         WHEN semester_unlock_settings.year_label = '3rd Year' AND semester_unlock_settings.max_semester > 6 THEN 4
+         WHEN semester_unlock_settings.year_label = '4th Year' AND semester_unlock_settings.max_semester > 8 THEN 6
          ELSE semester_unlock_settings.max_semester
        END,
        updated_at = NOW();`,
