@@ -1,0 +1,43 @@
+{
+  "css.validate": false,
+  "less.validate": false,
+  "scss.validate": false,
+  "css.lint.unknownAtRules": "ignore",
+  "css.lint.validProperties": [
+    "--color-background",
+    "--color-surface",
+    "--color-surface-2",
+    "--color-borderLine",
+    "--color-borderStrong",
+    "--color-textPrimary",
+    "--color-textSecondary",
+    "--color-textMuted",
+    "--color-brand-primary",
+    "--color-brand-hover",
+    "--color-brand-soft",
+    "--color-brand-subtle",
+    "--color-success",
+    "--color-success-soft",
+    "--color-alert",
+    "--color-alert-soft",
+    "--color-warning",
+    "--color-warning-soft",
+    "--shadow-xs",
+    "--shadow-sm",
+    "--shadow-md",
+    "--shadow-lg",
+    "--shadow-xl",
+    "--shadow-brand"
+  ],
+  "editor.quickSuggestions": {
+    "strings": true
+  },
+  "tailwindCSS.includeLanguages": {
+    "html": "html",
+    "javascript": "javascript",
+    "javascriptreact": "javascriptreact",
+    "typescript": "javascript",
+    "typescriptreact": "javascriptreact"
+  },
+  "tailwindCSS.experimental.classRegex": []
+}
