@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Target, Download, CheckCircle2, Search, Sparkles, SlidersHorizontal, RefreshCw } from 'lucide-react';
+import { Target, Download, CheckCircle2, Search, Sparkles, SlidersHorizontal, RefreshCw, GraduationCap, Trophy, Building, Users } from 'lucide-react';
 
 interface StudentCandidate {
   rank: number;
@@ -215,35 +215,39 @@ export const PlacementEligibilitySection: React.FC<PlacementEligibilityProps> = 
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => applyPreset('academic')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
               activePreset === 'academic' ? 'bg-brand-primary text-white border-brand-primary shadow-sm' : 'bg-background text-textPrimary border-borderLine hover:border-brand-primary'
             }`}
           >
-            🎓 Core Academic Drive (CGPA ≥ 7.5)
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>Core Academic Drive (CGPA ≥ 7.5)</span>
           </button>
           <button
             onClick={() => applyPreset('tier1')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
               activePreset === 'tier1' ? 'bg-brand-primary text-white border-brand-primary shadow-sm' : 'bg-background text-textPrimary border-borderLine hover:border-brand-primary'
             }`}
           >
-            🏆 Tier-1 Product Drive (CGPA ≥ 8.0, LC ≥ 200, GH ≥ 5)
+            <Trophy className="w-3.5 h-3.5" />
+            <span>Tier-1 Product Drive (CGPA ≥ 8.0, LC ≥ 200, GH ≥ 5)</span>
           </button>
           <button
             onClick={() => applyPreset('mass')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
               activePreset === 'mass' ? 'bg-brand-primary text-white border-brand-primary shadow-sm' : 'bg-background text-textPrimary border-borderLine hover:border-brand-primary'
             }`}
           >
-            🏢 IT Major Mass Drive (CGPA ≥ 6.0, LC ≥ 50)
+            <Building className="w-3.5 h-3.5" />
+            <span>IT Major Mass Drive (CGPA ≥ 6.0, LC ≥ 50)</span>
           </button>
           <button
             onClick={() => applyPreset('all')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border ${
               activePreset === 'all' ? 'bg-brand-primary text-white border-brand-primary shadow-sm' : 'bg-background text-textPrimary border-borderLine hover:border-brand-primary'
             }`}
           >
-            👥 All Students (No Cutoffs)
+            <Users className="w-3.5 h-3.5" />
+            <span>All Students (No Cutoffs)</span>
           </button>
         </div>
       </div>
