@@ -1848,16 +1848,27 @@ app.get('/proxy/leetcode/:handle', async (req: Request, res: Response) => {
         query userProblemsSolved($username: String!) {
           matchedUser(username: $username) {
             username
+            userCalendar {
+              streak
+              totalActiveDays
+              submissionCalendar
+            }
             submitStats: submitStatsGlobal {
               acSubmissionNum { difficulty count submissions }
             }
             profile { ranking reputation }
           }
+          recentAcSubmissionList(username: $username, limit: 15) {
+            id
+            title
+            titleSlug
+            timestamp
+          }
           userContestRanking(username: $username) { rating globalRanking attendedContestsCount }
         }
       `;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
       let lcFetch: Awaited<ReturnType<typeof fetch>>;
       try {
         lcFetch = await fetch('https://leetcode.com/graphql', {
@@ -1893,9 +1904,31 @@ app.get('/proxy/leetcode/:handle', async (req: Request, res: Response) => {
       });
       if (!totalSolved) totalSolved = easySolved + mediumSolved + hardSolved;
       const contestInfo = json?.data?.userContestRanking || {};
-      return { handle: matchedUser.username || handle, totalSolved, easySolved, mediumSolved, hardSolved,
-               ranking: matchedUser.profile?.ranking || 0, reputation: matchedUser.profile?.reputation || 0,
-               contestRating: Math.round(contestInfo.rating || 0), attendedContestsCount: contestInfo.attendedContestsCount || 0 };
+
+      const rawCalendar = matchedUser.userCalendar?.submissionCalendar;
+      let submissionCalendar = {};
+      if (rawCalendar) {
+        try {
+          submissionCalendar = typeof rawCalendar === 'string' ? JSON.parse(rawCalendar) : rawCalendar;
+        } catch { /* ignore */ }
+      }
+      const recentSubmissions = json?.data?.recentAcSubmissionList || [];
+
+      return {
+        handle: matchedUser.username || handle,
+        totalSolved,
+        easySolved,
+        mediumSolved,
+        hardSolved,
+        ranking: matchedUser.profile?.ranking || 0,
+        reputation: matchedUser.profile?.reputation || 0,
+        streak: matchedUser.userCalendar?.streak || 0,
+        totalActiveDays: matchedUser.userCalendar?.totalActiveDays || 0,
+        submissionCalendar,
+        recentSubmissions,
+        contestRating: Math.round(contestInfo.rating || 0),
+        attendedContestsCount: contestInfo.attendedContestsCount || 0,
+      };
     });
 
 

@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 
 interface ActivityHeatmapProps {
-  heatmapData: Record<string, number>; // 'YYYY-MM-DD' -> count
+  heatmapData?: Record<string, number>; // 'YYYY-MM-DD' or epoch -> count
   platformName?: string;
 }
 
+const formatLocalDate = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
-  heatmapData,
+  heatmapData = {},
   platformName = 'Platform',
 }) => {
   const currentYear = new Date().getFullYear();
@@ -14,51 +21,80 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
 
   const years = [currentYear, currentYear - 1, currentYear - 2];
 
+  // Normalize heatmapData keys to standard 'YYYY-MM-DD'
+  const normalizedData = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (!heatmapData) return map;
+
+    Object.entries(heatmapData).forEach(([key, count]) => {
+      const numCount = Number(count) || 0;
+      if (numCount <= 0) return;
+
+      if (/^\d{9,12}$/.test(key)) {
+        // Unix epoch timestamp in seconds
+        const d = new Date(Number(key) * 1000);
+        const dateStr = formatLocalDate(d);
+        map[dateStr] = (map[dateStr] || 0) + numCount;
+      } else if (/^\d{4}-\d{2}-\d{2}/.test(key)) {
+        const dateStr = key.slice(0, 10);
+        map[dateStr] = (map[dateStr] || 0) + numCount;
+      } else {
+        map[key] = (map[key] || 0) + numCount;
+      }
+    });
+    return map;
+  }, [heatmapData]);
+
   // Total submissions for selected year
-  const totalSubmissionsInYear = Object.entries(heatmapData).reduce(
-    (acc, [date, count]) => {
+  const totalSubmissionsInYear = useMemo(() => {
+    return Object.entries(normalizedData).reduce((acc, [date, count]) => {
       if (date.startsWith(String(selectedYear))) {
         return acc + count;
       }
       return acc;
-    },
-    0
-  );
+    }, 0);
+  }, [normalizedData, selectedYear]);
 
-  // Build grid for selected year (52 weeks x 7 days)
-  const startDate = new Date(selectedYear, 0, 1);
-  const endDate = new Date(selectedYear, 11, 31);
+  // Build grid for selected year (52+ weeks x 7 days)
+  const weeks = useMemo(() => {
+    const startDate = new Date(selectedYear, 0, 1);
+    const endDate = new Date(selectedYear, 11, 31);
 
-  const startDayOfWeek = startDate.getDay();
-  const adjustedStart = new Date(startDate);
-  adjustedStart.setDate(adjustedStart.getDate() - startDayOfWeek);
+    const startDayOfWeek = startDate.getDay();
+    const adjustedStart = new Date(startDate);
+    adjustedStart.setDate(adjustedStart.getDate() - startDayOfWeek);
 
-  const weeks: Array<Array<{ dateStr: string; count: number; date: Date }>> = [];
-  let curr = new Date(adjustedStart);
-  const MAX_WEEKS = 54;
+    const result: Array<Array<{ dateStr: string; count: number; date: Date }>> = [];
+    let curr = new Date(adjustedStart);
+    const MAX_WEEKS = 54;
 
-  while (weeks.length < MAX_WEEKS) {
-    const week: Array<{ dateStr: string; count: number; date: Date }> = [];
-    for (let d = 0; d < 7; d++) {
-      const dateStr = curr.toISOString().slice(0, 10);
-      const isTargetYear = curr.getFullYear() === selectedYear;
-      const count = isTargetYear ? (heatmapData[dateStr] || 0) : 0;
-      week.push({ dateStr, count, date: new Date(curr) });
-      curr.setDate(curr.getDate() + 1);
+    while (result.length < MAX_WEEKS) {
+      const week: Array<{ dateStr: string; count: number; date: Date }> = [];
+      for (let d = 0; d < 7; d++) {
+        const dateStr = formatLocalDate(curr);
+        const isTargetYear = curr.getFullYear() === selectedYear;
+        const count = isTargetYear ? (normalizedData[dateStr] || 0) : 0;
+        week.push({ dateStr, count, date: new Date(curr) });
+        curr.setDate(curr.getDate() + 1);
+      }
+      result.push(week);
+      if (curr > endDate && result.length >= 52) break;
     }
-    weeks.push(week);
-    // Stop once we've passed the end of the year and have at least 52 weeks
-    if (curr > endDate && weeks.length >= 52) break;
-  }
+    return result;
+  }, [selectedYear, normalizedData]);
 
-  const maxCount = Math.max(1, ...Object.values(heatmapData));
+  const maxCount = useMemo(() => {
+    const counts = Object.values(normalizedData);
+    return counts.length > 0 ? Math.max(1, ...counts) : 1;
+  }, [normalizedData]);
 
   const getDotColor = (count: number) => {
-    if (count === 0) return '#E2E8F0'; // Light gray dot matching BytsOne
+    if (count === 0) return 'rgba(148, 163, 184, 0.2)'; // neutral muted dot
     const pct = count / maxCount;
-    if (pct < 0.3) return '#86EFAC';
-    if (pct < 0.6) return '#4ADE80';
-    return '#22C55E'; // Vibrant green
+    if (pct < 0.25) return '#86EFAC';
+    if (pct < 0.5) return '#4ADE80';
+    if (pct < 0.75) return '#22C55E';
+    return '#16A34A'; // Rich emerald green
   };
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -68,7 +104,7 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
       {/* Title & Dropdown Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-textPrimary">
-          {totalSubmissionsInYear} submissions in the {selectedYear}
+          {totalSubmissionsInYear} submissions in {selectedYear}
         </h3>
 
         <select
@@ -115,8 +151,8 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({
                   {week.map((day, di) => (
                     <div
                       key={di}
-                      title={`${day.dateStr}: ${day.count} submissions`}
-                      className="w-2.5 h-2.5 rounded-full transition-transform hover:scale-125 cursor-pointer"
+                      title={`${day.dateStr}: ${day.count} submission${day.count === 1 ? '' : 's'}`}
+                      className="w-2.5 h-2.5 rounded-full transition-transform hover:scale-150 cursor-pointer"
                       style={{ backgroundColor: getDotColor(day.count) }}
                     />
                   ))}

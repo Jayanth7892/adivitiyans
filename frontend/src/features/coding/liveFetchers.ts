@@ -51,6 +51,35 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
           attendedContestsCount: data.attendedContestsCount ?? 0,
           rating: data.contestRating ?? 0,
         };
+
+        const rawCalField = data.submissionCalendar ?? data.submissionCalendarJSON;
+        if (rawCalField) {
+          try {
+            const rawCal = typeof rawCalField === 'string' ? JSON.parse(rawCalField) : rawCalField;
+            Object.entries(rawCal).forEach(([epochStr, count]) => {
+              const d = new Date(Number(epochStr) * 1000);
+              const year = d.getFullYear();
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              const dateStr = `${year}-${month}-${day}`;
+              calendarObj[dateStr] = (calendarObj[dateStr] || 0) + Number(count);
+            });
+          } catch { /* ignore */ }
+        }
+
+        const recentList = data.recentSubmissions ?? data.recentAcSubmissionNum ?? [];
+        if (Array.isArray(recentList)) {
+          recentActivities = recentList.slice(0, 15).map((sub: any) => {
+            const d = sub.timestamp ? new Date(Number(sub.timestamp) * 1000) : new Date();
+            const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            return {
+              date: dateStr,
+              title: sub.title ?? sub.titleSlug ?? 'Problem',
+              status: sub.statusDisplay ?? sub.status ?? 'Accepted',
+              type: 'submission',
+            };
+          });
+        }
       }
     } else if (res.status === 404) {
       throw new Error(`LeetCode user "${cleanHandle}" not found.`);
