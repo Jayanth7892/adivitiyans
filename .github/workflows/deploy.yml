@@ -46,4 +46,11 @@ jobs:
         run: chmod +x deploy.sh
 
       - name: Run AWS Deployment Script
+        env:
+          ADMIN_MASTER_EMAIL: ${{ secrets.ADMIN_MASTER_EMAIL }}
+          ADMIN_MASTER_PASS: ${{ secrets.ADMIN_MASTER_PASS }}
+          HOD_MASTER_EMAIL: ${{ secrets.HOD_MASTER_EMAIL }}
+          HOD_MASTER_PASS: ${{ secrets.HOD_MASTER_PASS }}
+          ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+          FACULTY_SECRET_KEY: ${{ secrets.FACULTY_SECRET_KEY }}
         run: ./deploy.sh

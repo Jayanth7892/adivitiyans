@@ -23,6 +23,7 @@ ADMIN_MASTER_PASS="${ADMIN_MASTER_PASS:-}" \
 HOD_MASTER_EMAIL="${HOD_MASTER_EMAIL:-hodcseds@rgmcet.edu.in}" \
 HOD_MASTER_PASS="${HOD_MASTER_PASS:-}" \
 ADMIN_SECRET="${ADMIN_SECRET:-}" \
+FACULTY_SECRET_KEY="${FACULTY_SECRET_KEY:-}" \
 npm run cdk -- deploy --require-approval never --outputs-file ../cdk-outputs.json
 cd ..
 
