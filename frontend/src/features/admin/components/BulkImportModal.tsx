@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, FileText, CheckCircle2, AlertCircle, Download, X, Loader2 } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, AlertCircle, Download, X, Loader2, FileSpreadsheet } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { PillButton } from '../../../components/common/PillButton';
 
@@ -13,6 +13,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClos
   const [rawText, setRawText] = useState('');
   const [parsedRows, setParsedRows] = useState<any[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resultMessage, setResultMessage] = useState<{ success: boolean; text: string } | null>(null);
 
@@ -73,10 +74,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClos
     setParsedRows(rows);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const processFile = (file: File) => {
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -85,6 +83,27 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClos
       parseCSV(content);
     };
     reader.readAsText(file);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
   };
 
   const handleTextChange = (text: string) => {
@@ -158,17 +177,28 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClos
 
         {/* Template Download & Upload Area */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="border border-dashed border-borderLine rounded-xl p-4 text-center hover:border-brand-primary transition-all bg-background/50 flex flex-col items-center justify-center">
-            <FileText className="w-8 h-8 text-brand-primary mb-2" />
-            <p className="text-xs font-bold text-textPrimary mb-1">Select CSV File</p>
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed rounded-2xl p-5 text-center transition-all flex flex-col items-center justify-center cursor-pointer ${
+              isDragging
+                ? 'border-brand-primary bg-brand-soft/30 scale-[1.01]'
+                : 'border-borderLine hover:border-brand-primary/60 bg-surface-2 hover:bg-brand-soft/10'
+            }`}
+          >
+            <FileSpreadsheet className="w-8 h-8 text-brand-primary mb-2" />
+            <p className="text-xs font-bold text-textPrimary mb-1">
+              {isDragging ? 'Drop CSV File Here' : 'Drag & Drop CSV File'}
+            </p>
             <p className="text-[11px] text-textSecondary mb-3">{fileName || 'Supports .csv format with headers'}</p>
-            <label className="cursor-pointer px-3 py-1.5 rounded-lg bg-brand-primary text-white text-xs font-bold hover:bg-brand-primary/90 transition-all">
+            <label className="cursor-pointer px-3.5 py-1.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:bg-brand-hover transition-all shadow-xs">
               Browse File
               <input type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
             </label>
           </div>
 
-          <div className="bg-background/80 border border-borderLine rounded-xl p-4 flex flex-col justify-between">
+          <div className="bg-surface-2 border border-borderLine rounded-2xl p-5 flex flex-col justify-between">
             <div>
               <h4 className="text-xs font-bold text-textPrimary mb-1 flex items-center gap-1.5">
                 <Download className="w-3.5 h-3.5 text-brand-primary" />
@@ -199,31 +229,39 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClos
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-textPrimary">Parsed Rows Preview ({parsedRows.length} Valid Records)</span>
-              <span className="text-emerald-600 font-semibold">✓ Ready for import</span>
+              <span className="text-emerald-600 font-semibold inline-flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Ready for import
+              </span>
             </div>
             <div className="max-h-40 overflow-y-auto border border-borderLine rounded-xl">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-background border-b border-borderLine text-textSecondary">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-surface-2 border-b border-borderLine text-textSecondary font-semibold">
                   <tr>
                     <th className="py-2 px-3">Roll No</th>
                     <th className="py-2 px-3">Name</th>
                     <th className="py-2 px-3">Year / Sec</th>
                     <th className="py-2 px-3">CGPA</th>
+                    <th className="py-2 px-3 text-right">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-borderLine">
                   {parsedRows.slice(0, 10).map((r, idx) => (
-                    <tr key={idx} className="hover:bg-background/50">
+                    <tr key={idx} className="hover:bg-surface-2/60 transition-colors">
                       <td className="py-2 px-3 font-mono font-bold text-brand-primary">{r.roll_number}</td>
-                      <td className="py-2 px-3 text-textPrimary">{r.name}</td>
+                      <td className="py-2 px-3 text-textPrimary font-medium">{r.name}</td>
                       <td className="py-2 px-3 text-textSecondary">{r.year} • Sec {r.section}</td>
-                      <td className="py-2 px-3 font-bold text-green-600">{r.cgpa > 0 ? r.cgpa : 'N/A'}</td>
+                      <td className="py-2 px-3 font-bold text-success">{r.cgpa > 0 ? r.cgpa : 'N/A'}</td>
+                      <td className="py-2 px-3 text-right">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-success bg-success-soft px-2 py-0.5 rounded-md">
+                          ✓ Valid
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               {parsedRows.length > 10 && (
-                <div className="p-2 text-center text-[10px] text-textSecondary bg-background border-t border-borderLine">
+                <div className="p-2 text-center text-[10px] font-semibold text-textSecondary bg-surface-2 border-t border-borderLine">
                   + {parsedRows.length - 10} more rows
                 </div>
               )}
@@ -233,8 +271,8 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClos
 
         {/* Notification Result Banner */}
         {resultMessage && (
-          <div className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 ${resultMessage.success ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
-            {resultMessage.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertCircle className="w-4 h-4 text-red-600" />}
+          <div className={`p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2 ${resultMessage.success ? 'bg-success-soft text-success border border-success/30' : 'bg-alert-soft text-alert border border-alert/30'}`}>
+            {resultMessage.success ? <CheckCircle2 className="w-4 h-4 text-success" /> : <AlertCircle className="w-4 h-4 text-alert" />}
             <span>{resultMessage.text}</span>
           </div>
         )}
@@ -252,3 +290,4 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClos
     </div>
   );
 };
+

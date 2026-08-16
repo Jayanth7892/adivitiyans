@@ -77,7 +77,7 @@ function DiffRing({ solved, total, color, label }: { solved: number; total: numb
     <div className="flex flex-col items-center gap-1">
       <div className="relative w-16 h-16">
         <svg width="64" height="64" viewBox="0 0 64 64" className="-rotate-90">
-          <circle cx="32" cy="32" r={r} fill="none" stroke="#E5E7EB" strokeWidth="7" />
+          <circle cx="32" cy="32" r={r} fill="none" className="stroke-borderLine" strokeWidth="7" />
           <circle cx="32" cy="32" r={r} fill="none" stroke={color} strokeWidth="7"
             strokeDasharray={circ} strokeDashoffset={offset}
             strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
