@@ -3,8 +3,32 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-background: #F7F8FA;
+    --color-surface: #FFFFFF;
+    --color-borderLine: #EAECEF;
+    --color-textPrimary: #111827;
+    --color-textSecondary: #6B7280;
+    --color-brand-primary: #5B4FE9;
+    --color-brand-soft: #EEF0FE;
+    --color-success-soft: #E7F8EE;
+    --color-alert-soft: #FDECEC;
+  }
+
+  .dark {
+    --color-background: #0B0F19;
+    --color-surface: #111827;
+    --color-borderLine: #1F2937;
+    --color-textPrimary: #F9FAFB;
+    --color-textSecondary: #9CA3AF;
+    --color-brand-primary: #6366F1;
+    --color-brand-soft: rgba(99, 102, 241, 0.15);
+    --color-success-soft: rgba(22, 163, 74, 0.15);
+    --color-alert-soft: rgba(220, 38, 38, 0.15);
+  }
+
   body {
-    @apply bg-background text-textPrimary antialiased selection:bg-brand-soft selection:text-brand-primary;
+    @apply bg-background text-textPrimary antialiased selection:bg-brand-soft selection:text-brand-primary transition-colors duration-200;
   }
 }
 
@@ -23,6 +47,14 @@
   border-radius: 9999px;
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: #374151;
+}
+
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
 }

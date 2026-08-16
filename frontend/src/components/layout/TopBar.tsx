@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Bell, Search, User, LogOut, ChevronDown, X, ExternalLink, Sparkles, GraduationCap, Code2, Users, PieChart } from 'lucide-react';
+import { Menu, Bell, Search, User, LogOut, ChevronDown, X, ExternalLink, Sparkles, GraduationCap, Code2, Users, PieChart, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../../lib/api';
@@ -21,6 +21,26 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
     pages: { name: string; path: string; category: string }[];
   }>({ students: [], pages: [] });
   const [searching, setSearching] = useState(false);
+
+  // Day / Night Mode state (persisted in localStorage)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('theme');
+      if (saved) return saved === 'dark';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
 
   const profileRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -223,6 +243,20 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
           )}
         </div>
         )}
+
+        {/* Day / Night Mode Toggle */}
+        <button
+          onClick={() => setIsDarkMode(!isDarkMode)}
+          title={isDarkMode ? 'Switch to Day Mode' : 'Switch to Night Mode'}
+          aria-label={isDarkMode ? 'Switch to Day Mode' : 'Switch to Night Mode'}
+          className="p-2 rounded-full text-textSecondary hover:bg-background transition-all flex items-center justify-center"
+        >
+          {isDarkMode ? (
+            <Sun className="w-5 h-5 text-amber-400 hover:rotate-45 transition-transform" />
+          ) : (
+            <Moon className="w-5 h-5 text-indigo-500 hover:-rotate-12 transition-transform" />
+          )}
+        </button>
 
         {/* Notifications Icon */}
         <button className="p-2 rounded-full text-textSecondary hover:bg-background transition-colors relative">
