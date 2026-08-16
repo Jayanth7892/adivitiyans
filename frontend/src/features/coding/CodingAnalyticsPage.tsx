@@ -53,6 +53,7 @@ export const CodingAnalyticsPage: React.FC = () => {
   const [liveSnapshots, setLiveSnapshots] = useState<Record<string, { total: number; easy: number; medium: number; hard: number; rating: number }>>({});
   const [liveGhSnapshots, setLiveGhSnapshots] = useState<Record<string, { repos: number; stars: number; followers: number; topLang: string }>>({});
   const [loadingLive, setLoadingLive] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Fetch real students dynamically from Database Backend API
   const { data: students = [], isLoading, refetch } = useQuery({
@@ -104,7 +105,7 @@ export const CodingAnalyticsPage: React.FC = () => {
     if (uniqueStudents.length > 0) {
       loadLiveStats();
     }
-  }, [students]);
+  }, [students, refreshKey]);
 
   // Fetch real live GitHub stats for connected handles
   useEffect(() => {
@@ -138,7 +139,7 @@ export const CodingAnalyticsPage: React.FC = () => {
       loadGithubStats();
     }
     return () => { mounted = false; };
-  }, [students]);
+  }, [students, refreshKey]);
 
   // Map real database students to live analytics without any duplicate or hardcoded fake profiles
   const enrichedStudents: EnrichedStudent[] = uniqueStudents.map((s) => {
@@ -237,7 +238,7 @@ export const CodingAnalyticsPage: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={() => refetch()}
+          onClick={() => { refetch(); setRefreshKey(k => k + 1); }}
           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-background hover:bg-surface border border-borderLine text-textSecondary text-xs font-semibold transition-all shrink-0"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading || loadingLive ? 'animate-spin' : ''}`} />
