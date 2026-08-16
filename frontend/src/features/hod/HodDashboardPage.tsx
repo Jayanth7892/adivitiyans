@@ -732,21 +732,24 @@ export const HodDashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={<Users className="w-5 h-5" />}
-          iconBgColor="bg-indigo-50 text-indigo-600"
+          iconBgColor="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+          accentColor="indigo"
           label="Total Department Students"
           value={`${summaryMetrics.count} Students`}
           subtext={isFiltered ? 'Filtered dataset' : 'Enrolled in Data Science'}
         />
         <StatCard
           icon={<GraduationCap className="w-5 h-5" />}
-          iconBgColor="bg-emerald-50 text-emerald-600"
+          iconBgColor="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+          accentColor="success"
           label="Department Average CGPA"
           value={`${summaryMetrics.avgCgpa} / 10`}
           subtext="Overall cumulative GPA"
         />
         <StatCard
           icon={<Trophy className="w-5 h-5" />}
-          iconBgColor="bg-amber-50 text-amber-600"
+          iconBgColor="bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+          accentColor="amber"
           label="Distinction Rate"
           value={summaryMetrics.distinctionRatio}
           subtext="Students with >9.0 CGPA"
@@ -754,6 +757,7 @@ export const HodDashboardPage: React.FC = () => {
         <StatCard
           icon={<Code2 className="w-5 h-5" />}
           iconBgColor="bg-[#FFA116]/10 text-[#FFA116]"
+          accentColor="brand"
           label="Avg LeetCode Solved"
           value={`${summaryMetrics.avgLeetCode} Solved`}
           subtext="Coding activity index"
@@ -761,26 +765,32 @@ export const HodDashboardPage: React.FC = () => {
       </div>
 
       {/* ── TAB NAVIGATION ── */}
-      <div className="flex border-b border-borderLine space-x-6 text-sm font-semibold overflow-x-auto">
-        {[
-          { key: 'overview', label: '📊 Year-Wise Overview' },
-          { key: 'analytics', label: '📈 Academic Analytics' },
-          { key: 'placement', label: '🎯 Placement Eligibility Engine (T&P)' },
-          { key: 'students', label: '👨‍🎓 Student Directory & Inspection' },
-          { key: 'rankings', label: '🏆 Department Leaderboard' },
-          { key: 'mentees', label: `👤 My Mentees${hodMentees.length > 0 ? ` (${hodMentees.length})` : ''}` },
-          { key: 'settings', label: '⚙️ Account Settings' },
-        ].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key as any)}
-            className={`pb-3 transition-colors whitespace-nowrap ${
-              activeTab === t.key ? 'border-b-2 border-brand-primary text-brand-primary font-bold' : 'text-textSecondary hover:text-textPrimary'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="bg-surface border border-borderLine rounded-2xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <nav className="flex px-2 pt-2 pb-0 gap-1 border-b border-borderLine">
+            {[
+              { key: 'overview', label: '📊 Year-Wise Overview' },
+              { key: 'analytics', label: '📈 Academic Analytics' },
+              { key: 'placement', label: '🎯 Placement Eligibility Engine (T&P)' },
+              { key: 'students', label: '👨‍🎓 Student Directory & Inspection' },
+              { key: 'rankings', label: '🏆 Department Leaderboard' },
+              { key: 'mentees', label: `👤 My Mentees${hodMentees.length > 0 ? ` (${hodMentees.length})` : ''}` },
+              { key: 'settings', label: '⚙️ Account Settings' },
+            ].map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key as any)}
+                className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all rounded-t-lg ${
+                  activeTab === t.key
+                    ? 'border-brand-primary text-brand-primary bg-brand-soft'
+                    : 'border-transparent text-textSecondary hover:text-textPrimary hover:bg-surface-2'
+                }`}
+              >
+                <span>{t.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
       </div>
 
       {/* ── TAB: Placement Eligibility Engine ── */}

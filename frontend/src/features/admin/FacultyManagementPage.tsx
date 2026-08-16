@@ -96,22 +96,25 @@ export default function FacultyManagementPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6 p-6 min-h-screen bg-background transition-colors duration-200">
+    <div className="flex flex-col gap-6">
 
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-textPrimary">Faculty Management</h1>
-          <p className="mt-1 text-sm text-textSecondary">
-            {faculty.length} faculty members — select a row to view their assigned mentees
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-soft text-brand-primary text-xs font-semibold mb-2">
+            <span>Faculty Portal</span>
+          </div>
+          <h1 className="text-xl font-extrabold text-textPrimary">Faculty Management</h1>
+          <p className="mt-0.5 text-xs text-textSecondary">
+            {faculty.length} faculty members — select a row to view assigned mentees
           </p>
         </div>
         <button
           onClick={() => setShowBlocked(p => !p)}
-          className={`px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+          className={`px-4 py-2 rounded-xl border text-xs font-bold transition-colors ${
             showBlocked
               ? 'bg-alert border-alert text-white'
-              : 'bg-surface border-alert text-alert hover:bg-alert/10'
+              : 'bg-surface border-alert/50 text-alert hover:bg-alert-soft'
           }`}
         >
           {showBlocked ? 'Hide' : 'Show'} Blocked Emails
@@ -120,19 +123,19 @@ export default function FacultyManagementPage() {
 
       {/* Blocked Emails panel */}
       {showBlocked && (
-        <div className="bg-alert-soft border border-alert/30 rounded-xl p-5">
-          <h3 className="text-sm font-bold text-alert mb-3">Blocked Emails ({blocked.length})</h3>
+        <div className="bg-alert-soft border border-alert/30 rounded-2xl p-5 shadow-xs">
+          <h3 className="text-xs font-bold text-alert uppercase tracking-widest mb-3">Blocked Emails ({blocked.length})</h3>
           {blocked.length === 0 ? (
             <p className="text-sm text-textSecondary">No blocked emails.</p>
           ) : blocked.map(b => (
-            <div key={b.email} className="flex items-center gap-3 bg-surface border border-alert/20 rounded-lg px-3.5 py-2.5 mb-1.5">
+            <div key={b.email} className="flex items-center gap-3 bg-surface border border-alert/20 rounded-xl px-4 py-3 mb-2">
               <div className="flex-1 min-w-0">
-                <span className="font-semibold text-alert text-sm">{b.email}</span>
-                <span className="ml-2.5 text-textSecondary text-xs">{b.reason}</span>
+                <span className="font-bold text-alert text-xs">{b.email}</span>
+                <span className="ml-2.5 text-textMuted text-[11px]">{b.reason}</span>
               </div>
               <button
                 onClick={() => unblockMut.mutate(b.email)}
-                className="px-3.5 py-1 rounded-md border border-green-500 bg-surface text-green-600 font-semibold text-xs hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                className="px-3.5 py-1.5 rounded-lg border border-success/50 bg-surface text-success font-bold text-xs hover:bg-success-soft transition-colors"
               >
                 Unblock
               </button>
@@ -167,8 +170,8 @@ export default function FacultyManagementPage() {
                   <div
                     key={f.faculty_id}
                     onClick={() => setSelectedFaculty(f)}
-                    className={`px-4 py-3.5 border-b border-borderLine cursor-pointer transition-colors border-l-[3px] ${
-                      sel ? 'bg-brand-soft border-l-brand-primary' : 'bg-surface border-l-transparent hover:bg-background'
+                    className={`px-4 py-3.5 border-b border-borderLine cursor-pointer transition-all border-l-[3px] ${
+                      sel ? 'bg-brand-soft border-l-brand-primary' : 'bg-surface border-l-transparent hover:bg-surface-2'
                     }`}
                   >
                     <div className="flex justify-between items-center gap-2">
@@ -199,7 +202,7 @@ export default function FacultyManagementPage() {
                         )}
                         <div className="text-[11px] text-textSecondary mt-0.5">{f.faculty_id}</div>
                       </div>
-                      <span className="bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap">
+                      <span className="bg-brand-soft text-brand-primary rounded-full px-2.5 py-0.5 text-[10px] font-bold whitespace-nowrap">
                         {f.mentee_count ?? 0} mentees
                       </span>
                     </div>
@@ -281,10 +284,10 @@ export default function FacultyManagementPage() {
             </div>
           ) : (
             <>
-              <div className="px-4 py-3.5 border-b border-borderLine bg-background">
+              <div className="px-5 py-4 border-b border-borderLine bg-surface-2">
                 <h3 className="text-sm font-bold text-textPrimary">{selectedFaculty.name}</h3>
-                <p className="text-xs text-textSecondary mt-0.5">
-                  {selectedFaculty.faculty_id} · {mentees.length} assigned mentees
+                <p className="text-xs text-textMuted mt-0.5">
+                  {selectedFaculty.faculty_id} &middot; {mentees.length} assigned mentees
                 </p>
               </div>
               <div className="overflow-y-auto flex-1">
@@ -310,7 +313,7 @@ export default function FacultyManagementPage() {
                       <button
                         onClick={() => unassignMut.mutate({ facId: selectedFaculty.faculty_id, roll: m.roll_number })}
                         disabled={unassignMut.isPending}
-                        className="px-2.5 py-1 rounded-md border border-alert/40 bg-surface text-alert text-xs font-semibold hover:bg-alert-soft transition-colors disabled:opacity-50"
+                        className="px-2.5 py-1.5 rounded-lg border border-alert/40 bg-surface text-alert text-[11px] font-bold hover:bg-alert-soft transition-colors disabled:opacity-50"
                       >Unassign</button>
                     </div>
                   ))}

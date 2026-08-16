@@ -188,31 +188,41 @@ export const FacultyDashboardPage: React.FC = () => {
       </div>
 
       {/* Sub-Tab Switcher */}
-      <div className="flex border-b border-borderLine space-x-4 text-sm font-semibold">
-        <button
-          onClick={() => setSearchParams({ tab: 'mentees' })}
-          className={`pb-3 transition-colors ${
-            activeTab === 'mentees' ? 'border-b-2 border-brand-primary text-brand-primary' : 'text-textSecondary hover:text-textPrimary'
-          }`}
-        >
-          Assigned Mentee Directory ({mentees.length})
-        </button>
-        <button
-          onClick={() => setSearchParams({ tab: 'analytics' })}
-          className={`pb-3 transition-colors ${
-            activeTab === 'analytics' ? 'border-b-2 border-brand-primary text-brand-primary' : 'text-textSecondary hover:text-textPrimary'
-          }`}
-        >
-          Department CGPA Analytics
-        </button>
-        <button
-          onClick={() => setSearchParams({ tab: 'placement' })}
-          className={`pb-3 transition-colors ${
-            activeTab === 'placement' ? 'border-b-2 border-brand-primary text-brand-primary' : 'text-textSecondary hover:text-textPrimary'
-          }`}
-        >
-          🎯 Placement Eligibility (T&P Drive)
-        </button>
+      <div className="bg-surface border border-borderLine rounded-2xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <nav className="flex px-2 pt-2 pb-0 gap-1 border-b border-borderLine">
+            <button
+              onClick={() => setSearchParams({ tab: 'mentees' })}
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all rounded-t-lg ${
+                activeTab === 'mentees'
+                  ? 'border-brand-primary text-brand-primary bg-brand-soft'
+                  : 'border-transparent text-textSecondary hover:text-textPrimary hover:bg-surface-2'
+              }`}
+            >
+              <span>Assigned Mentee Directory ({mentees.length})</span>
+            </button>
+            <button
+              onClick={() => setSearchParams({ tab: 'analytics' })}
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all rounded-t-lg ${
+                activeTab === 'analytics'
+                  ? 'border-brand-primary text-brand-primary bg-brand-soft'
+                  : 'border-transparent text-textSecondary hover:text-textPrimary hover:bg-surface-2'
+              }`}
+            >
+              <span>Department CGPA Analytics</span>
+            </button>
+            <button
+              onClick={() => setSearchParams({ tab: 'placement' })}
+              className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all rounded-t-lg ${
+                activeTab === 'placement'
+                  ? 'border-brand-primary text-brand-primary bg-brand-soft'
+                  : 'border-transparent text-textSecondary hover:text-textPrimary hover:bg-surface-2'
+              }`}
+            >
+              <span>🎯 Placement Eligibility (T&P Drive)</span>
+            </button>
+          </nav>
+        </div>
       </div>
 
       {/* Stat Cards */}
@@ -220,13 +230,15 @@ export const FacultyDashboardPage: React.FC = () => {
         <StatCard
           icon={<Users className="w-5 h-5" />}
           iconBgColor="bg-brand-soft text-brand-primary"
+          accentColor="brand"
           label="Assigned Mentees"
           value={mentees.length}
           subtext="Under your guidance"
         />
         <StatCard
           icon={<BookOpen className="w-5 h-5" />}
-          iconBgColor="bg-indigo-50 text-indigo-600"
+          iconBgColor="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+          accentColor="indigo"
           label="Department Avg GPA"
           value={realAvgGpa || deptReport?.avgGpa || '—'}
           subtext="Computed from mentee records"
@@ -234,13 +246,15 @@ export const FacultyDashboardPage: React.FC = () => {
         <StatCard
           icon={<TrendingUp className="w-5 h-5" />}
           iconBgColor="bg-success-soft text-success"
+          accentColor="success"
           label="Avg Academic Score"
           value={`${deptReport?.avgEmployabilityScore || 88.5} / 100`}
           subtext="High performance standing"
         />
         <StatCard
           icon={<Award className="w-5 h-5" />}
-          iconBgColor="bg-amber-50 text-amber-600"
+          iconBgColor="bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+          accentColor="amber"
           label="Top Standing (9.0+)"
           value={topStandingCount}
           subtext={`Out of ${mentees.length} mentees`}

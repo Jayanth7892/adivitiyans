@@ -524,25 +524,14 @@ export const AuthPage: React.FC = () => {
 
       {/* ── Session Kicked-Out Banner ── */}
       {sessionKickedOut && (
-        <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-lg">
-          <div
-            style={{
-              background: 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%)',
-              border: '1px solid #ef4444',
-              borderRadius: '12px',
-              padding: '14px 18px',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '12px',
-              boxShadow: '0 4px 20px rgba(239,68,68,0.25)',
-            }}
-          >
-            <span style={{ fontSize: '20px', flexShrink: 0 }}>⚠️</span>
+        <div className="mt-4 sm:mx-auto sm:w-full sm:max-w-lg px-4 sm:px-0">
+          <div className="bg-alert-soft border border-alert/30 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+            <span className="text-xl shrink-0">⚠️</span>
             <div>
-              <p style={{ color: '#fecaca', fontWeight: 700, margin: 0, fontSize: '14px' }}>
+              <p className="text-sm font-bold text-alert m-0">
                 Session ended — another device signed in
               </p>
-              <p style={{ color: '#fca5a5', margin: '4px 0 0', fontSize: '13px' }}>
+              <p className="text-xs text-textSecondary mt-1">
                 Your account was accessed from a different browser or device. For security, only one active session is allowed. Please log in again.
               </p>
             </div>
@@ -551,7 +540,7 @@ export const AuthPage: React.FC = () => {
       )}
 
       <div className="mt-4 sm:mt-8 sm:mx-auto sm:w-full sm:max-w-lg">
-        <div className="bg-surface py-5 sm:py-8 px-5 sm:px-6 shadow-sm border border-borderLine sm:rounded-2xl sm:px-10">
+        <div className="bg-surface py-6 sm:py-8 px-5 sm:px-10 shadow-md border border-borderLine rounded-2xl">
           {/* Inline Error Banner */}
           {errorMessage && (
             <div className="mb-6 flex items-start gap-3 bg-red-950/60 border border-red-500/50 rounded-xl px-4 py-3 text-sm animate-pulse-once">
@@ -570,43 +559,43 @@ export const AuthPage: React.FC = () => {
             </div>
           )}
           {/* Role Switcher Pill Tabs */}
-          <div className="grid grid-cols-4 gap-1 bg-background p-1 rounded-xl border border-borderLine mb-8">
+          <div className="grid grid-cols-4 gap-1.5 bg-surface-2 p-1.5 rounded-2xl border border-borderLine mb-7">
             <button
               onClick={() => { setActiveTab('student'); setIsSignUp(false); }}
-              className={`py-2 text-xs font-bold rounded-lg transition-all ${
+              className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'student'
-                  ? 'bg-surface text-brand-primary shadow-sm border border-borderLine'
-                  : 'text-textSecondary hover:text-textPrimary'
+                  ? 'bg-brand-primary text-white shadow-sm shadow-brand/30'
+                  : 'text-textSecondary hover:text-textPrimary hover:bg-surface'
               }`}
             >
               Student
             </button>
             <button
               onClick={() => { setActiveTab('faculty'); setIsSignUp(false); }}
-              className={`py-2 text-xs font-bold rounded-lg transition-all ${
+              className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'faculty'
-                  ? 'bg-surface text-brand-primary shadow-sm border border-borderLine'
-                  : 'text-textSecondary hover:text-textPrimary'
+                  ? 'bg-brand-primary text-white shadow-sm shadow-brand/30'
+                  : 'text-textSecondary hover:text-textPrimary hover:bg-surface'
               }`}
             >
               Faculty
             </button>
             <button
               onClick={() => { setActiveTab('hod'); setIsSignUp(false); }}
-              className={`py-2 text-xs font-bold rounded-lg transition-all ${
+              className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'hod'
-                  ? 'bg-surface text-brand-primary shadow-sm border border-borderLine'
-                  : 'text-textSecondary hover:text-textPrimary'
+                  ? 'bg-brand-primary text-white shadow-sm shadow-brand/30'
+                  : 'text-textSecondary hover:text-textPrimary hover:bg-surface'
               }`}
             >
               HOD
             </button>
             <button
               onClick={() => { setActiveTab('admin'); setIsSignUp(false); }}
-              className={`py-2 text-xs font-bold rounded-lg transition-all ${
+              className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'admin'
-                  ? 'bg-surface text-brand-primary shadow-sm border border-borderLine'
-                  : 'text-textSecondary hover:text-textPrimary'
+                  ? 'bg-brand-primary text-white shadow-sm shadow-brand/30'
+                  : 'text-textSecondary hover:text-textPrimary hover:bg-surface'
               }`}
             >
               Admin

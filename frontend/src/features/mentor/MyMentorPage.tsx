@@ -28,13 +28,13 @@ export default function MyMentorPage() {
   });
 
   return (
-    <div className="min-h-screen bg-background px-6 py-8 transition-colors duration-200">
-      <div className="max-w-3xl mx-auto">
+    <div className="bg-background px-4 py-6 sm:px-6 sm:py-8">
+      <div className="max-w-2xl mx-auto space-y-5">
 
-        {/* Header */}
-        <div className="mb-7">
+        {/* Page Header */}
+        <div>
           <h1 className="text-2xl font-extrabold text-textPrimary tracking-tight">My Mentor</h1>
-          <p className="mt-1.5 text-sm text-textSecondary">
+          <p className="mt-1 text-sm text-textSecondary">
             Your assigned faculty mentor and academic guidance
           </p>
         </div>
@@ -50,7 +50,7 @@ export default function MyMentorPage() {
 
         {/* Error */}
         {error && (
-          <div className="bg-alert-soft border border-alert/30 rounded-2xl p-6 text-alert text-center text-sm font-medium">
+          <div className="bg-alert-soft border border-alert/30 rounded-2xl p-6 text-alert text-center text-sm font-semibold">
             Failed to load mentor details. Please try again later.
           </div>
         )}
@@ -61,21 +61,23 @@ export default function MyMentorPage() {
             {/* ── Mentor Card ── */}
             {mentor?.assigned ? (
               <div className="bg-surface border border-borderLine rounded-2xl overflow-hidden shadow-sm">
-                {/* Purple gradient banner */}
-                <div className="h-20 bg-gradient-to-r from-violet-600 to-sky-500" />
+                {/* Gradient banner */}
+                <div
+                  className="h-24 w-full"
+                  style={{ background: 'linear-gradient(135deg, var(--color-brand-primary) 0%, #818CF8 100%)' }}
+                />
 
-                <div className="px-7 pb-7">
-                  {/* Avatar overlapping banner */}
-                  <div className="-mt-11 mb-4 flex items-end justify-between">
+                <div className="px-6 pb-7 -mt-10">
+                  {/* Avatar + role badge */}
+                  <div className="flex items-end justify-between mb-5">
                     <div
-                      className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-black text-white border-4 border-surface shadow-md shrink-0"
+                      className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-black text-white border-4 border-surface shadow-md shrink-0"
                       style={{ background: avatarColor(mentor.name || 'M') }}
                     >
                       {getInitials(mentor.name || 'M')}
                     </div>
-                    {/* Role badge */}
                     <span
-                      className="px-4 py-1.5 rounded-full text-white font-bold text-xs"
+                      className="px-3 py-1.5 rounded-full text-white font-bold text-xs shadow-sm"
                       style={{
                         background: mentor.role === 'hod'
                           ? 'linear-gradient(135deg,#7c3aed,#5b21b6)'
@@ -86,14 +88,14 @@ export default function MyMentorPage() {
                     </span>
                   </div>
 
-                  {/* Name & details */}
-                  <h2 className="text-xl font-extrabold text-textPrimary mb-1">{mentor.name}</h2>
-                  <p className="text-sm text-textSecondary mb-5">
+                  {/* Name & dept */}
+                  <h2 className="text-xl font-extrabold text-textPrimary mb-0.5">{mentor.name}</h2>
+                  <p className="text-xs text-textSecondary mb-5 font-medium">
                     {mentor.department || 'CSE (Data Science)'}
                   </p>
 
                   {/* Info grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <InfoCard icon="🏛️" label="Department" value={mentor.department || 'CSE (Data Science)'} />
                     <InfoCard icon="👤" label="Designation" value={mentor.role === 'hod' ? 'Head of Department' : 'Faculty Mentor'} />
                     {mentor.email && (
@@ -105,12 +107,12 @@ export default function MyMentorPage() {
               </div>
             ) : (
               /* Not assigned state */
-              <div className="bg-surface border-2 border-dashed border-violet-300 dark:border-violet-800 rounded-2xl p-12 text-center shadow-sm">
+              <div className="bg-surface border-2 border-dashed border-brand-primary/30 rounded-2xl p-12 text-center shadow-xs">
                 <div className="text-5xl mb-4">🎓</div>
-                <h3 className="text-lg font-bold text-violet-700 dark:text-violet-400 mb-2">
+                <h3 className="text-base font-bold text-textPrimary mb-2">
                   No Mentor Assigned Yet
                 </h3>
-                <p className="text-sm text-textSecondary leading-relaxed">
+                <p className="text-sm text-textSecondary leading-relaxed max-w-xs mx-auto">
                   Your faculty mentor will be assigned by the department admin.<br />
                   Please check back later or contact your HOD.
                 </p>
@@ -118,8 +120,8 @@ export default function MyMentorPage() {
             )}
 
             {/* ── Faculty Remarks ── */}
-            <div className="bg-surface border border-borderLine rounded-2xl overflow-hidden shadow-sm">
-              <div className="px-7 py-5 border-b border-borderLine bg-background flex items-center gap-3">
+            <div className="bg-surface border border-borderLine rounded-2xl overflow-hidden shadow-xs">
+              <div className="px-6 py-4 border-b border-borderLine bg-surface-2 flex items-center gap-3">
                 <span className="text-xl">📝</span>
                 <div>
                   <h3 className="text-sm font-bold text-textPrimary">Faculty Remarks</h3>
@@ -129,10 +131,10 @@ export default function MyMentorPage() {
                 </div>
               </div>
 
-              <div className="p-7">
+              <div className="p-6">
                 {mentor?.remarks ? (
-                  <div className="bg-background rounded-xl p-6 border-l-4 border-violet-500">
-                    <p className="text-sm text-textPrimary leading-relaxed mb-4 whitespace-pre-wrap">
+                  <div className="bg-surface-2 rounded-xl p-5 border-l-4 border-brand-primary">
+                    <p className="text-sm text-textPrimary leading-relaxed mb-4 whitespace-pre-wrap italic">
                       "{mentor.remarks}"
                     </p>
                     <div className="flex items-center gap-3">
@@ -144,7 +146,7 @@ export default function MyMentorPage() {
                           {getInitials(mentor.name)}
                         </div>
                       )}
-                      <span className="text-violet-600 font-bold text-sm">
+                      <span className="text-brand-primary font-bold text-sm">
                         — {mentor?.name || 'Your Mentor'}
                       </span>
                     </div>
@@ -152,8 +154,8 @@ export default function MyMentorPage() {
                 ) : (
                   <div className="text-center py-8 text-textSecondary">
                     <div className="text-4xl mb-3">✍️</div>
-                    <p className="text-sm font-medium">No remarks added yet</p>
-                    <p className="text-xs mt-1.5">Your mentor's feedback and academic notes will appear here</p>
+                    <p className="text-sm font-semibold text-textPrimary">No remarks added yet</p>
+                    <p className="text-xs text-textSecondary mt-1.5">Your mentor's feedback and academic notes will appear here</p>
                   </div>
                 )}
               </div>
@@ -170,8 +172,8 @@ function InfoCard({ icon, label, value, href }: {
   icon: string; label: string; value: string; href?: string;
 }) {
   return (
-    <div className="bg-background border border-borderLine rounded-xl px-4 py-3.5">
-      <div className="text-[10px] font-bold text-textSecondary uppercase tracking-wider mb-1.5">
+    <div className="bg-surface-2 border border-borderLine rounded-xl px-4 py-3.5">
+      <div className="text-[10px] font-bold text-textMuted uppercase tracking-widest mb-1.5">
         {icon} {label}
       </div>
       {href ? (

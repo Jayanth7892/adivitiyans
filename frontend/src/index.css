@@ -1,41 +1,118 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --color-background: #F7F8FA;
-    --color-surface: #FFFFFF;
-    --color-borderLine: #EAECEF;
-    --color-textPrimary: #111827;
-    --color-textSecondary: #6B7280;
+    /* ── Core Surfaces ── */
+    --color-background:   #F3F4F8;
+    --color-surface:      #FFFFFF;
+    --color-surface-2:    #F8F9FC;
+    --color-borderLine:   #E4E7EE;
+    --color-borderStrong: #C8CDD8;
+
+    /* ── Text ── */
+    --color-textPrimary:   #0F172A;
+    --color-textSecondary: #64748B;
+    --color-textMuted:     #94A3B8;
+
+    /* ── Brand ── */
     --color-brand-primary: #5B4FE9;
-    --color-brand-soft: #EEF0FE;
-    --color-success-soft: #E7F8EE;
-    --color-alert-soft: #FDECEC;
+    --color-brand-hover:   #4C41D4;
+    --color-brand-soft:    #EEEDFB;
+    --color-brand-subtle:  #F5F4FF;
+
+    /* ── Status ── */
+    --color-success:      #16A34A;
+    --color-success-soft: #DCFCE7;
+    --color-alert:        #DC2626;
+    --color-alert-soft:   #FEE2E2;
+    --color-warning:      #D97706;
+    --color-warning-soft: #FEF3C7;
+
+    /* ── Shadows ── */
+    --shadow-xs: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
+    --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.07), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+    --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+    --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+    --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+    --shadow-brand: 0 4px 14px rgba(91, 79, 233, 0.25);
   }
 
   .dark {
-    --color-background: #0B0F19;
-    --color-surface: #111827;
-    --color-borderLine: #1F2937;
-    --color-textPrimary: #F9FAFB;
-    --color-textSecondary: #9CA3AF;
+    /* ── Core Surfaces ── */
+    --color-background:   #070C18;
+    --color-surface:      #0F172A;
+    --color-surface-2:    #162032;
+    --color-borderLine:   #1E293B;
+    --color-borderStrong: #334155;
+
+    /* ── Text ── */
+    --color-textPrimary:   #F1F5F9;
+    --color-textSecondary: #94A3B8;
+    --color-textMuted:     #64748B;
+
+    /* ── Brand ── */
     --color-brand-primary: #6366F1;
-    --color-brand-soft: rgba(99, 102, 241, 0.15);
-    --color-success-soft: rgba(22, 163, 74, 0.15);
-    --color-alert-soft: rgba(220, 38, 38, 0.15);
+    --color-brand-hover:   #818CF8;
+    --color-brand-soft:    rgba(99, 102, 241, 0.18);
+    --color-brand-subtle:  rgba(99, 102, 241, 0.08);
+
+    /* ── Status ── */
+    --color-success:      #22C55E;
+    --color-success-soft: rgba(34, 197, 94, 0.15);
+    --color-alert:        #F87171;
+    --color-alert-soft:   rgba(248, 113, 113, 0.12);
+    --color-warning:      #FBBF24;
+    --color-warning-soft: rgba(251, 191, 36, 0.12);
+
+    /* ── Shadows (lighter in dark mode) ── */
+    --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.35), 0 1px 2px -1px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+    --shadow-brand: 0 4px 14px rgba(99, 102, 241, 0.3);
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   body {
-    @apply bg-background text-textPrimary antialiased selection:bg-brand-soft selection:text-brand-primary transition-colors duration-200;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    @apply bg-background text-textPrimary;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* ── Focus ring ── */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* ── Selection ── */
+  ::selection {
+    background: var(--color-brand-soft);
+    color: var(--color-brand-primary);
   }
 }
 
-/* Custom scrollbars */
+/* ─────────────────────────────────────────── */
+/* Custom scrollbar                           */
+/* ─────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -43,18 +120,77 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--color-borderStrong);
   border-radius: 9999px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: #374151;
-}
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--color-textMuted);
 }
 
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #4b5563;
+/* ─────────────────────────────────────────── */
+/* Utility layer                              */
+/* ─────────────────────────────────────────── */
+@layer utilities {
+  /* Card helpers */
+  .card {
+    @apply bg-surface border border-borderLine rounded-2xl;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .card-hover {
+    @apply card transition-all cursor-pointer;
+  }
+  .card-hover:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-brand-primary);
+  }
+
+  /* Input base style */
+  .input {
+    @apply w-full px-4 py-2.5 rounded-xl border border-borderLine bg-surface text-sm text-textPrimary placeholder:text-textMuted transition-all;
+  }
+  .input:focus {
+    @apply outline-none border-brand-primary;
+    box-shadow: 0 0 0 3px rgba(91, 79, 233, 0.12);
+  }
+  .dark .input:focus {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  }
+
+  /* Section header divider */
+  .section-header {
+    @apply text-[11px] font-bold text-textMuted uppercase tracking-widest;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+  .badge-brand {
+    @apply badge bg-brand-soft text-brand-primary;
+  }
+  .badge-success {
+    @apply badge bg-success-soft text-success;
+  }
+  .badge-alert {
+    @apply badge bg-alert-soft text-alert;
+  }
+  .badge-warning {
+    @apply badge bg-warning-soft text-warning;
+  }
+
+  /* Shadow utilities */
+  .shadow-brand {
+    box-shadow: var(--shadow-brand);
+  }
+  .shadow-card {
+    box-shadow: var(--shadow-sm);
+  }
+  .shadow-card-md {
+    box-shadow: var(--shadow-md);
+  }
+  .shadow-card-lg {
+    box-shadow: var(--shadow-lg);
+  }
 }
