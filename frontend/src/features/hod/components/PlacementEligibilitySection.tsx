@@ -148,7 +148,7 @@ export const PlacementEligibilitySection: React.FC<PlacementEligibilityProps> = 
     const headers = ['Rank', 'Name', 'Reg Number', 'Email', 'Phone', 'Year', 'Section', 'CGPA', 'LeetCode Solved', 'GitHub Repos', 'Standing', 'Eligibility Status'];
     const rows = eligibleStudents.map((s, idx) => [
       idx + 1,
-      `"${s.name}"`,
+      `"${(s.name || '').replace(/"/g, '""')}"`,
       s.regNo,
       s.email,
       s.phone,
@@ -161,14 +161,16 @@ export const PlacementEligibilitySection: React.FC<PlacementEligibilityProps> = 
       '"ELIGIBLE FOR RECRUITMENT DRIVE"',
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvString = [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
+    link.setAttribute('href', url);
     link.setAttribute('download', `Placement_Eligible_Candidates_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const totalCount = candidateDataset.length || 1;
