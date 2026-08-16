@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sparkles, Edit3, TrendingUp } from 'lucide-react';
 import { PillButton } from './PillButton';
 
@@ -8,11 +8,27 @@ interface GreetingHeroProps {
   onEditProfile: () => void;
 }
 
+function getDynamicGreeting(): string {
+  const h = new Date().getHours();
+  if (h >= 0 && h < 12) return 'Good morning';
+  if (h >= 12 && h < 16) return 'Good afternoon';
+  return 'Good evening';
+}
+
 export const GreetingHero: React.FC<GreetingHeroProps> = ({
   name,
   completionPercentage,
   onEditProfile,
 }) => {
+  const [greeting, setGreeting] = useState<string>(getDynamicGreeting);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setGreeting(getDynamicGreeting());
+    }, 30000); // Re-evaluate every 30s to update time boundary transitions seamlessly
+    return () => clearInterval(timer);
+  }, []);
+
   const pct = Math.min(Math.max(completionPercentage, 0), 100);
 
   // Colour the progress bar based on completion
@@ -20,13 +36,6 @@ export const GreetingHero: React.FC<GreetingHeroProps> = ({
     pct >= 80 ? '#22C55E'
     : pct >= 50 ? '#6366F1'
     : '#F59E0B';
-
-  const greeting = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
-  })();
 
   return (
     <div className="relative bg-surface border border-borderLine rounded-2xl overflow-hidden shadow-sm">
@@ -54,7 +63,7 @@ export const GreetingHero: React.FC<GreetingHeroProps> = ({
         <div className="absolute inset-0 flex flex-col justify-center px-8">
           <div className="inline-flex items-center gap-1.5 mb-3 w-fit">
             <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
-            <span className="text-xs font-bold text-white/80 uppercase tracking-widest">Student Placement Portal</span>
+            <span className="text-xs font-bold text-white/80 uppercase tracking-widest">Student Portal</span>
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight leading-tight drop-shadow-sm">
             {greeting}, <span className="text-yellow-200">{name}</span>! 👋
