@@ -1,0 +1,5 @@
+# Enforce Unix LF line endings for shell scripts (prevents CRLF breaking bash on Ubuntu CI)
+*.sh text eol=lf
+
+# All other files: auto-detect
+* text=auto
