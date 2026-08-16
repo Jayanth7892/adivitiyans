@@ -89,10 +89,16 @@ export const GreetingHero: React.FC<GreetingHeroProps> = ({
               style={{ width: `${pct}%`, background: barColor }}
             />
           </div>
-          <p className="text-[10px] text-textMuted mt-1.5">
-            {pct >= 80 ? '🟢 Strong profile' : pct >= 50 ? '🟡 Getting there' : '🔴 Needs attention'}
-            {' · '}{100 - pct}% remaining
-          </p>
+          <div className="flex items-center gap-2 mt-1.5 text-[10px]">
+            {pct >= 80 ? (
+              <span className="badge-success">Strong Profile</span>
+            ) : pct >= 50 ? (
+              <span className="badge-warning">Getting There</span>
+            ) : (
+              <span className="badge-alert">Needs Attention</span>
+            )}
+            <span className="text-textMuted">&bull; {100 - pct}% remaining</span>
+          </div>
         </div>
 
         {/* CTA */}

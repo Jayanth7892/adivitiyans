@@ -145,9 +145,9 @@ export const DashboardPage: React.FC = () => {
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
-                    <PolarGrid stroke="#EAECEF" />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#4B5563', fontSize: 11 }} />
-                    <PolarRadiusAxis angle={30} domain={[0, 5]} stroke="#CBD5E1" />
+                    <PolarGrid stroke="var(--color-borderLine)" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: 'var(--color-textSecondary)', fontSize: 11 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 5]} stroke="var(--color-borderLine)" />
                     <Radar
                       name="Rating"
                       dataKey="A"

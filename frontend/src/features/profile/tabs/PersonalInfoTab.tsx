@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Edit2, Save, X, ExternalLink, GraduationCap } from 'lucide-react';
+import { Edit2, Save, X, ExternalLink, GraduationCap, Lock } from 'lucide-react';
 import { StudentProfile, AcademicRecord } from '../../../types';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
@@ -141,8 +141,9 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, acade
 
           <div>
             <label className="block text-xs font-semibold text-textSecondary uppercase tracking-wider mb-1">Registration Number (Locked)</label>
-            <p className="text-sm font-bold text-brand-primary bg-brand-soft px-3 py-1.5 rounded-lg inline-block">
-              {s?.roll_number || activeRoll || 'Not assigned'}
+            <p className="text-sm font-bold text-brand-primary bg-brand-soft px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5">
+              <Lock className="w-3.5 h-3.5" />
+              <span>{s?.roll_number || activeRoll || 'Not assigned'}</span>
             </p>
           </div>
 
