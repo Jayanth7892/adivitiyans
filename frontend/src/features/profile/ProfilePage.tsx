@@ -132,15 +132,15 @@ export const ProfilePage: React.FC = () => {
         >
           {/* Mesh overlay dots */}
           <div
-            className="absolute inset-0 opacity-20"
+            className="absolute inset-0 opacity-20 pointer-events-none"
             style={{
               backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.5) 1px, transparent 1px)',
               backgroundSize: '24px 24px',
             }}
           />
           {/* Glow orbs */}
-          <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute bottom-0 left-20 w-32 h-32 rounded-full bg-purple-300/20 blur-2xl" />
+          <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-20 w-32 h-32 rounded-full bg-purple-300/20 blur-2xl pointer-events-none" />
         </div>
 
         {/* ── Content below banner ── */}

@@ -40,15 +40,15 @@ export const GreetingHero: React.FC<GreetingHeroProps> = ({
       >
         {/* Dot mesh */}
         <div
-          className="absolute inset-0 opacity-[0.18]"
+          className="absolute inset-0 opacity-[0.18] pointer-events-none"
           style={{
             backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px)',
             backgroundSize: '20px 20px',
           }}
         />
         {/* Glow orbs */}
-        <div className="absolute -top-12 -right-12 w-56 h-56 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute bottom-0 left-32 w-40 h-40 rounded-full bg-purple-300/20 blur-2xl" />
+        <div className="absolute -top-12 -right-12 w-56 h-56 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-32 w-40 h-40 rounded-full bg-purple-300/20 blur-2xl pointer-events-none" />
 
         {/* Overlay text inside banner */}
         <div className="absolute inset-0 flex flex-col justify-center px-8">
