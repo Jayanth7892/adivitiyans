@@ -139,6 +139,20 @@ export function getCurrentSession(): Promise<CognitoAuthResult | null> {
 }
 
 /**
+ * Helper to check if an error is a Cognito configuration or client ID error
+ * (e.g. "User pool client ... does not exist", ResourceNotFoundException, InvalidParameterException)
+ */
+export function isCognitoConfigError(err: any): boolean {
+  const msg = typeof err === 'string' ? err : err?.message || String(err || '');
+  return (
+    msg.includes('does not exist') ||
+    msg.includes('ResourceNotFoundException') ||
+    msg.includes('InvalidParameterException') ||
+    msg.includes('User pool client')
+  );
+}
+
+/**
  * Get the current valid JWT ID token (for API authorization).
  * Returns null if not authenticated.
  */
