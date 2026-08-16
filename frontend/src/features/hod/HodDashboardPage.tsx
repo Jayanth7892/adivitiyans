@@ -735,7 +735,7 @@ export const HodDashboardPage: React.FC = () => {
           iconBgColor="bg-indigo-50 text-indigo-600"
           label="Total Department Students"
           value={`${summaryMetrics.count} Students`}
-          subtext={isFiltered ? 'Filtered dataset' : 'Enrolled in CSE'}
+          subtext={isFiltered ? 'Filtered dataset' : 'Enrolled in Data Science'}
         />
         <StatCard
           icon={<GraduationCap className="w-5 h-5" />}
