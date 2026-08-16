@@ -27,7 +27,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
 
   const rawDisplayName = user?.name || (user?.email ? user.email.split('@')[0] : 'User');
   // Strip trailing bracketed suffix like (HOD ...) or (HOD CSE(Data Science))
-  const displayName = rawDisplayName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const displayName = rawDisplayName.replace(/\s*\(HOD.*$/i, '').replace(/\s*\(.*$/, '').trim();
 
   // For HOD role, avatar circle displays 'HOD' (clearly visible)
   const avatarText = user?.role === 'hod'

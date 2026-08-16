@@ -119,7 +119,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
     : role === 'hod' ? hodNavGroups
     : studentNavGroups;
 
-  const footerDisplayName = user?.name || (user?.email ? user.email.split('@')[0] : 'User');
+  const rawFooterName = user?.name || (user?.email ? user.email.split('@')[0] : 'User');
+  const footerDisplayName = rawFooterName.replace(/\s*\(HOD.*$/i, '').replace(/\s*\(.*$/, '').trim();
   const footerInitials = footerDisplayName
     .split(' ')
     .filter(Boolean)
