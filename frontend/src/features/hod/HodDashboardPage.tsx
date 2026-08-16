@@ -960,7 +960,7 @@ export const HodDashboardPage: React.FC = () => {
         <div className="space-y-6">
           <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
             <div className="mb-4">
-              <h3 className="text-base font-bold text-textPrimary">CSE Department Year-Wise CGPA Breakdown</h3>
+              <h3 className="text-base font-bold text-textPrimary">Data Science Department Year-Wise CGPA Breakdown</h3>
               <p className="text-xs text-textSecondary">Academic standing distribution across 1st to 4th year batches</p>
             </div>
             <div className="overflow-x-auto">

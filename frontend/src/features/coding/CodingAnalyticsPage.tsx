@@ -254,7 +254,7 @@ export const CodingAnalyticsPage: React.FC = () => {
           accentColor="brand"
           label="Average CGPA"
           value={`${avgCgpa} / 10`}
-          subtext="CSE Program Average"
+          subtext="Data Science Program Average"
         />
         <StatCard
           icon={<Trophy className="w-5 h-5" />}
