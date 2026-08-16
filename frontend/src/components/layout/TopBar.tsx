@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Bell, Search, User, LogOut, ChevronDown, X, Code2, Sun, Moon } from 'lucide-react';
+import { PanelLeft, Bell, Search, User, LogOut, ChevronDown, X, Code2, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
@@ -127,16 +127,32 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
     navigate('/auth');
   };
 
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Global ⌘K or Ctrl+K shortcut listener to focus search input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setIsSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <header className="h-16 bg-surface border-b border-borderLine px-4 md:px-6 flex items-center justify-between sticky top-0 z-30 shadow-xs">
-      {/* Left — hamburger */}
+      {/* Left — sidebar toggle */}
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuToggle}
-          className="p-2 rounded-xl text-textSecondary hover:bg-surface-2 hover:text-textPrimary transition-colors"
+          className="p-2 rounded-xl text-textSecondary hover:bg-surface-2 hover:text-brand-primary transition-all focus:outline-none"
           aria-label="Toggle Navigation Menu"
+          title="Toggle Navigation Menu"
         >
-          <Menu className="w-5 h-5" />
+          <PanelLeft className="w-5 h-5" />
         </button>
       </div>
 
@@ -149,6 +165,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-2 border border-borderLine text-xs text-textPrimary w-64 lg:w-80 focus-within:border-brand-primary focus-within:ring-2 focus-within:ring-brand-primary/15 transition-all">
               <Search className="w-3.5 h-3.5 text-textMuted shrink-0" />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -156,6 +173,11 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
                 placeholder="Search students, pages..."
                 className="bg-transparent border-none outline-none text-xs w-full text-textPrimary placeholder:text-textMuted"
               />
+              {!searchQuery && (
+                <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold text-textMuted bg-surface border border-borderLine shadow-2xs">
+                  ⌘K
+                </kbd>
+              )}
               {searchQuery && (
                 <button
                   onClick={() => { setSearchQuery(''); setIsSearchOpen(false); }}
