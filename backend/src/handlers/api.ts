@@ -1841,6 +1841,7 @@ app.get('/proxy/leetcode/:handle', async (req: Request, res: Response) => {
   try {
     const handle = String(req.params.handle).trim();
     if (!handle) return res.status(400).json({ error: 'Handle is required' });
+    const forceRefresh = req.query.refresh === 'true';
 
     // ── Cache-first (2-hour TTL) ──────────────────────────────────────────────
     const { data: result, fromCache } = await cachedFetch('leetcode', handle, async () => {
@@ -1929,8 +1930,7 @@ app.get('/proxy/leetcode/:handle', async (req: Request, res: Response) => {
         contestRating: Math.round(contestInfo.rating || 0),
         attendedContestsCount: contestInfo.attendedContestsCount || 0,
       };
-    });
-
+    }, forceRefresh);
 
     res.set('X-Cache', fromCache ? 'HIT' : 'MISS');
     res.json(result);
@@ -1948,6 +1948,7 @@ app.get('/proxy/github/:handle', async (req: Request, res: Response) => {
     const rawHandle = String(req.params.handle).trim();
     if (!rawHandle) return res.status(400).json({ error: 'Handle is required' });
     const handle = rawHandle.replace(/^https?:\/\/(www\.)?github\.com\//i, '').replace(/\/$/, '').trim();
+    const forceRefresh = req.query.refresh === 'true';
 
     const { data: result, fromCache } = await cachedFetch('github', handle, async () => {
       const headers: Record<string, string> = { 'Accept': 'application/vnd.github+json', 'User-Agent': 'Advitiyans-App/1.0' };

@@ -218,7 +218,7 @@ export const CodingProfilesSection: React.FC<CodingProfilesSectionProps> = ({
 
     setLoadingPlatform(true);
     try {
-      const updated = await fetchLivePlatformSnapshot(id, existing.handle);
+      const updated = await fetchLivePlatformSnapshot(id, existing.handle, true);
       setSnapshots((prev) => ({
         ...prev,
         [id]: updated,

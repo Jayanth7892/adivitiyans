@@ -1,4 +1,4 @@
-﻿import { DynamoDBClient, GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 
 const TABLE_NAME = process.env.PLATFORM_CACHE_TABLE || 'advitiyans-platform-cache';
@@ -81,11 +81,19 @@ export async function setCached(platform: string, handle: string, data: any): Pr
 export async function cachedFetch(
   platform: string,
   handle: string,
-  fetchFn: () => Promise<any>
+  fetchFn: () => Promise<any>,
+  forceRefresh = false
 ): Promise<{ data: any; fromCache: boolean }> {
-  const cached = await getCached(platform, handle);
-  if (cached !== null) {
-    return { data: cached, fromCache: true };
+  if (!forceRefresh) {
+    const cached = await getCached(platform, handle);
+    if (cached !== null) {
+      // If cached leetcode data is missing submissionCalendar, force live refresh to upgrade cache
+      if (platform === 'leetcode' && (cached.submissionCalendar === undefined || Object.keys(cached.submissionCalendar || {}).length === 0)) {
+        console.log(`[Cache] LeetCode cache for ${handle} missing calendar, refreshing live.`);
+      } else {
+        return { data: cached, fromCache: true };
+      }
+    }
   }
 
   const data = await fetchFn();

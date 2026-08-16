@@ -16,7 +16,7 @@ const BACKEND_API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://caam6j4db
  *   ✗ leetcode-api-faisalshohag.vercel.app      — 404 DEPLOYMENT_NOT_FOUND
  *   ✗ leetcode-stats-api.herokuapp.com          — 503 Server Unavailable
  */
-export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSnapshot> {
+export async function fetchLiveLeetCode(handle: string, forceRefresh = false): Promise<PlatformStatsSnapshot> {
   const cleanHandle = handle.replace(/^@/, '').trim();
 
   let profileData: any = null;
@@ -27,7 +27,8 @@ export async function fetchLiveLeetCode(handle: string): Promise<PlatformStatsSn
   // ── Primary: backend proxy (server-side LeetCode GraphQL) ────────────────
   try {
     const token = sessionStorage.getItem('advitiyans_jwt_token') || '';
-    const res = await fetch(`${BACKEND_API_BASE}/proxy/leetcode/${encodeURIComponent(cleanHandle)}`, {
+    const query = forceRefresh ? '?refresh=true' : '';
+    const res = await fetch(`${BACKEND_API_BASE}/proxy/leetcode/${encodeURIComponent(cleanHandle)}${query}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
 
@@ -712,9 +713,10 @@ export async function fetchLiveHackerRank(handle: string): Promise<PlatformStats
  */
 export async function fetchLivePlatformSnapshot(
   platformId: PlatformId,
-  handle: string
+  handle: string,
+  forceRefresh = false
 ): Promise<PlatformStatsSnapshot> {
-  if (platformId === 'leetcode') return await fetchLiveLeetCode(handle);
+  if (platformId === 'leetcode') return await fetchLiveLeetCode(handle, forceRefresh);
   if (platformId === 'github') return await fetchLiveGitHub(handle);
   if (platformId === 'codeforces') return await fetchLiveCodeforces(handle);
   if (platformId === 'geeksforgeeks') return await fetchLiveGeeksforGeeks(handle);
