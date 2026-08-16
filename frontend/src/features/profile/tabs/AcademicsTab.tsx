@@ -238,7 +238,7 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
                     if (active && payload && payload.length) {
                       const data = payload[0].payload;
                       return (
-                        <div className="bg-gray-900 text-white p-3 rounded-xl shadow-lg text-xs space-y-1">
+                        <div className="bg-textPrimary text-surface p-3 rounded-xl shadow-lg text-xs space-y-1">
                           <p className="font-bold">{data.name}</p>
                           <p className="text-brand-primary font-extrabold text-sm">GPA: {data.gpa} / 10.0</p>
                           {data.semester > 1 && (
@@ -246,7 +246,7 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
                               {data.delta >= 0 ? `+${data.delta}` : data.delta} change vs previous sem
                             </p>
                           )}
-                          <p className="text-gray-300 text-[10px]">Attendance: {data.attendance}%</p>
+                          <p className="text-textSecondary/70 text-[10px]">Attendance: {data.attendance}%</p>
                         </div>
                       );
                     }
@@ -284,7 +284,7 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
                 <div key={semNum} className={`bg-surface border border-dashed rounded-2xl p-5 text-center flex flex-col justify-between space-y-3 transition-all ${isLocked ? 'border-amber-200 opacity-70' : 'border-borderLine hover:border-[#5B4FE9]'}`}>
                   <div className="flex items-center justify-between text-xs text-textSecondary">
                     <span className="font-bold text-textPrimary">Semester {semNum}</span>
-                    <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded font-semibold">
+                    <span className="text-[10px] bg-background border border-borderLine px-2 py-0.5 rounded font-semibold text-textSecondary">
                       {isLocked ? 'Locked' : 'Not Entered'}
                     </span>
                   </div>

@@ -63,10 +63,10 @@ export const RefreshButton: React.FC<RefreshButtonProps> = ({
         }
         className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 transition-all ${
           loading
-            ? 'bg-gray-800 text-white opacity-80 cursor-wait'
+            ? 'bg-textPrimary text-surface opacity-80 cursor-wait'
             : cooldownLeft > 0
-            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-            : 'bg-gray-900 text-white hover:bg-gray-800 shadow-sm active:scale-95'
+            ? 'bg-borderLine text-textSecondary cursor-not-allowed'
+            : 'bg-textPrimary text-surface hover:opacity-80 shadow-sm active:scale-95'
         }`}
       >
         <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />

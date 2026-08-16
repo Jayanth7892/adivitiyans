@@ -267,8 +267,8 @@ export const DashboardPage: React.FC = () => {
               {codingProfiles.find((p) => p.platform === 'GitHub') ? (
                 <div className="p-3 rounded-xl bg-background border border-borderLine flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-gray-900 flex items-center justify-center">
-                      <Github className="w-4 h-4 text-white" />
+                    <div className="w-7 h-7 rounded-lg bg-textPrimary flex items-center justify-center">
+                      <Github className="w-4 h-4 text-surface" />
                     </div>
                     <div>
                       <p className="text-xs font-bold text-textPrimary">GitHub</p>
@@ -282,9 +282,9 @@ export const DashboardPage: React.FC = () => {
                 </div>
               ) : (
                 <button onClick={() => navigate('/profile?tab=coding-profiles')}
-                  className="w-full p-3 rounded-xl border border-dashed border-borderLine text-xs text-textSecondary hover:border-gray-900 hover:text-gray-900 transition-all text-left flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center">
-                    <Github className="w-3.5 h-3.5 text-gray-700" />
+                  className="w-full p-3 rounded-xl border border-dashed border-borderLine text-xs text-textSecondary hover:border-borderLine hover:text-textPrimary transition-all text-left flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-background flex items-center justify-center">
+                    <Github className="w-3.5 h-3.5 text-textSecondary" />
                   </div>
                   Connect GitHub →
                 </button>

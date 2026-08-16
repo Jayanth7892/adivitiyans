@@ -1191,7 +1191,7 @@ export const HodDashboardPage: React.FC = () => {
                     <div key={s.regNo} className="p-3.5 rounded-xl bg-background border border-borderLine flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-full font-black text-xs flex items-center justify-center ${
-                          idx === 0 ? 'bg-amber-100 text-amber-700' : idx === 1 ? 'bg-slate-200 text-slate-700' : 'bg-orange-100 text-orange-700'
+                          idx === 0 ? 'bg-amber-100 text-amber-700' : idx === 1 ? 'bg-borderLine text-textSecondary' : 'bg-orange-100 text-orange-700'
                         }`}>
                           #{idx + 1}
                         </div>

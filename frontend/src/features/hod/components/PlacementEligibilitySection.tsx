@@ -401,7 +401,7 @@ export const PlacementEligibilitySection: React.FC<PlacementEligibilityProps> = 
             </p>
           </div>
         </div>
-        <span className="text-lg font-black text-emerald-700 bg-white px-3 py-1 rounded-lg border border-emerald-300 self-start sm:self-auto">
+        <span className="text-lg font-black text-emerald-700 bg-surface px-3 py-1 rounded-lg border border-emerald-300 self-start sm:self-auto">
           {ratioPct}% Qualified
         </span>
       </div>

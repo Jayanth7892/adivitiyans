@@ -155,10 +155,10 @@ export const GitHubCard: React.FC<GitHubCardProps> = ({ initialUsername = '', on
   return (
     <div className="bg-surface border border-borderLine rounded-2xl shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-borderLine bg-gray-900/5">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-borderLine bg-background">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gray-900 flex items-center justify-center">
-            <Github className="w-5 h-5 text-white" />
+          <div className="w-9 h-9 rounded-xl bg-textPrimary flex items-center justify-center">
+            <Github className="w-5 h-5 text-surface" />
           </div>
           <div>
             <h3 className="text-sm font-bold text-textPrimary">GitHub Analytics</h3>
@@ -190,12 +190,12 @@ export const GitHubCard: React.FC<GitHubCardProps> = ({ initialUsername = '', on
             onChange={(e) => setInputVal(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
             placeholder="Enter GitHub username..."
-            className="flex-1 px-3 py-2 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-gray-900/20"
+            className="flex-1 px-3 py-2 text-sm rounded-xl border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary/20"
           />
           <button
             onClick={handleConnect}
             disabled={loading || !inputVal.trim()}
-            className="px-4 py-2 text-sm font-bold rounded-xl bg-gray-900 text-white transition-all hover:bg-gray-800 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-bold rounded-xl bg-textPrimary text-surface transition-all hover:opacity-80 disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Connect'}
           </button>

@@ -293,7 +293,7 @@ export const CodingAnalyticsPage: React.FC = () => {
           onClick={() => setActiveTab('github')}
           className={`pb-3 flex items-center gap-2 transition-colors ${
             activeTab === 'github'
-              ? 'border-b-2 border-gray-900 text-gray-900'
+              ? 'border-b-2 border-textPrimary text-textPrimary'
               : 'text-textSecondary hover:text-textPrimary'
           }`}
         >
@@ -395,7 +395,7 @@ export const CodingAnalyticsPage: React.FC = () => {
                             rank === 1 && s.isLcLinked && s.totalSolved > 0
                               ? 'text-amber-500'
                               : rank === 2 && s.isLcLinked && s.totalSolved > 0
-                              ? 'text-gray-400'
+                              ? 'text-textSecondary'
                               : rank === 3 && s.isLcLinked && s.totalSolved > 0
                               ? 'text-amber-700'
                               : 'text-textSecondary'
@@ -457,8 +457,8 @@ export const CodingAnalyticsPage: React.FC = () => {
       {activeTab === 'github' && (
         <div className="bg-surface border border-borderLine rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-borderLine flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center">
-              <Github className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-textPrimary flex items-center justify-center">
+              <Github className="w-4 h-4 text-surface" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-textPrimary">Verified Student GitHub Rankings</h3>
@@ -498,7 +498,7 @@ export const CodingAnalyticsPage: React.FC = () => {
                             rank === 1 && s.isGhLinked
                               ? 'text-amber-500'
                               : rank === 2 && s.isGhLinked
-                              ? 'text-gray-400'
+                              ? 'text-textSecondary'
                               : rank === 3 && s.isGhLinked
                               ? 'text-amber-700'
                               : 'text-textSecondary'
@@ -517,7 +517,7 @@ export const CodingAnalyticsPage: React.FC = () => {
                             href={`https://github.com/${s.ghHandle.replace(/^@/, '')}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-xs font-semibold text-gray-800 hover:underline flex items-center gap-0.5"
+                            className="text-xs font-semibold text-textPrimary hover:underline flex items-center gap-0.5"
                           >
                             @{s.ghHandle.replace(/^@/, '')} <ExternalLink className="w-3 h-3" />
                           </a>
@@ -600,7 +600,7 @@ export const CodingAnalyticsPage: React.FC = () => {
                       <td className="py-3.5 px-4">
                         <span
                           className={`font-extrabold text-sm ${
-                            rank === 1 ? 'text-amber-500' : rank === 2 ? 'text-gray-400' : rank === 3 ? 'text-amber-700' : 'text-textSecondary'
+                            rank === 1 ? 'text-amber-500' : rank === 2 ? 'text-textSecondary' : rank === 3 ? 'text-amber-700' : 'text-textSecondary'
                           }`}
                         >
                           {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`}

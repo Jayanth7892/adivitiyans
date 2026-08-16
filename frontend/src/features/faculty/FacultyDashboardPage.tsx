@@ -43,7 +43,7 @@ const getStanding = (cgpa: number | string | undefined | null) => {
   if (val >= 7.5) return { label: `First Class (${val.toFixed(2)})`, color: 'bg-blue-50 text-blue-700 border-blue-200' };
   if (val >= 6.0) return { label: `Second Class (${val.toFixed(2)})`, color: 'bg-amber-50 text-amber-700 border-amber-200' };
   if (val > 0)   return { label: `Pass (${val.toFixed(2)})`, color: 'bg-orange-50 text-orange-700 border-orange-200' };
-  return { label: 'No Data', color: 'bg-gray-50 text-gray-500 border-gray-200' };
+  return { label: 'No Data', color: 'bg-background text-textSecondary border-borderLine' };
 };
 
 export const FacultyDashboardPage: React.FC = () => {

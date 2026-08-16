@@ -214,7 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
                     {item.soon && (
                       <span
                         className={[
-                          'ml-auto text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded shrink-0',
+                          'ml-auto text-[10px] bg-background text-textSecondary border border-borderLine px-1.5 py-0.5 rounded shrink-0',
                           collapsed ? 'lg:hidden' : '',
                         ].join(' ')}
                       >

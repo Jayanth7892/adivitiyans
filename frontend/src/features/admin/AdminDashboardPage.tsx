@@ -706,7 +706,7 @@ export const AdminDashboardPage: React.FC = () => {
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FFA116]/10 text-[#FFA116]">LeetCode</span>
                         )}
                         {(s as any).github_handle && (s as any).github_handle !== 'Not Linked' && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-800">GitHub</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-borderLine text-textPrimary">GitHub</span>
                         )}
                         {(s as any).codeforces_handle && (s as any).codeforces_handle !== 'Not Linked' && (
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-600">Codeforces</span>
@@ -809,7 +809,7 @@ export const AdminDashboardPage: React.FC = () => {
                       <td className="py-3.5 px-4 font-extrabold text-textPrimary text-xs">{p.leetcodePts} solved</td>
                       <td className="py-3.5 px-4">
                         <a href={`https://github.com/${p.github}`} target="_blank" rel="noreferrer"
-                          className="text-xs font-semibold text-gray-800 hover:underline flex items-center gap-0.5">
+                          className="text-xs font-semibold text-textPrimary hover:underline flex items-center gap-0.5">
                           @{p.github} <ExternalLink className="w-3 h-3" />
                         </a>
                       </td>
