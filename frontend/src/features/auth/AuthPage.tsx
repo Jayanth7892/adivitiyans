@@ -1070,23 +1070,17 @@ export const AuthPage: React.FC = () => {
         </div>
       </div>
       </div>
-      {/* ── Premium Horizontal Scrolling Tagline Strip ── */}
-      <div className="w-full overflow-hidden border-t border-borderLine bg-surface/60 backdrop-blur-md shrink-0 py-3">
-        <div className="auth-marquee-track flex items-center gap-16 whitespace-nowrap">
-          {[...Array(6)].map((_, i) => (
-            <div key={`marquee-${i}`} className="flex items-center gap-16 shrink-0">
-              <span className="flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-brand-primary shadow-lg shadow-brand-primary/40" />
-                <span className="text-sm font-extrabold tracking-wide text-brand-primary">Where ever the data, there is Data Science</span>
-                <span className="text-brand-primary/60">✦</span>
-              </span>
-              <span className="flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-lg shadow-indigo-500/40" />
-                <span className="text-sm font-extrabold tracking-wide text-indigo-600 dark:text-indigo-400">Celebrate every moment</span>
-                <span className="text-indigo-400/60">✦</span>
-              </span>
-            </div>
-          ))}
+      {/* ── Glassmorphism Tagline Banner ── */}
+      <div className="w-full shrink-0 flex items-center justify-center py-3">
+        <div className="auth-glass-tag px-8 py-2.5 rounded-2xl backdrop-blur-xl bg-white/10 dark:bg-white/5 border border-white/20 dark:border-white/10 shadow-lg shadow-brand-primary/10">
+          <div className="auth-tag-crossfade">
+            <span className="auth-tag-item text-sm font-extrabold tracking-wide bg-gradient-to-r from-brand-primary via-indigo-500 to-sky-500 bg-clip-text text-transparent">
+              Where ever the data, there is Data Science ✨
+            </span>
+            <span className="auth-tag-item text-sm font-extrabold tracking-wide bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+              Celebrate every moment 🎉
+            </span>
+          </div>
         </div>
       </div>
       <Footer />
