@@ -151,33 +151,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
       >
         {/* ── Logo Header ── */}
         <div className="h-16 flex items-center border-b border-borderLine shrink-0 px-3.5 gap-3 overflow-hidden">
-          <div className="w-8 h-8 rounded-xl bg-[#0F172A] dark:bg-brand-primary p-1 flex items-center justify-center shrink-0 select-none shadow-brand ring-1 ring-white/10">
-            <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-6 h-6">
-              {/* Outer Hexagon Lines */}
-              <line x1="50" y1="18" x2="78" y2="34" stroke="white" strokeWidth="5" strokeLinecap="round" />
-              <line x1="78" y1="34" x2="78" y2="66" stroke="white" strokeWidth="5" strokeLinecap="round" />
-              <line x1="78" y1="66" x2="50" y2="82" stroke="white" strokeWidth="5" strokeLinecap="round" />
-              <line x1="50" y1="82" x2="22" y2="66" stroke="white" strokeWidth="5" strokeLinecap="round" />
-              <line x1="22" y1="66" x2="22" y2="34" stroke="white" strokeWidth="5" strokeLinecap="round" />
-              <line x1="22" y1="34" x2="50" y2="18" stroke="white" strokeWidth="5" strokeLinecap="round" />
-              {/* Inner Ring */}
-              <polygon points="50,30 67,40 67,60 50,70 33,60 33,40" stroke="white" strokeWidth="4" strokeLinejoin="round" fill="none" opacity="0.9" />
-              {/* Internal Spokes */}
-              <line x1="50" y1="18" x2="50" y2="30" stroke="white" strokeWidth="4" strokeLinecap="round" />
-              <line x1="78" y1="34" x2="67" y2="40" stroke="white" strokeWidth="4" strokeLinecap="round" />
-              <line x1="78" y1="66" x2="67" y2="60" stroke="white" strokeWidth="4" strokeLinecap="round" />
-              <line x1="50" y1="82" x2="50" y2="70" stroke="white" strokeWidth="4" strokeLinecap="round" />
-              <line x1="22" y1="66" x2="33" y2="60" stroke="white" strokeWidth="4" strokeLinecap="round" />
-              <line x1="22" y1="34" x2="33" y2="40" stroke="white" strokeWidth="4" strokeLinecap="round" />
-              {/* Red / Coral Nodes */}
-              <circle cx="22" cy="34" r="8" fill="#EF4444" stroke="white" strokeWidth="2" />
-              <circle cx="78" cy="34" r="8" fill="#EF4444" stroke="white" strokeWidth="2" />
-              <circle cx="50" cy="82" r="8" fill="#EF4444" stroke="white" strokeWidth="2" />
-              {/* Cyan / Blue Nodes */}
-              <circle cx="50" cy="18" r="8" fill="#38BDF8" stroke="white" strokeWidth="2" />
-              <circle cx="22" cy="66" r="8" fill="#38BDF8" stroke="white" strokeWidth="2" />
-              <circle cx="78" cy="66" r="8" fill="#38BDF8" stroke="white" strokeWidth="2" />
-            </svg>
+          <div className="w-8 h-8 rounded-xl bg-brand-primary flex items-center justify-center text-white font-black text-sm shrink-0 select-none shadow-brand">
+            A
           </div>
           <div
             className={[
