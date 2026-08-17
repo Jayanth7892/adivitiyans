@@ -16,8 +16,45 @@ const BACKEND_API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://caam6j4db
  *   ✗ leetcode-api-faisalshohag.vercel.app      — 404 DEPLOYMENT_NOT_FOUND
  *   ✗ leetcode-stats-api.herokuapp.com          — 503 Server Unavailable
  */
+export function cleanLeetCodeHandle(handle: string): string {
+  if (!handle) return '';
+  return handle
+    .trim()
+    .replace(/^https?:\/\/(www\.)?leetcode\.com\/(u\/|profile\/)?/i, '')
+    .replace(/^https?:\/\/(www\.)?leetcode\.cn\/(u\/|profile\/)?/i, '')
+    .replace(/^u\//i, '')
+    .replace(/^profile\//i, '')
+    .replace(/^@/, '')
+    .replace(/\/.*$/, '')
+    .trim();
+}
+
 export async function fetchLiveLeetCode(handle: string, forceRefresh = false): Promise<PlatformStatsSnapshot> {
-  const cleanHandle = handle.replace(/^@/, '').trim();
+  const cleanHandle = cleanLeetCodeHandle(handle);
+
+  if (!cleanHandle || cleanHandle.toLowerCase() === 'not linked') {
+    return {
+      platform: 'leetcode',
+      handle: '',
+      profileUrl: 'https://leetcode.com',
+      lastRefreshedAt: new Date().toISOString(),
+      syncStatus: 'synced',
+      kpis: [
+        { label: 'Total Questions Solved', value: 0 },
+        { label: 'Total Contests Attended', value: 0 },
+        { label: 'User name', value: 'Not Linked' },
+      ],
+      breakdown: [
+        { label: 'Easy', solved: 0, total: 857, color: '#00b8a3' },
+        { label: 'Medium', solved: 0, total: 1756, color: '#ffc01e' },
+        { label: 'Hard', solved: 0, total: 799, color: '#ff375f' },
+      ],
+      awards: [],
+      topicAnalysis: [],
+      activity: [],
+      heatmap: {},
+    };
+  }
 
   let profileData: any = null;
   let calendarObj: Record<string, number> = {};

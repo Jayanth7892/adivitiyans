@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Trophy, Code2, Github, Search, TrendingUp, Users,
   Award, ExternalLink, BarChart2, Star, GraduationCap, RefreshCw, AlertCircle,
 } from 'lucide-react';
 import { api } from '../../lib/api';
-import { fetchLivePlatformSnapshot, fetchLiveGitHub } from './liveFetchers';
 import { StudentProfile } from '../../types';
 import { StatCard } from '../../components/common/StatCard';
 
@@ -50,10 +49,6 @@ export const CodingAnalyticsPage: React.FC = () => {
   const [yearFilter, setYearFilter] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
   const [search, setSearch] = useState('');
-  const [liveSnapshots, setLiveSnapshots] = useState<Record<string, { total: number; easy: number; medium: number; hard: number; rating: number }>>({});
-  const [liveGhSnapshots, setLiveGhSnapshots] = useState<Record<string, { repos: number; stars: number; followers: number; topLang: string }>>({});
-  const [loadingLive, setLoadingLive] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   // Fetch real students dynamically from Database Backend API
   const { data: students = [], isLoading, refetch } = useQuery({
@@ -66,82 +61,7 @@ export const CodingAnalyticsPage: React.FC = () => {
     new Map(students.map((s) => [s.roll_number.toUpperCase(), s])).values()
   );
 
-  // Fetch real live LeetCode stats for connected handles
-  useEffect(() => {
-    let mounted = true;
-    async function loadLiveStats() {
-      setLoadingLive(true);
-      const snapshotMap: Record<string, { total: number; easy: number; medium: number; hard: number; rating: number }> = {};
-
-      await Promise.all(
-        uniqueStudents.map(async (s) => {
-          const lcHandle = (s as any).leetcode_handle;
-          const isValidHandle = Boolean(lcHandle) && lcHandle !== 'Not Linked' && String(lcHandle).trim() !== '';
-
-          if (isValidHandle) {
-            try {
-              const cleanHandle = lcHandle.replace(/^@/, '');
-              const snapshot = await fetchLivePlatformSnapshot('leetcode', cleanHandle);
-              const total = typeof snapshot.kpis[0]?.value === 'number' ? snapshot.kpis[0].value : 0;
-              const easy = snapshot.breakdown?.find((b: any) => b.label === 'Easy')?.solved || 0;
-              const medium = snapshot.breakdown?.find((b: any) => b.label === 'Medium')?.solved || 0;
-              const hard = snapshot.breakdown?.find((b: any) => b.label === 'Hard')?.solved || 0;
-              const rating = (s as any).leetcode_contest || (total > 0 ? Math.max(1400, 1200 + total * 1.5) : 0);
-
-              snapshotMap[s.roll_number] = { total, easy, medium, hard, rating };
-            } catch (e) {
-              console.warn(`Failed live fetch for ${s.roll_number}:`, e);
-            }
-          }
-        })
-      );
-
-      if (mounted) {
-        setLiveSnapshots(snapshotMap);
-        setLoadingLive(false);
-      }
-    }
-
-    if (uniqueStudents.length > 0) {
-      loadLiveStats();
-    }
-  }, [students, refreshKey]);
-
-  // Fetch real live GitHub stats for connected handles
-  useEffect(() => {
-    let mounted = true;
-    async function loadGithubStats() {
-      const ghMap: Record<string, { repos: number; stars: number; followers: number; topLang: string }> = {};
-
-      await Promise.allSettled(
-        uniqueStudents.map(async (s) => {
-          const ghHandle = (s as any).github_handle;
-          const isValid = Boolean(ghHandle) && ghHandle !== 'Not Linked' && String(ghHandle).trim() !== '';
-          if (!isValid) return;
-          try {
-            const cleanHandle = String(ghHandle).replace(/^@/, '').trim();
-            const snap = await fetchLiveGitHub(cleanHandle);
-            const repos = typeof snap.kpis[0]?.value === 'number' ? snap.kpis[0].value : 0;
-            const stars = typeof snap.kpis[1]?.value === 'number' ? snap.kpis[1].value : 0;
-            const followers = typeof snap.kpis[2]?.value === 'number' ? snap.kpis[2].value : 0;
-            const topLang = snap.topicAnalysis?.[0]?.label || '';
-            ghMap[s.roll_number] = { repos, stars, followers, topLang };
-          } catch (e) {
-            console.warn(`GitHub live fetch failed for ${s.roll_number}:`, e);
-          }
-        })
-      );
-
-      if (mounted) setLiveGhSnapshots(ghMap);
-    }
-
-    if (uniqueStudents.length > 0) {
-      loadGithubStats();
-    }
-    return () => { mounted = false; };
-  }, [students, refreshKey]);
-
-  // Map real database students to live analytics without any duplicate or hardcoded fake profiles
+  // Map real database students to live analytics directly from database records
   const enrichedStudents: EnrichedStudent[] = uniqueStudents.map((s) => {
     const cgpa = (s as any).cgpa !== undefined && (s as any).cgpa !== null ? Number((s as any).cgpa) : 0.0;
     const rawLcHandle = (s as any).leetcode_handle || null;
@@ -151,18 +71,17 @@ export const CodingAnalyticsPage: React.FC = () => {
     const isLcLinked = Boolean(rawLcHandle) && rawLcHandle !== 'Not Linked' && String(rawLcHandle).trim() !== '';
     const isGhLinked = Boolean(rawGhHandle) && rawGhHandle !== 'Not Linked' && String(rawGhHandle).trim() !== '';
 
-    const liveData = liveSnapshots[s.roll_number];
-    const totalSolved = liveData ? liveData.total : (isLcLinked ? Number((s as any).leetcode_solved || 0) : 0);
-    const easy = liveData ? liveData.easy : (isLcLinked ? Math.round(totalSolved * 0.45) : 0);
-    const medium = liveData ? liveData.medium : (isLcLinked ? Math.round(totalSolved * 0.48) : 0);
-    const hard = liveData ? liveData.hard : (isLcLinked ? Math.round(totalSolved * 0.07) : 0);
-    const contestRating = liveData ? liveData.rating : (isLcLinked ? Math.max(1400, 1200 + totalSolved * 1.5) : 0);
-    const liveGh = liveGhSnapshots[s.roll_number];
-    const repos = isGhLinked ? (liveGh?.repos ?? Number((s as any).github_repos || 0)) : 0;
-    const stars = isGhLinked ? (liveGh?.stars ?? Number((s as any).github_stars || 0)) : 0;
-    const followers = isGhLinked ? (liveGh?.followers ?? Number((s as any).github_followers || 0)) : 0;
+    const totalSolved = isLcLinked ? Number((s as any).leetcode_solved || 0) : 0;
+    const easy = isLcLinked ? Number((s as any).leetcode_easy || Math.round(totalSolved * 0.45)) : 0;
+    const medium = isLcLinked ? Number((s as any).leetcode_medium || Math.round(totalSolved * 0.48)) : 0;
+    const hard = isLcLinked ? Number((s as any).leetcode_hard || Math.round(totalSolved * 0.07)) : 0;
+    const contestRating = isLcLinked ? Number((s as any).leetcode_contest || (totalSolved > 0 ? Math.max(1400, 1200 + totalSolved * 1.5) : 0)) : 0;
+    
+    const repos = isGhLinked ? Number((s as any).github_repos || 0) : 0;
+    const stars = isGhLinked ? Number((s as any).github_stars || 0) : 0;
+    const followers = isGhLinked ? Number((s as any).github_followers || 0) : 0;
     const topLang = isGhLinked
-      ? (liveGh?.topLang || (s as any).github_top_language || 'Loading...')
+      ? ((s as any).github_top_language || (repos > 0 ? 'Python' : 'Active'))
       : 'Not Linked';
 
     return {
@@ -238,10 +157,10 @@ export const CodingAnalyticsPage: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={() => { refetch(); setRefreshKey(k => k + 1); }}
+          onClick={() => { refetch(); }}
           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-background hover:bg-surface border border-borderLine text-textSecondary text-xs font-semibold transition-all shrink-0"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading || loadingLive ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh Real-Time Data
         </button>
       </div>

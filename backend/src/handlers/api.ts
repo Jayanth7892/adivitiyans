@@ -1840,8 +1840,19 @@ app.delete('/students/:id/coding-profiles/:platform', requireOwnerOrRole('id', '
 // GET /proxy/leetcode/:handle — Proxy live LeetCode stats via GraphQL
 app.get('/proxy/leetcode/:handle', async (req: Request, res: Response) => {
   try {
-    const handle = String(req.params.handle).trim();
-    if (!handle) return res.status(400).json({ error: 'Handle is required' });
+    const rawHandle = decodeURIComponent(String(req.params.handle || '')).trim();
+    const handle = rawHandle
+      .replace(/^https?:\/\/(www\.)?leetcode\.com\/(u\/|profile\/)?/i, '')
+      .replace(/^https?:\/\/(www\.)?leetcode\.cn\/(u\/|profile\/)?/i, '')
+      .replace(/^u\//i, '')
+      .replace(/^profile\//i, '')
+      .replace(/^@/, '')
+      .replace(/\/.*$/, '')
+      .trim();
+
+    if (!handle || handle.toLowerCase() === 'not linked') {
+      return res.status(400).json({ error: 'Valid LeetCode handle is required' });
+    }
     const forceRefresh = req.query.refresh === 'true';
 
     // ── Cache-first (2-hour TTL) ──────────────────────────────────────────────

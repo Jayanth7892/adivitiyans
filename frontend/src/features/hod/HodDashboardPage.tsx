@@ -30,7 +30,6 @@ import {
 } from 'recharts';
 import { api } from '../../lib/api';
 import type { AcademicRecord, TechSkill, Certification, SoftSkill, Achievement, PlacementProfile } from '../../types';
-import { fetchLivePlatformSnapshot } from '../coding/liveFetchers';
 import { StatCard } from '../../components/common/StatCard';
 import { PersonalInfoTab } from '../profile/tabs/PersonalInfoTab';
 import { CodingProfilesTab } from '../profile/tabs/CodingProfilesTab';
@@ -249,55 +248,19 @@ export const HodDashboardPage: React.FC = () => {
       .catch(() => {}); // silently keep defaults on error
   }, []);
 
-  const [liveSnapshots, setLiveSnapshots] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    let mounted = true;
-    async function loadLiveStats() {
-      if (students.length === 0) return;
-      const snapshotMap: Record<string, number> = {};
-
-      await Promise.allSettled(
-        students.map(async (s: any) => {
-          const lcHandle = s.leetcode_handle;
-          const isValidHandle = Boolean(lcHandle) && lcHandle !== 'Not Linked' && String(lcHandle).trim() !== '';
-          if (isValidHandle) {
-            try {
-              const cleanHandle = lcHandle.replace(/^@/, '').trim();
-              const snapshot = await fetchLivePlatformSnapshot('leetcode', cleanHandle);
-              const total = typeof snapshot.kpis[0]?.value === 'number' ? snapshot.kpis[0].value : 0;
-              snapshotMap[s.roll_number] = total;
-            } catch (e) {
-              console.warn(`[HOD Dashboard] Live fetch failed for ${s.roll_number}:`, e);
-            }
-          }
-        })
-      );
-
-      if (mounted) {
-        setLiveSnapshots(snapshotMap);
-      }
-    }
-    loadLiveStats();
-    return () => { mounted = false; };
-  }, [students]);
-
   const mergedStudentDataset: HodStudentEntry[] = useMemo(() => {
     let dataset: HodStudentEntry[];
     if (students.length > 0) {
       const uniqueStudents = Array.from(
         new Map(students.map((s) => [s.roll_number.toUpperCase(), s])).values()
       );
-      dataset = uniqueStudents.map((s, idx) => {
-        const liveSolved = liveSnapshots[s.roll_number];
-        return mapStudentToHodEntry(s, idx, liveSolved);
-      });
+      dataset = uniqueStudents.map((s, idx) => mapStudentToHodEntry(s, idx));
     } else {
       // No real students yet — return empty dataset (no fake fallback)
       dataset = [];
     }
     return dataset.map((s, idx) => ({ ...s, rank: idx + 1 }));
-  }, [students, liveSnapshots]);
+  }, [students]);
 
   const filteredDataset = useMemo(() => {
     return mergedStudentDataset.filter((s) => {
