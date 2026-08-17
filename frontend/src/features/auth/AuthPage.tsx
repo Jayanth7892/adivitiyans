@@ -511,33 +511,21 @@ export const AuthPage: React.FC = () => {
 
   return (
     <div className="h-dvh bg-background flex flex-col overflow-hidden relative">
-      {/* ── Left Slanted Vertical Scrolling Tag Ribbon ── */}
-      <div className="hidden md:block absolute left-4 lg:left-12 top-0 bottom-0 w-72 overflow-hidden pointer-events-none z-0">
-        <div className="-rotate-6 transform origin-center animate-vertical-scroll-left space-y-8 py-4">
-          {[...Array(8)].map((_, i) => (
-            <div
-              key={`left-tag-${i}`}
-              className="bg-surface/85 dark:bg-surface/95 border border-brand-primary/30 backdrop-blur-md shadow-xl rounded-2xl px-5 py-3 text-xs font-extrabold text-brand-primary tracking-wide flex items-center gap-2.5 whitespace-nowrap ring-1 ring-brand-primary/10"
-            >
-              <span className="w-2.5 h-2.5 rounded-full bg-brand-primary animate-ping shrink-0" />
-              <span>Wherever there is Data, there is Data Science ✨</span>
-            </div>
-          ))}
+      {/* ── Left Vertical Tag Line ── */}
+      <div className="hidden md:flex absolute left-6 lg:left-14 top-0 bottom-0 items-center pointer-events-none z-0">
+        <div className="auth-float-tag" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)' }}>
+          <span className="text-[13px] font-extrabold tracking-[0.35em] uppercase text-brand-primary/40 dark:text-brand-primary/30 select-none whitespace-nowrap">
+            Wherever there is Data · there is Data Science ✨
+          </span>
         </div>
       </div>
 
-      {/* ── Right Slanted Vertical Scrolling Tag Ribbon ── */}
-      <div className="hidden md:block absolute right-4 lg:right-12 top-0 bottom-0 w-72 overflow-hidden pointer-events-none z-0">
-        <div className="rotate-6 transform origin-center animate-vertical-scroll-right space-y-8 py-4">
-          {[...Array(8)].map((_, i) => (
-            <div
-              key={`right-tag-${i}`}
-              className="bg-surface/85 dark:bg-surface/95 border border-indigo-500/30 backdrop-blur-md shadow-xl rounded-2xl px-5 py-3 text-xs font-extrabold text-indigo-600 dark:text-indigo-400 tracking-wide flex items-center gap-2.5 whitespace-nowrap ring-1 ring-indigo-500/10"
-            >
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-ping shrink-0" />
-              <span>Celebrate every moment 🎉</span>
-            </div>
-          ))}
+      {/* ── Right Vertical Tag Line ── */}
+      <div className="hidden md:flex absolute right-6 lg:right-14 top-0 bottom-0 items-center pointer-events-none z-0">
+        <div className="auth-float-tag-delayed" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+          <span className="text-[13px] font-extrabold tracking-[0.35em] uppercase text-indigo-400/40 dark:text-indigo-400/30 select-none whitespace-nowrap">
+            Celebrate every moment 🎉
+          </span>
         </div>
       </div>
 

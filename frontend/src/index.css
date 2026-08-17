@@ -194,22 +194,34 @@
     box-shadow: var(--shadow-lg);
   }
 }
-
-/* ── Slanted Vertical Marquee Animations ── */
-@keyframes marqueeVerticalDown {
-  0% {
-    transform: translateY(-50%);
+/* ── Auth Page Vertical Tag Float Animations ── */
+@keyframes authTagFloat {
+  0%, 100% {
+    transform: rotate(180deg) translateY(0px);
+    opacity: 0.4;
   }
-  100% {
-    transform: translateY(0%);
+  50% {
+    transform: rotate(180deg) translateY(-12px);
+    opacity: 0.6;
   }
 }
 
-.animate-vertical-scroll-left {
-  animation: marqueeVerticalDown 20s linear infinite;
+@keyframes authTagFloatRight {
+  0%, 100% {
+    transform: translateY(0px);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-12px);
+    opacity: 0.6;
+  }
 }
 
-.animate-vertical-scroll-right {
-  animation: marqueeVerticalDown 24s linear infinite;
+.auth-float-tag {
+  animation: authTagFloat 6s ease-in-out infinite;
 }
 
+.auth-float-tag-delayed {
+  animation: authTagFloatRight 6s ease-in-out infinite;
+  animation-delay: 3s;
+}
