@@ -194,34 +194,22 @@
     box-shadow: var(--shadow-lg);
   }
 }
-/* ── Auth Page Vertical Tag Float Animations ── */
-@keyframes authTagFloat {
-  0%, 100% {
-    transform: rotate(180deg) translateY(0px);
-    opacity: 0.4;
+/* ── Auth Page Horizontal Marquee ── */
+@keyframes authMarqueeScroll {
+  0% {
+    transform: translateX(0);
   }
-  50% {
-    transform: rotate(180deg) translateY(-12px);
-    opacity: 0.6;
+  100% {
+    transform: translateX(-50%);
   }
 }
 
-@keyframes authTagFloatRight {
-  0%, 100% {
-    transform: translateY(0px);
-    opacity: 0.4;
-  }
-  50% {
-    transform: translateY(-12px);
-    opacity: 0.6;
-  }
+.auth-marquee-track {
+  animation: authMarqueeScroll 25s linear infinite;
+  will-change: transform;
 }
 
-.auth-float-tag {
-  animation: authTagFloat 6s ease-in-out infinite;
+.auth-marquee-track:hover {
+  animation-play-state: paused;
 }
 
-.auth-float-tag-delayed {
-  animation: authTagFloatRight 6s ease-in-out infinite;
-  animation-delay: 3s;
-}

@@ -511,23 +511,6 @@ export const AuthPage: React.FC = () => {
 
   return (
     <div className="h-dvh bg-background flex flex-col overflow-hidden relative">
-      {/* ── Left Vertical Tag Line ── */}
-      <div className="hidden md:flex absolute left-6 lg:left-14 top-0 bottom-0 items-center pointer-events-none z-0">
-        <div className="auth-float-tag" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)' }}>
-          <span className="text-[13px] font-extrabold tracking-[0.35em] uppercase text-brand-primary/40 dark:text-brand-primary/30 select-none whitespace-nowrap">
-            Wherever there is Data · there is Data Science ✨
-          </span>
-        </div>
-      </div>
-
-      {/* ── Right Vertical Tag Line ── */}
-      <div className="hidden md:flex absolute right-6 lg:right-14 top-0 bottom-0 items-center pointer-events-none z-0">
-        <div className="auth-float-tag-delayed" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-          <span className="text-[13px] font-extrabold tracking-[0.35em] uppercase text-indigo-400/40 dark:text-indigo-400/30 select-none whitespace-nowrap">
-            Celebrate every moment 🎉
-          </span>
-        </div>
-      </div>
 
       <div className="flex-1 overflow-y-auto flex flex-col justify-center py-4 sm:py-12 sm:px-6 lg:px-8 z-10">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
@@ -1086,6 +1069,25 @@ export const AuthPage: React.FC = () => {
           )}
         </div>
       </div>
+      </div>
+      {/* ── Premium Horizontal Scrolling Tagline Strip ── */}
+      <div className="w-full overflow-hidden border-t border-borderLine bg-surface/60 backdrop-blur-md shrink-0 py-3">
+        <div className="auth-marquee-track flex items-center gap-16 whitespace-nowrap">
+          {[...Array(6)].map((_, i) => (
+            <div key={`marquee-${i}`} className="flex items-center gap-16 shrink-0">
+              <span className="flex items-center gap-3">
+                <span className="w-2 h-2 rounded-full bg-brand-primary shadow-lg shadow-brand-primary/40" />
+                <span className="text-sm font-extrabold tracking-wide text-brand-primary">Where ever the data, there is Data Science</span>
+                <span className="text-brand-primary/60">✦</span>
+              </span>
+              <span className="flex items-center gap-3">
+                <span className="w-2 h-2 rounded-full bg-indigo-500 shadow-lg shadow-indigo-500/40" />
+                <span className="text-sm font-extrabold tracking-wide text-indigo-600 dark:text-indigo-400">Celebrate every moment</span>
+                <span className="text-indigo-400/60">✦</span>
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
       <Footer />
     </div>
