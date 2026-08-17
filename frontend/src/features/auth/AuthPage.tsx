@@ -513,8 +513,33 @@ export const AuthPage: React.FC = () => {
     <div className="h-dvh bg-background flex flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto flex flex-col justify-center py-4 sm:py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="inline-flex items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-brand-primary text-white font-black text-xl sm:text-2xl shadow-lg shadow-brand-primary/30 mb-2 sm:mb-4">
-          A
+        <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-[#0F172A] p-2 text-white shadow-lg shadow-brand-primary/30 mb-2 sm:mb-4 ring-1 ring-white/10">
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 sm:w-10 sm:h-10">
+            {/* Outer Hexagon Lines */}
+            <line x1="50" y1="18" x2="78" y2="34" stroke="white" strokeWidth="5" strokeLinecap="round" />
+            <line x1="78" y1="34" x2="78" y2="66" stroke="white" strokeWidth="5" strokeLinecap="round" />
+            <line x1="78" y1="66" x2="50" y2="82" stroke="white" strokeWidth="5" strokeLinecap="round" />
+            <line x1="50" y1="82" x2="22" y2="66" stroke="white" strokeWidth="5" strokeLinecap="round" />
+            <line x1="22" y1="66" x2="22" y2="34" stroke="white" strokeWidth="5" strokeLinecap="round" />
+            <line x1="22" y1="34" x2="50" y2="18" stroke="white" strokeWidth="5" strokeLinecap="round" />
+            {/* Inner Ring */}
+            <polygon points="50,30 67,40 67,60 50,70 33,60 33,40" stroke="white" strokeWidth="4" strokeLinejoin="round" fill="none" opacity="0.9" />
+            {/* Internal Spokes */}
+            <line x1="50" y1="18" x2="50" y2="30" stroke="white" strokeWidth="4" strokeLinecap="round" />
+            <line x1="78" y1="34" x2="67" y2="40" stroke="white" strokeWidth="4" strokeLinecap="round" />
+            <line x1="78" y1="66" x2="67" y2="60" stroke="white" strokeWidth="4" strokeLinecap="round" />
+            <line x1="50" y1="82" x2="50" y2="70" stroke="white" strokeWidth="4" strokeLinecap="round" />
+            <line x1="22" y1="66" x2="33" y2="60" stroke="white" strokeWidth="4" strokeLinecap="round" />
+            <line x1="22" y1="34" x2="33" y2="40" stroke="white" strokeWidth="4" strokeLinecap="round" />
+            {/* Red / Coral Nodes */}
+            <circle cx="22" cy="34" r="8" fill="#EF4444" stroke="white" strokeWidth="2" />
+            <circle cx="78" cy="34" r="8" fill="#EF4444" stroke="white" strokeWidth="2" />
+            <circle cx="50" cy="82" r="8" fill="#EF4444" stroke="white" strokeWidth="2" />
+            {/* Cyan / Blue Nodes */}
+            <circle cx="50" cy="18" r="8" fill="#38BDF8" stroke="white" strokeWidth="2" />
+            <circle cx="22" cy="66" r="8" fill="#38BDF8" stroke="white" strokeWidth="2" />
+            <circle cx="78" cy="66" r="8" fill="#38BDF8" stroke="white" strokeWidth="2" />
+          </svg>
         </div>
         <h2 className="text-2xl sm:text-3xl font-extrabold text-textPrimary tracking-tight">
           <span>A</span><span className="text-brand-primary">D</span><span>VITIYAN</span><span className="text-brand-primary">S</span>
