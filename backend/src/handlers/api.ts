@@ -1569,8 +1569,9 @@ app.delete('/students/:id', requireRole('admin'), async (req: Request, res: Resp
       return res.status(404).json({ error: 'Student not found in database' });
     }
 
-    // Cognito + session cleanup: fire-and-forget so Cognito errors never cause a 500
-    deleteCognitoUsers([studentId, studentEmail]).catch(() => {});
+    // Cognito + session cleanup — awaited so errors appear in Lambda logs
+    // (does NOT throw — errors are caught and logged inside deleteCognitoUsers)
+    await deleteCognitoUsers([studentId, studentEmail]);
 
     res.json({ message: `Student ${studentId} deleted successfully` });
   } catch (err: any) {
@@ -1611,8 +1612,8 @@ app.post('/admin/students/bulk-delete', requireRole('admin'), async (req: Reques
     );
     const deleted = result.rows.length;
 
-    // Cognito + session cleanup: fire-and-forget — Cognito errors must NOT cause a 500
-    deleteCognitoUsers([...ids, ...emailsToDelete]).catch(() => {});
+    // Cognito + session cleanup — awaited so failures show in Lambda logs
+    await deleteCognitoUsers([...ids, ...emailsToDelete]);
 
     res.json({ deleted, message: `${deleted} student(s) deleted successfully` });
   } catch (err: any) {
