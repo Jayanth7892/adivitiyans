@@ -1210,64 +1210,192 @@ export const HodDashboardPage: React.FC = () => {
 
       {/* ── TAB: My Mentees ── */}
       {activeTab === 'mentees' && (
-        <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
-              <h3 className="text-base font-bold text-textPrimary">My Mentees Directory ({hodMentees.length})</h3>
-              <p className="text-xs text-textSecondary">Students assigned directly under your mentorship</p>
+              <h3 className="text-base font-bold text-textPrimary">My Assigned Mentees</h3>
+              <p className="text-xs text-textSecondary">
+                {hodMentees.length > 0
+                  ? `${hodMentees.length} students assigned under you as mentor — grouped by academic year`
+                  : user?.email
+                    ? 'No mentees assigned yet. Upload a mentor assignment CSV from Admin panel.'
+                    : 'Loading...'}
+              </p>
             </div>
-            <span className="text-xs font-bold text-brand-primary bg-brand-soft px-3 py-1 rounded-full border border-brand-primary/20 shrink-0 self-start md:self-auto">
-              {hodMentees.length} Mentees Assigned
-            </span>
+            <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-borderLine bg-background text-xs w-52">
+                <Search className="w-4 h-4 text-textSecondary shrink-0" />
+                <input
+                  type="text"
+                  value={menteeSearch}
+                  onChange={(e) => setMenteeSearch(e.target.value)}
+                  placeholder="Search name or roll no..."
+                  className="w-full bg-transparent focus:outline-none text-textPrimary"
+                />
+              </div>
+              <select
+                value={menteeYearFilter}
+                onChange={(e) => setMenteeYearFilter(e.target.value)}
+                className="px-3 py-1.5 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold"
+              >
+                <option value="">All Years</option>
+                {['4th Year', '3rd Year', '2nd Year', '1st Year'].map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
-                  <th className="py-3 px-4">Student Name</th>
-                  <th className="py-3 px-4">Reg Number</th>
-                  <th className="py-3 px-4">Year & Sec</th>
-                  <th className="py-3 px-4">CGPA</th>
-                  <th className="py-3 px-4">LeetCode</th>
-                  <th className="py-3 px-4">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-borderLine text-sm">
-                {hodMentees.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-textSecondary text-xs">
-                      No mentees currently assigned to your profile. Mentees can be assigned via Admin Faculty Management or CSV upload.
-                    </td>
-                  </tr>
-                ) : (
-                  hodMentees.map((m: any) => (
-                    <tr key={m.roll_number} className="hover:bg-background/50 transition-colors">
-                      <td className="py-3 px-4 font-bold text-textPrimary">{m.name}</td>
-                      <td className="py-3 px-4 font-mono text-xs text-brand-primary">{m.roll_number}</td>
-                      <td className="py-3 px-4 text-xs text-textSecondary">{m.year || '3rd Year'} • {m.section || 'Sec A'}</td>
-                      <td className="py-3 px-4 font-black text-brand-primary">{m.cgpa ? `${m.cgpa} CGPA` : '—'}</td>
-                      <td className="py-3 px-4 text-xs font-bold text-[#FFA116]">
-                        {m.leetcode_solved ? `${m.leetcode_solved} Solved` : (m.leetcode_handle ? 'Linked' : 'Not Linked')}
-                      </td>
-                      <td className="py-3 px-4">
-                        <button
-                          onClick={() => {
-                            setInspectStudent(mapStudentToHodEntry(m, 0));
-                            setInspectTab('academics-graph');
-                          }}
-                          className="px-3 py-1.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:bg-brand-primary/90 transition-all inline-flex items-center gap-1.5 shadow-sm"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Inspect Profile</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          {(() => {
+            const filtered = hodMentees.filter((m: any) => {
+              const q = menteeSearch.toLowerCase();
+              const matchSearch = !q || (m.name || '').toLowerCase().includes(q) || m.roll_number.toLowerCase().includes(q);
+              const matchYear = !menteeYearFilter || m.year === menteeYearFilter;
+              return matchSearch && matchYear;
+            });
+            const YEAR_ORDER = ['4th Year', '3rd Year', '2nd Year', '1st Year'];
+            const groups = YEAR_ORDER.map((y) => ({
+              year: y,
+              list: filtered.filter((m: any) => (m as any).registered !== false && m.year === y),
+            })).filter((g) => g.list.length > 0);
+            const unregistered = filtered.filter((m: any) => (m as any).registered === false);
+            if (unregistered.length > 0) groups.push({ year: 'Unregistered', list: unregistered });
+
+            if (filtered.length === 0) {
+              return <p className="text-center text-textSecondary text-xs py-10">No mentees found matching your criteria.</p>;
+            }
+
+            return (
+              <div className="space-y-4">
+                {groups.map(({ year, list }) => {
+                  const isCollapsed = collapsedYears.has(year);
+                  const isUnregGroup = year === 'Unregistered';
+                  const atRisk = list.filter((m: any) => Number(m.cgpa) > 0 && Number(m.cgpa) < 6.0).length;
+                  const validCgpa = list.filter((m: any) => Number(m.cgpa) > 0);
+                  const avgCgpa = validCgpa.length > 0 ? (validCgpa.reduce((s: number, m: any) => s + Number(m.cgpa), 0) / validCgpa.length).toFixed(2) : '—';
+                  return (
+                    <div key={year} className="border border-borderLine rounded-2xl overflow-hidden">
+                      <button
+                        onClick={() => toggleYear(year)}
+                        className={`w-full flex items-center justify-between px-4 py-3 transition-colors ${
+                          isUnregGroup ? 'bg-amber-50/50 hover:bg-amber-50 dark:bg-amber-950/20' : 'bg-background hover:bg-brand-soft/10'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-bold text-textPrimary">{isUnregGroup ? '🕐 Not Yet Registered' : year}</span>
+                          <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold ${isUnregGroup ? 'bg-amber-100 text-amber-700' : 'bg-brand-soft text-brand-primary'}`}>
+                            {list.length} students
+                          </span>
+                          {!isUnregGroup && <span className="text-[11px] font-semibold text-textSecondary">Avg CGPA: {avgCgpa}</span>}
+                          {atRisk > 0 && (
+                            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-red-50 text-red-600 font-bold border border-red-200">
+                              ⚠️ {atRisk} at risk
+                            </span>
+                          )}
+                          {isUnregGroup && <span className="text-[11px] text-amber-600">Students assigned but not yet signed up</span>}
+                        </div>
+                        <span className="text-textSecondary text-sm font-bold">{isCollapsed ? '▶' : '▼'}</span>
+                      </button>
+
+                      {!isCollapsed && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
+                                <th className="py-3 px-4">Student</th>
+                                <th className="py-3 px-4">Roll No</th>
+                                <th className="py-3 px-4">Batch / Sec</th>
+                                <th className="py-3 px-4">CGPA</th>
+                                <th className="py-3 px-4">Standing</th>
+                                <th className="py-3 px-4 text-right">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-borderLine text-sm">
+                              {list.map((m: any) => {
+                                const isReg = m.registered !== false;
+                                if (!isReg) {
+                                  return (
+                                    <tr key={m.roll_number} className="bg-amber-50/20 hover:bg-amber-50/40 transition-colors">
+                                      <td className="py-3.5 px-4">
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 font-bold flex items-center justify-center text-xs">?</div>
+                                          <div>
+                                            <p className="font-semibold text-amber-700 leading-tight text-xs">Not Registered Yet</p>
+                                            <p className="text-[11px] text-amber-500">Student has not created an account</p>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="py-3.5 px-4 font-bold text-amber-600 text-xs font-mono">{m.roll_number}</td>
+                                      <td className="py-3.5 px-4 text-xs text-textSecondary">—</td>
+                                      <td className="py-3.5 px-4 text-xs text-textSecondary">—</td>
+                                      <td className="py-3.5 px-4">
+                                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-600 border border-amber-200">
+                                          🕐 Pending Registration
+                                        </span>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-right">—</td>
+                                    </tr>
+                                  );
+                                }
+
+                                const cgpa = Number(m.cgpa);
+                                const isAtRisk = cgpa > 0 && cgpa < 6.0;
+                                const initials = (m.name || '?').split(' ').map((n: string) => n[0]).join('');
+                                const standing = cgpa >= 9.0 ? 'Distinction' : cgpa >= 7.0 ? 'First Class' : cgpa >= 5.0 ? 'Second Class' : 'Pass';
+
+                                return (
+                                  <tr
+                                    key={m.roll_number}
+                                    className={`hover:bg-background/80 transition-colors ${isAtRisk ? 'bg-red-50/20' : ''}`}
+                                  >
+                                    <td className="py-3.5 px-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs ${isAtRisk ? 'bg-red-100 text-red-600' : 'bg-brand-primary text-white'}`}>
+                                          {initials}
+                                        </div>
+                                        <div>
+                                          <p className="font-semibold text-textPrimary leading-tight">
+                                            {isAtRisk && <span title="CGPA below 6.0">⚠️ </span>}{m.name}
+                                          </p>
+                                          <p className="text-[11px] text-textSecondary">{m.email}</p>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="py-3.5 px-4 font-bold text-brand-primary text-xs font-mono">{m.roll_number}</td>
+                                    <td className="py-3.5 px-4 text-xs text-textSecondary">{m.batch || '2023-2027'} • Sec {m.section || 'A'}</td>
+                                    <td className="py-3.5 px-4 text-sm font-extrabold text-brand-primary">{cgpa > 0 ? cgpa.toFixed(2) : '—'}</td>
+                                    <td className="py-3.5 px-4">
+                                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                        standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700' : 'bg-brand-soft text-brand-primary'
+                                      }`}>
+                                        {standing}
+                                      </span>
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right">
+                                      <button
+                                        onClick={() => {
+                                          setInspectStudent(mapStudentToHodEntry(m, 0));
+                                          setInspectTab('academics-graph');
+                                        }}
+                                        className="px-3 py-1.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:bg-brand-primary/90 transition-all inline-flex items-center gap-1.5 shadow-sm"
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                        <span>Inspect Profile</span>
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
