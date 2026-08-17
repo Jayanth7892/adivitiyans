@@ -510,8 +510,38 @@ export const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="h-dvh bg-background flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto flex flex-col justify-center py-4 sm:py-12 sm:px-6 lg:px-8">
+    <div className="h-dvh bg-background flex flex-col overflow-hidden relative">
+      {/* ── Left Slanted Vertical Scrolling Tag Ribbon ── */}
+      <div className="hidden md:block absolute left-4 lg:left-12 top-0 bottom-0 w-72 overflow-hidden pointer-events-none z-0">
+        <div className="-rotate-6 transform origin-center animate-vertical-scroll-left space-y-8 py-4">
+          {[...Array(8)].map((_, i) => (
+            <div
+              key={`left-tag-${i}`}
+              className="bg-surface/85 dark:bg-surface/95 border border-brand-primary/30 backdrop-blur-md shadow-xl rounded-2xl px-5 py-3 text-xs font-extrabold text-brand-primary tracking-wide flex items-center gap-2.5 whitespace-nowrap ring-1 ring-brand-primary/10"
+            >
+              <span className="w-2.5 h-2.5 rounded-full bg-brand-primary animate-ping shrink-0" />
+              <span>Wherever there is Data, there is Data Science ✨</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Right Slanted Vertical Scrolling Tag Ribbon ── */}
+      <div className="hidden md:block absolute right-4 lg:right-12 top-0 bottom-0 w-72 overflow-hidden pointer-events-none z-0">
+        <div className="rotate-6 transform origin-center animate-vertical-scroll-right space-y-8 py-4">
+          {[...Array(8)].map((_, i) => (
+            <div
+              key={`right-tag-${i}`}
+              className="bg-surface/85 dark:bg-surface/95 border border-indigo-500/30 backdrop-blur-md shadow-xl rounded-2xl px-5 py-3 text-xs font-extrabold text-indigo-600 dark:text-indigo-400 tracking-wide flex items-center gap-2.5 whitespace-nowrap ring-1 ring-indigo-500/10"
+            >
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-ping shrink-0" />
+              <span>Celebrate every moment 🎉</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto flex flex-col justify-center py-4 sm:py-12 sm:px-6 lg:px-8 z-10">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <div className="inline-flex items-center justify-center w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-[#031B33] p-1.5 shadow-xl shadow-brand-primary/30 mb-2 sm:mb-4 ring-1 ring-white/10 overflow-hidden">
           <img

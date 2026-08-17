@@ -194,3 +194,22 @@
     box-shadow: var(--shadow-lg);
   }
 }
+
+/* ── Slanted Vertical Marquee Animations ── */
+@keyframes marqueeVerticalDown {
+  0% {
+    transform: translateY(-50%);
+  }
+  100% {
+    transform: translateY(0%);
+  }
+}
+
+.animate-vertical-scroll-left {
+  animation: marqueeVerticalDown 20s linear infinite;
+}
+
+.animate-vertical-scroll-right {
+  animation: marqueeVerticalDown 24s linear infinite;
+}
+
