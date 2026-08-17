@@ -204,31 +204,27 @@
 
 .auth-tag-crossfade {
   position: relative;
-  height: 1.4em;
-  overflow: hidden;
+  display: grid;
 }
 
 .auth-tag-item {
-  display: block;
+  grid-area: 1 / 1;
   white-space: nowrap;
-  animation: tagCrossfade 8s ease-in-out infinite;
+  animation: tagFadeA 8s ease-in-out infinite;
 }
 
 .auth-tag-item:nth-child(2) {
-  animation-delay: -4s;
+  animation-name: tagFadeB;
 }
 
-@keyframes tagCrossfade {
-  0%, 40% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  45%, 95% {
-    opacity: 0;
-    transform: translateY(-100%);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+@keyframes tagFadeA {
+  0%, 45%  { opacity: 1; }
+  50%, 95% { opacity: 0; }
+  100%     { opacity: 1; }
+}
+
+@keyframes tagFadeB {
+  0%, 45%  { opacity: 0; }
+  50%, 95% { opacity: 1; }
+  100%     { opacity: 0; }
 }
