@@ -535,66 +535,71 @@ export const AdminDashboardPage: React.FC = () => {
       </div>
 
       {/* Admin Tab Switcher */}
-      <div className="flex border-b border-borderLine space-x-6 text-sm font-semibold">
-        {[
-          { key: 'students', label: 'Student Directory (CRUD)' },
-          { key: 'performance', label: 'CGPA & Coding Rankings' },
-          { key: 'faculty', label: 'Faculty & Mentor Assignments' },
-          { key: 'hod-credentials', label: '🔑 HOD Credentials' },
-          { key: 'student-passwords', label: '🔒 Student Passwords' },
-          ...(isSuperAdmin ? [{ key: 'admin-management', label: '👑 Admin Management' }] : []),
-        ].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => {
-              setSearchParams({ tab: t.key });
-              // Fetch HOD credentials when that tab is opened
-              if (t.key === 'hod-credentials' && !hodCreds) {
-                setHodCredsLoading(true);
-                api.getHodCredentials().then((data) => {
-                  setHodCreds(data);
-                  setHodCredsLoading(false);
-                }).catch(() => setHodCredsLoading(false));
-              }
-              // Fetch student passwords on first open only; Refresh button handles manual re-fetch
-              if (t.key === 'student-passwords' && pwdStudents.length === 0) {
-                setPwdLoading(true);
-                api.getStudentPasswords().then((rows) => {
-                  setPwdStudents(rows);
-                  setPwdLoading(false);
-                }).catch(() => setPwdLoading(false));
-              }
-              // Fetch regular admin list on first open only; Refresh button handles manual re-fetch
-              if (t.key === 'admin-management' && isSuperAdmin && user?.email && adminList.length === 0) {
-                setAdminListLoading(true);
-                api.getSuperAdminAdmins(user.email).then((rows) => {
-                  setAdminList(rows);
-                  setAdminListLoading(false);
-                }).catch(() => setAdminListLoading(false));
-              }
-            }}
-            className={`pb-3 transition-colors ${activeTab === t.key ? 'border-b-2 border-brand-primary text-brand-primary' : 'text-textSecondary hover:text-textPrimary'}`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="bg-surface border border-borderLine rounded-2xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <nav className="flex px-2 pt-2 pb-0 gap-1 border-b border-borderLine">
+            {[
+              { key: 'students', label: 'Student Directory (CRUD)' },
+              { key: 'performance', label: 'CGPA & Coding Rankings' },
+              { key: 'faculty', label: 'Faculty & Mentor Assignments' },
+              { key: 'hod-credentials', label: '🔑 HOD Credentials' },
+              { key: 'student-passwords', label: '🔒 Student Passwords' },
+              ...(isSuperAdmin ? [{ key: 'admin-management', label: '👑 Admin Management' }] : []),
+            ].map((t) => (
+              <button
+                key={t.key}
+                onClick={() => {
+                  setSearchParams({ tab: t.key });
+                  if (t.key === 'hod-credentials' && !hodCreds) {
+                    setHodCredsLoading(true);
+                    api.getHodCredentials().then((data) => {
+                      setHodCreds(data);
+                      setHodCredsLoading(false);
+                    }).catch(() => setHodCredsLoading(false));
+                  }
+                  if (t.key === 'student-passwords' && pwdStudents.length === 0) {
+                    setPwdLoading(true);
+                    api.getStudentPasswords().then((rows) => {
+                      setPwdStudents(rows);
+                      setPwdLoading(false);
+                    }).catch(() => setPwdLoading(false));
+                  }
+                  if (t.key === 'admin-management' && isSuperAdmin && user?.email && adminList.length === 0) {
+                    setAdminListLoading(true);
+                    api.getSuperAdminAdmins(user.email).then((rows) => {
+                      setAdminList(rows);
+                      setAdminListLoading(false);
+                    }).catch(() => setAdminListLoading(false));
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all rounded-t-lg ${
+                  activeTab === t.key
+                    ? 'border-brand-primary text-brand-primary bg-brand-soft'
+                    : 'border-transparent text-textSecondary hover:text-textPrimary hover:bg-surface-2'
+                }`}
+              >
+                <span>{t.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
       </div>
 
       {/* Stat Cards — always visible */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={<Users className="w-5 h-5" />} iconBgColor="bg-brand-soft text-brand-primary"
-          label="Total Students" value={students.length} subtext="Active in platform" />
-        <StatCard icon={<GraduationCap className="w-5 h-5" />} iconBgColor="bg-amber-50 text-amber-600"
-          label="CGPA > 9.0 (Distinction)" value="3 Students" subtext="Academic distinction" />
-        <StatCard icon={<BookOpen className="w-5 h-5" />} iconBgColor="bg-indigo-50 text-indigo-600"
-          label="Avg Institution CGPA" value="9.09 / 10" subtext="High academic standing" />
+          accentColor="brand" label="Total Students" value={students.length} subtext="Active in platform" />
+        <StatCard icon={<GraduationCap className="w-5 h-5" />} iconBgColor="bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+          accentColor="amber" label="CGPA > 9.0 (Distinction)" value="3 Students" subtext="Academic distinction" />
+        <StatCard icon={<BookOpen className="w-5 h-5" />} iconBgColor="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+          accentColor="indigo" label="Avg Institution CGPA" value="9.09 / 10" subtext="High academic standing" />
         <StatCard icon={<Code2 className="w-5 h-5" />} iconBgColor="bg-[#FFA116]/10 text-[#FFA116]"
-          label="LeetCode Profiles" value="Active Sync" subtext="Real-time platform stats" />
+          accentColor="brand" label="LeetCode Profiles" value="Active Sync" subtext="Real-time platform stats" />
       </div>
 
       {/* ── TAB 1: Student Directory ── */}
       {activeTab === 'students' && (
-        <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
+        <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-xs">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
               <h3 className="text-base font-bold text-textPrimary">Student Directory</h3>

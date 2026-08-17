@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { Search, Mail, Pencil, Link, Trash2, AlertTriangle, Users, Check, X, ShieldAlert, UserCheck } from 'lucide-react';
 
 interface FacultyRow {
   faculty_id: string;
@@ -96,43 +97,51 @@ export default function FacultyManagementPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6 p-6 min-h-screen bg-background transition-colors duration-200">
+    <div className="flex flex-col gap-6">
 
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-textPrimary">Faculty Management</h1>
-          <p className="mt-1 text-sm text-textSecondary">
-            {faculty.length} faculty members — select a row to view their assigned mentees
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-soft text-brand-primary text-xs font-semibold mb-2">
+            <Users className="w-3.5 h-3.5" />
+            <span>Faculty Portal</span>
+          </div>
+          <h1 className="text-xl font-extrabold text-textPrimary">Faculty Management</h1>
+          <p className="mt-0.5 text-xs text-textSecondary">
+            {faculty.length} faculty members — select a row to view assigned mentees
           </p>
         </div>
         <button
           onClick={() => setShowBlocked(p => !p)}
-          className={`px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-xs font-bold transition-colors ${
             showBlocked
               ? 'bg-alert border-alert text-white'
-              : 'bg-surface border-alert text-alert hover:bg-alert/10'
+              : 'bg-surface border-alert/50 text-alert hover:bg-alert-soft'
           }`}
         >
-          {showBlocked ? 'Hide' : 'Show'} Blocked Emails
+          <ShieldAlert className="w-3.5 h-3.5" />
+          <span>{showBlocked ? 'Hide' : 'Show'} Blocked Emails</span>
         </button>
       </div>
 
       {/* Blocked Emails panel */}
       {showBlocked && (
-        <div className="bg-alert-soft border border-alert/30 rounded-xl p-5">
-          <h3 className="text-sm font-bold text-alert mb-3">Blocked Emails ({blocked.length})</h3>
+        <div className="bg-alert-soft border border-alert/30 rounded-2xl p-5 shadow-xs">
+          <h3 className="text-xs font-bold text-alert uppercase tracking-widest mb-3 flex items-center gap-1.5">
+            <ShieldAlert className="w-4 h-4" />
+            <span>Blocked Emails ({blocked.length})</span>
+          </h3>
           {blocked.length === 0 ? (
             <p className="text-sm text-textSecondary">No blocked emails.</p>
           ) : blocked.map(b => (
-            <div key={b.email} className="flex items-center gap-3 bg-surface border border-alert/20 rounded-lg px-3.5 py-2.5 mb-1.5">
+            <div key={b.email} className="flex items-center gap-3 bg-surface border border-alert/20 rounded-xl px-4 py-3 mb-2">
               <div className="flex-1 min-w-0">
-                <span className="font-semibold text-alert text-sm">{b.email}</span>
-                <span className="ml-2.5 text-textSecondary text-xs">{b.reason}</span>
+                <span className="font-bold text-alert text-xs">{b.email}</span>
+                <span className="ml-2.5 text-textMuted text-[11px]">{b.reason}</span>
               </div>
               <button
                 onClick={() => unblockMut.mutate(b.email)}
-                className="px-3.5 py-1 rounded-md border border-green-500 bg-surface text-green-600 font-semibold text-xs hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                className="px-3.5 py-1.5 rounded-lg border border-success/50 bg-surface text-success font-bold text-xs hover:bg-success-soft transition-colors"
               >
                 Unblock
               </button>
@@ -147,12 +156,15 @@ export default function FacultyManagementPage() {
         {/* LEFT — Faculty list */}
         <div className="bg-surface border border-borderLine rounded-2xl overflow-hidden flex flex-col max-h-[75vh]">
           <div className="px-4 py-3.5 border-b border-borderLine">
-            <input
-              placeholder="Search name, email, ID..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-borderLine bg-background text-sm text-textPrimary placeholder:text-textSecondary focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary transition-all"
-            />
+            <div className="relative">
+              <Search className="w-4 h-4 text-textMuted absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                placeholder="Search name, email, ID..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-borderLine bg-background text-sm text-textPrimary placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary transition-all"
+              />
+            </div>
           </div>
           <div className="overflow-y-auto flex-1">
             {facLoading
@@ -167,8 +179,8 @@ export default function FacultyManagementPage() {
                   <div
                     key={f.faculty_id}
                     onClick={() => setSelectedFaculty(f)}
-                    className={`px-4 py-3.5 border-b border-borderLine cursor-pointer transition-colors border-l-[3px] ${
-                      sel ? 'bg-brand-soft border-l-brand-primary' : 'bg-surface border-l-transparent hover:bg-background'
+                    className={`px-4 py-3.5 border-b border-borderLine cursor-pointer transition-all border-l-[3px] ${
+                      sel ? 'bg-brand-soft border-l-brand-primary' : 'bg-surface border-l-transparent hover:bg-surface-2'
                     }`}
                   >
                     <div className="flex justify-between items-center gap-2">
@@ -179,7 +191,7 @@ export default function FacultyManagementPage() {
                               autoFocus
                               value={renameValue}
                               onChange={e => setRenameValue(e.target.value)}
-                              className="flex-1 px-2 py-1 rounded-md border border-brand-primary bg-background text-sm text-textPrimary focus:outline-none"
+                              className="flex-1 px-2.5 py-1 rounded-lg border border-brand-primary bg-background text-sm text-textPrimary focus:outline-none"
                               onKeyDown={e => {
                                 if (e.key === 'Enter') renameMut.mutate({ id: f.faculty_id, name: renameValue });
                                 if (e.key === 'Escape') setRenameId(null);
@@ -187,19 +199,23 @@ export default function FacultyManagementPage() {
                             />
                             <button
                               onClick={() => renameMut.mutate({ id: f.faculty_id, name: renameValue })}
-                              className="px-2.5 py-1 rounded-md bg-brand-primary text-white text-xs font-semibold"
-                            >Save</button>
+                              className="px-2.5 py-1 rounded-lg bg-brand-primary text-white text-xs font-semibold inline-flex items-center gap-1"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Save
+                            </button>
                             <button
                               onClick={() => setRenameId(null)}
-                              className="px-2 py-1 rounded-md bg-background text-textSecondary text-xs border border-borderLine"
-                            >✕</button>
+                              className="px-2 py-1 rounded-lg bg-background text-textSecondary text-xs border border-borderLine"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         ) : (
                           <div className="font-semibold text-sm text-textPrimary truncate">{f.name}</div>
                         )}
                         <div className="text-[11px] text-textSecondary mt-0.5">{f.faculty_id}</div>
                       </div>
-                      <span className="bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap">
+                      <span className="bg-brand-soft text-brand-primary rounded-full px-2.5 py-0.5 text-[10px] font-bold whitespace-nowrap">
                         {f.mentee_count ?? 0} mentees
                       </span>
                     </div>
@@ -212,7 +228,7 @@ export default function FacultyManagementPage() {
                             value={linkEmailValue}
                             onChange={e => setLinkEmailValue(e.target.value)}
                             placeholder="email@rgmcet.edu.in"
-                            className="flex-1 px-2 py-1 rounded-md border border-sky-400 bg-background text-xs text-textPrimary focus:outline-none"
+                            className="flex-1 px-2.5 py-1 rounded-lg border border-sky-400 bg-background text-xs text-textPrimary focus:outline-none"
                             onKeyDown={e => {
                               if (e.key === 'Enter') linkEmailMut.mutate({ id: f.faculty_id, email: linkEmailValue });
                               if (e.key === 'Escape') setLinkEmailId(null);
@@ -220,16 +236,20 @@ export default function FacultyManagementPage() {
                           />
                           <button
                             onClick={() => linkEmailMut.mutate({ id: f.faculty_id, email: linkEmailValue })}
-                            className="px-2.5 py-1 rounded-md bg-sky-500 text-white text-xs font-semibold"
-                          >Link</button>
+                            className="px-2.5 py-1 rounded-lg bg-sky-500 text-white text-xs font-semibold inline-flex items-center gap-1"
+                          >
+                            <Link className="w-3 h-3" /> Link
+                          </button>
                           <button
                             onClick={() => setLinkEmailId(null)}
-                            className="px-2 py-1 rounded-md bg-background text-textSecondary text-xs border border-borderLine"
-                          >✕</button>
+                            className="px-2 py-1 rounded-lg bg-background text-textSecondary text-xs border border-borderLine"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       ) : (
-                        <span className={`text-xs font-medium ${isLinked ? 'text-green-600' : 'text-amber-500'}`}>
-                          {isLinked ? `✉ ${f.email}` : '⚠ Not linked'}
+                        <span className={`text-xs font-medium inline-flex items-center gap-1 ${isLinked ? 'text-green-600 dark:text-green-400' : 'text-amber-500'}`}>
+                          {isLinked ? <><Mail className="w-3 h-3" /> {f.email}</> : <><AlertTriangle className="w-3 h-3" /> Not linked</>}
                         </span>
                       )}
                     </div>
@@ -241,29 +261,37 @@ export default function FacultyManagementPage() {
                     <div className="flex gap-1.5 mt-2.5 flex-wrap" onClick={e => e.stopPropagation()}>
                       <button
                         onClick={() => { setRenameId(f.faculty_id); setRenameValue(f.name); }}
-                        className="px-2.5 py-1 rounded-md border border-borderLine bg-surface text-textSecondary text-xs font-semibold hover:bg-background transition-colors"
-                      >✏ Rename</button>
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-borderLine bg-surface text-textSecondary text-xs font-semibold hover:bg-background transition-colors"
+                      >
+                        <Pencil className="w-3 h-3" /> Rename
+                      </button>
                       <button
                         onClick={() => { setLinkEmailId(f.faculty_id); setLinkEmailValue(f.email || ''); }}
-                        className="px-2.5 py-1 rounded-md border border-sky-400 bg-surface text-sky-600 text-xs font-semibold hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-colors"
-                      >{isLinked ? '📧 Update Email' : '🔗 Link Email'}</button>
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-sky-400/40 bg-surface text-sky-600 dark:text-sky-400 text-xs font-semibold hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-colors"
+                      >
+                        <Mail className="w-3 h-3" /> {isLinked ? 'Update Email' : 'Link Email'}
+                      </button>
                       {isDeleting ? (
                         <>
                           <button
                             onClick={() => deleteMut.mutate(f.faculty_id)}
                             disabled={deleteMut.isPending}
-                            className="px-2.5 py-1 rounded-md bg-alert text-white text-xs font-bold disabled:opacity-60"
-                          >{deleteMut.isPending ? '...' : '⚠ Confirm Delete'}</button>
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-alert text-white text-xs font-bold disabled:opacity-60"
+                          >
+                            <AlertTriangle className="w-3 h-3" /> {deleteMut.isPending ? 'Deleting...' : 'Confirm Delete'}
+                          </button>
                           <button
                             onClick={() => setDeleteConfirm(null)}
-                            className="px-2 py-1 rounded-md bg-background text-textSecondary text-xs border border-borderLine"
+                            className="px-2 py-1 rounded-lg bg-background text-textSecondary text-xs border border-borderLine"
                           >Cancel</button>
                         </>
                       ) : (
                         <button
                           onClick={() => setDeleteConfirm(f.faculty_id)}
-                          className="px-2.5 py-1 rounded-md border border-alert/40 bg-surface text-alert text-xs font-semibold hover:bg-alert-soft transition-colors"
-                        >🗑 Delete</button>
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-alert/40 bg-surface text-alert text-xs font-semibold hover:bg-alert-soft transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" /> Delete
+                        </button>
                       )}
                     </div>
                   </div>
@@ -276,15 +304,17 @@ export default function FacultyManagementPage() {
         <div className="bg-surface border border-borderLine rounded-2xl overflow-hidden flex flex-col max-h-[75vh]">
           {!selectedFaculty ? (
             <div className="flex-1 flex flex-col items-center justify-center text-textSecondary gap-3 p-10 text-center">
-              <span className="text-5xl">👈</span>
+              <div className="w-12 h-12 rounded-2xl bg-brand-soft text-brand-primary flex items-center justify-center">
+                <UserCheck className="w-6 h-6" />
+              </div>
               <p className="text-sm font-medium">Select a faculty member to view their assigned mentees</p>
             </div>
           ) : (
             <>
-              <div className="px-4 py-3.5 border-b border-borderLine bg-background">
+              <div className="px-5 py-4 border-b border-borderLine bg-surface-2">
                 <h3 className="text-sm font-bold text-textPrimary">{selectedFaculty.name}</h3>
-                <p className="text-xs text-textSecondary mt-0.5">
-                  {selectedFaculty.faculty_id} · {mentees.length} assigned mentees
+                <p className="text-xs text-textMuted mt-0.5">
+                  {selectedFaculty.faculty_id} &middot; {mentees.length} assigned mentees
                 </p>
               </div>
               <div className="overflow-y-auto flex-1">
@@ -310,7 +340,7 @@ export default function FacultyManagementPage() {
                       <button
                         onClick={() => unassignMut.mutate({ facId: selectedFaculty.faculty_id, roll: m.roll_number })}
                         disabled={unassignMut.isPending}
-                        className="px-2.5 py-1 rounded-md border border-alert/40 bg-surface text-alert text-xs font-semibold hover:bg-alert-soft transition-colors disabled:opacity-50"
+                        className="px-2.5 py-1.5 rounded-lg border border-alert/40 bg-surface text-alert text-[11px] font-bold hover:bg-alert-soft transition-colors disabled:opacity-50"
                       >Unassign</button>
                     </div>
                   ))}
@@ -331,3 +361,4 @@ export default function FacultyManagementPage() {
     </div>
   );
 }
+

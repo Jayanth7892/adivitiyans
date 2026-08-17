@@ -90,6 +90,7 @@ export const DashboardPage: React.FC = () => {
             <StatCard
               icon={<TrendingUp className="w-5 h-5" />}
               iconBgColor="bg-brand-soft text-brand-primary"
+              accentColor="brand"
               label="Academic Performance Score"
               value={`${scoreData?.overallScore ?? 0}/100`}
               subtext="Computed from GPA & coding activity"
@@ -98,6 +99,7 @@ export const DashboardPage: React.FC = () => {
             <StatCard
               icon={<CheckCircle2 className="w-5 h-5" />}
               iconBgColor="bg-success-soft text-success"
+              accentColor="success"
               label="Certifications Earned"
               value={certifications.filter((c) => !c.suggested).length}
               subtext={`${certifications.filter((c) => c.suggested).length} recommended certs`}
@@ -105,7 +107,8 @@ export const DashboardPage: React.FC = () => {
             />
             <StatCard
               icon={<Code2 className="w-5 h-5" />}
-              iconBgColor="bg-indigo-50 text-indigo-600"
+              iconBgColor="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+              accentColor="indigo"
               label="Coding Profiles"
               value={`${codingProfiles.length} / 6`}
               subtext="Linked technical handles"
@@ -113,7 +116,8 @@ export const DashboardPage: React.FC = () => {
             />
             <StatCard
               icon={<Award className="w-5 h-5" />}
-              iconBgColor="bg-amber-50 text-amber-600"
+              iconBgColor="bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400"
+              accentColor="amber"
               label="Tech Skills Tracked"
               value={techSkills.length}
               subtext="Self & faculty verified skills"
@@ -122,11 +126,11 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           {/* Skill Snapshot Radar Chart Card */}
-          <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-xs">
+            <div className="flex items-center justify-between mb-5">
               <div>
-                <h3 className="text-base font-bold text-textPrimary">Skill Snapshot</h3>
-                <p className="text-xs text-textSecondary">Radar representation of top technical self-ratings</p>
+                <h3 className="text-sm font-bold text-textPrimary">Skill Snapshot</h3>
+                <p className="text-xs text-textSecondary mt-0.5">Radar of top technical self-ratings</p>
               </div>
               <button
                 onClick={() => navigate('/profile?tab=tech-skills')}
@@ -141,9 +145,9 @@ export const DashboardPage: React.FC = () => {
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
-                    <PolarGrid stroke="#EAECEF" />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#4B5563', fontSize: 11 }} />
-                    <PolarRadiusAxis angle={30} domain={[0, 5]} stroke="#CBD5E1" />
+                    <PolarGrid stroke="var(--color-borderLine)" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: 'var(--color-textSecondary)', fontSize: 11 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 5]} stroke="var(--color-borderLine)" />
                     <Radar
                       name="Rating"
                       dataKey="A"
@@ -172,11 +176,11 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           {/* Recent Achievements Card */}
-          <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-xs">
+            <div className="flex items-center justify-between mb-5">
               <div>
-                <h3 className="text-base font-bold text-textPrimary">Recent Achievements</h3>
-                <p className="text-xs text-textSecondary">Hackathons, capstone projects, and industry events</p>
+                <h3 className="text-sm font-bold text-textPrimary">Recent Achievements</h3>
+                <p className="text-xs text-textSecondary mt-0.5">Hackathons, projects, and industry events</p>
               </div>
               <button
                 onClick={() => navigate('/profile?tab=achievements')}
@@ -188,18 +192,18 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             {achievements.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {achievements.slice(0, 3).map((item) => (
-                  <div key={item.id || item.title} className="p-3.5 rounded-lg border border-borderLine bg-background flex items-start justify-between gap-3">
+                  <div key={item.id || item.title} className="p-3.5 rounded-xl border border-borderLine bg-surface-2 flex items-start justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-soft text-brand-primary">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-brand-soft text-brand-primary">
                           {item.type}
                         </span>
-                        <span className="text-xs text-textSecondary">{item.achievement_date || '2024'}</span>
+                        <span className="text-[10px] text-textMuted">{item.achievement_date || '2024'}</span>
                       </div>
-                      <h4 className="text-sm font-semibold text-textPrimary mt-1">{item.title}</h4>
-                      <p className="text-xs text-textSecondary line-clamp-1 mt-0.5">{item.description}</p>
+                      <h4 className="text-xs font-bold text-textPrimary">{item.title}</h4>
+                      <p className="text-[11px] text-textSecondary line-clamp-1 mt-0.5">{item.description}</p>
                     </div>
                   </div>
                 ))}
@@ -217,21 +221,19 @@ export const DashboardPage: React.FC = () => {
         {/* Right Column (40% ~ 5 cols in 12 grid) */}
         <div className="lg:col-span-5 space-y-6">
           {/* Completion Ring Card */}
-          <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm text-center">
-            <h3 className="text-sm font-bold text-textPrimary mb-1">Profile Completion Status</h3>
-            <p className="text-xs text-textSecondary mb-4">Complete all 8 sections to maximize academic evaluation</p>
-
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-xs text-center">
+            <h3 className="text-sm font-bold text-textPrimary mb-1">Profile Completion</h3>
+            <p className="text-xs text-textSecondary mb-4">Complete all 8 sections to maximize evaluation</p>
             <div className="py-2">
               <ProgressRing percentage={completionStatus.totalPercentage} size={110} strokeWidth={10} />
             </div>
-
             <p className="text-xs font-medium text-textSecondary mt-3">
-              <span className="font-bold text-textPrimary">{completionStatus.sectionsCompleteCount}</span> of {completionStatus.totalSectionsCount} profile sections completed
+              <span className="font-bold text-textPrimary">{completionStatus.sectionsCompleteCount}</span> of {completionStatus.totalSectionsCount} sections completed
             </p>
           </div>
 
           {/* Coding Snapshot Widget */}
-          <div className="bg-surface border border-borderLine rounded-xl p-5 shadow-sm">
+          <div className="bg-surface border border-borderLine rounded-2xl p-5 shadow-xs">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-textPrimary flex items-center gap-2">
                 <Code2 className="w-4 h-4 text-[#FFA116]" />
@@ -242,51 +244,51 @@ export const DashboardPage: React.FC = () => {
                 View All <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {codingProfiles.find((p) => p.platform === 'LeetCode') ? (
-                <div className="p-3 rounded-xl bg-background border border-borderLine flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-surface-2 border border-borderLine flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-black text-[11px]" style={{ background: '#FFA116' }}>LC</div>
                     <div>
                       <p className="text-xs font-bold text-textPrimary">LeetCode</p>
-                      <p className="text-[11px] text-textSecondary">@{codingProfiles.find((p) => p.platform === 'LeetCode')?.handle}</p>
+                      <p className="text-[11px] text-textMuted">@{codingProfiles.find((p) => p.platform === 'LeetCode')?.handle}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-extrabold" style={{ color: '#FFA116' }}>{codingProfiles.find((p) => p.platform === 'LeetCode')?.score_rating}</p>
-                    <p className="text-[10px] text-textSecondary">Rating</p>
+                    <p className="text-[10px] text-textMuted">Rating</p>
                   </div>
                 </div>
               ) : (
                 <button onClick={() => navigate('/profile?tab=coding-profiles')}
                   className="w-full p-3 rounded-xl border border-dashed border-borderLine text-xs text-textSecondary hover:border-[#FFA116] hover:text-[#FFA116] transition-all text-left flex items-center gap-2">
                   <div className="w-6 h-6 rounded-lg bg-[#FFA116]/10 flex items-center justify-center text-[#FFA116] font-black text-[10px]">LC</div>
-                  Connect LeetCode →
+                  Connect LeetCode &rarr;
                 </button>
               )}
               {codingProfiles.find((p) => p.platform === 'GitHub') ? (
-                <div className="p-3 rounded-xl bg-background border border-borderLine flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-surface-2 border border-borderLine flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-lg bg-textPrimary flex items-center justify-center">
                       <Github className="w-4 h-4 text-surface" />
                     </div>
                     <div>
                       <p className="text-xs font-bold text-textPrimary">GitHub</p>
-                      <p className="text-[11px] text-textSecondary">@{codingProfiles.find((p) => p.platform === 'GitHub')?.handle}</p>
+                      <p className="text-[11px] text-textMuted">@{codingProfiles.find((p) => p.platform === 'GitHub')?.handle}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-extrabold text-textPrimary">{codingProfiles.find((p) => p.platform === 'GitHub')?.repositories_count}</p>
-                    <p className="text-[10px] text-textSecondary">Repos</p>
+                    <p className="text-[10px] text-textMuted">Repos</p>
                   </div>
                 </div>
               ) : (
                 <button onClick={() => navigate('/profile?tab=coding-profiles')}
-                  className="w-full p-3 rounded-xl border border-dashed border-borderLine text-xs text-textSecondary hover:border-borderLine hover:text-textPrimary transition-all text-left flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-background flex items-center justify-center">
+                  className="w-full p-3 rounded-xl border border-dashed border-borderLine text-xs text-textSecondary hover:border-borderStrong hover:text-textPrimary transition-all text-left flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-surface-2 flex items-center justify-center">
                     <Github className="w-3.5 h-3.5 text-textSecondary" />
                   </div>
-                  Connect GitHub →
+                  Connect GitHub &rarr;
                 </button>
               )}
               <button onClick={() => navigate('/coding-analytics')}
@@ -296,20 +298,20 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Signature Interaction: Complete Your Profile (Nudge Cards Column) */}
-          <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
+          {/* Complete Your Profile nudges */}
+          <div className="bg-surface border border-borderLine rounded-2xl p-5 shadow-xs">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-textPrimary flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-brand-primary" />
                 <span>Complete Your Profile</span>
               </h3>
-              <span className="text-xs font-semibold text-alert bg-alert-soft px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-bold text-alert bg-alert-soft px-2.5 py-1 rounded-full">
                 {completionStatus.nudges.length} Prompts
               </span>
             </div>
 
             {completionStatus.nudges.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {completionStatus.nudges.map((nudge) => (
                   <NudgeCard
                     key={nudge.id}
@@ -321,16 +323,16 @@ export const DashboardPage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <div className="bg-success-soft border border-green-200 rounded-xl p-6 text-center">
+              <div className="bg-success-soft border border-success/20 rounded-xl p-5 text-center">
                 <CheckCircle className="w-8 h-8 text-success mx-auto mb-2" />
-                <h4 className="text-sm font-bold text-textPrimary">Your profile is 100% complete! 🎉</h4>
-                <p className="text-xs text-textSecondary mt-1">Great job! All technical profiles, certifications, and academic data are updated.</p>
+                <h4 className="text-sm font-bold text-textPrimary">Profile 100% complete! 🎉</h4>
+                <p className="text-xs text-textSecondary mt-1">All sections, coding profiles, and academic data are up to date.</p>
               </div>
             )}
           </div>
 
           {/* Announcements Card */}
-          <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
+          <div className="bg-surface border border-borderLine rounded-2xl p-5 shadow-xs">
             <div className="flex items-center gap-2 mb-3">
               <Bell className="w-4 h-4 text-brand-primary" />
               <h3 className="text-sm font-bold text-textPrimary">Announcements</h3>

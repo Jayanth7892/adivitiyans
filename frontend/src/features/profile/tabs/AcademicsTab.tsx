@@ -120,7 +120,7 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
       <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#5B4FE9]/10 text-[#5B4FE9] flex items-center justify-center shrink-0">
+            <div className="w-14 h-14 rounded-2xl bg-brand-soft text-brand-primary flex items-center justify-center shrink-0">
               <GraduationCap className="w-7 h-7" />
             </div>
             <div>

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Sparkles, Edit3 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, Edit3, TrendingUp } from 'lucide-react';
 import { PillButton } from './PillButton';
 
 interface GreetingHeroProps {
@@ -8,31 +8,109 @@ interface GreetingHeroProps {
   onEditProfile: () => void;
 }
 
+function getDynamicGreeting(): string {
+  const h = new Date().getHours();
+  if (h >= 0 && h < 12) return 'Good morning';
+  if (h >= 12 && h < 16) return 'Good afternoon';
+  return 'Good evening';
+}
+
 export const GreetingHero: React.FC<GreetingHeroProps> = ({
   name,
   completionPercentage,
   onEditProfile,
 }) => {
-  return (
-    <div className="bg-surface border border-borderLine rounded-2xl p-6 md:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-      {/* Decorative subtle background gradient */}
-      <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-brand-soft/60 rounded-full blur-3xl pointer-events-none" />
+  const [greeting, setGreeting] = useState<string>(getDynamicGreeting);
 
-      <div className="relative z-10">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-soft text-brand-primary text-xs font-semibold mb-3">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Student Placement Readiness Portal</span>
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setGreeting(getDynamicGreeting());
+    }, 30000); // Re-evaluate every 30s to update time boundary transitions seamlessly
+    return () => clearInterval(timer);
+  }, []);
+
+  const pct = Math.min(Math.max(completionPercentage, 0), 100);
+
+  // Colour the progress bar based on completion
+  const barColor =
+    pct >= 80 ? '#22C55E'
+    : pct >= 50 ? '#6366F1'
+    : '#F59E0B';
+
+  return (
+    <div className="relative bg-surface border border-borderLine rounded-2xl overflow-hidden shadow-sm">
+
+      {/* ── Rich gradient banner ── */}
+      <div
+        className="relative h-40 w-full overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, #312E81 0%, #4338CA 30%, #6366F1 60%, #818CF8 100%)',
+        }}
+      >
+        {/* Dot mesh */}
+        <div
+          className="absolute inset-0 opacity-[0.18] pointer-events-none"
+          style={{
+            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+          }}
+        />
+        {/* Glow orbs */}
+        <div className="absolute -top-12 -right-12 w-56 h-56 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-32 w-40 h-40 rounded-full bg-purple-300/20 blur-2xl pointer-events-none" />
+
+        {/* Overlay text inside banner */}
+        <div className="absolute inset-0 flex flex-col justify-center px-8">
+          <div className="inline-flex items-center gap-1.5 mb-3 w-fit">
+            <Sparkles className="w-3.5 h-3.5 text-yellow-300" />
+            <span className="text-xs font-bold text-white/80 uppercase tracking-widest">Student Portal</span>
+          </div>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight leading-tight drop-shadow-sm">
+            {greeting}, <span className="text-yellow-200">{name}</span>! 👋
+          </h1>
+          <p className="text-sm text-white/70 mt-1.5 max-w-md">
+            {pct < 100
+              ? 'Complete your profile to maximise your placement readiness.'
+              : 'Your profile is fully complete. You\'re placement-ready! 🎉'}
+          </p>
         </div>
-        <h1 className="text-2xl md:text-3xl font-extrabold text-textPrimary tracking-tight">
-          Welcome Back, <span className="text-brand-primary">{name}</span>! ✨
-        </h1>
-        <p className="text-sm text-textSecondary mt-2 max-w-xl leading-relaxed">
-          Ready to continue building your placement readiness profile? Your profile is currently{' '}
-          <span className="font-semibold text-textPrimary">{completionPercentage}% complete</span>.
-        </p>
       </div>
 
-      <div className="relative z-10 shrink-0">
+      {/* ── Bottom content strip ── */}
+      <div className="px-6 py-4 md:px-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Progress */}
+        <div className="flex-1 max-w-md">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-3.5 h-3.5 text-textSecondary" />
+              <span className="text-[11px] font-bold text-textSecondary uppercase tracking-widest">Profile Completion</span>
+            </div>
+            <span
+              className="text-sm font-extrabold"
+              style={{ color: barColor }}
+            >
+              {pct}%
+            </span>
+          </div>
+          <div className="h-2 w-full bg-surface-2 border border-borderLine rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${pct}%`, background: barColor }}
+            />
+          </div>
+          <div className="flex items-center gap-2 mt-1.5 text-[10px]">
+            {pct >= 80 ? (
+              <span className="badge-success">Strong Profile</span>
+            ) : pct >= 50 ? (
+              <span className="badge-warning">Getting There</span>
+            ) : (
+              <span className="badge-alert">Needs Attention</span>
+            )}
+            <span className="text-textMuted">&bull; {100 - pct}% remaining</span>
+          </div>
+        </div>
+
+        {/* CTA */}
         <PillButton
           variant="primary"
           size="md"

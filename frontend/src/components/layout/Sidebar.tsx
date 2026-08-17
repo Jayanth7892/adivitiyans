@@ -131,13 +131,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
 
   return (
     <>
-      {/* Mobile backdrop — tapping outside closes the sidebar.
-          top-16 ensures it starts BELOW the header so the hamburger button
-          remains clickable even while the sidebar overlay is open. */}
+      {/* Mobile backdrop */}
       {isOpen && (
         <div
           onClick={onClose}
-          className="fixed inset-x-0 bottom-0 top-16 bg-black/40 z-40 lg:hidden backdrop-blur-sm"
+          className="fixed inset-x-0 bottom-0 top-16 bg-black/50 z-40 lg:hidden backdrop-blur-sm"
         />
       )}
 
@@ -145,43 +143,44 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
         className={[
           'fixed top-0 left-0 bottom-0 z-50 flex flex-col bg-surface border-r border-borderLine',
           'transition-all duration-300 ease-in-out overflow-hidden',
-          // Desktop: always visible, width transitions between collapsed icon-rail and full
-          collapsed ? 'lg:w-14' : 'lg:w-[220px]',
-          // Mobile: overlay slides in/out, always full width when open
-          isOpen ? 'w-[220px] translate-x-0' : 'w-[220px] -translate-x-full',
+          collapsed ? 'lg:w-[60px]' : 'lg:w-[228px]',
+          isOpen ? 'w-[228px] translate-x-0' : 'w-[228px] -translate-x-full',
           'lg:translate-x-0',
         ].join(' ')}
-        style={{ boxShadow: '2px 0 16px 0 rgba(0,0,0,0.05)' }}
+        style={{ boxShadow: '1px 0 0 0 var(--color-borderLine)' }}
       >
-        {/* Logo */}
-        <div className="h-16 flex items-center border-b border-borderLine shrink-0 px-4 overflow-hidden">
-          <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm select-none">
+        {/* ── Logo Header ── */}
+        <div className="h-16 flex items-center border-b border-borderLine shrink-0 px-3.5 gap-3 overflow-hidden">
+          <div className="w-8 h-8 rounded-xl bg-brand-primary flex items-center justify-center text-white font-black text-sm shrink-0 select-none shadow-brand">
             A
           </div>
           <div
             className={[
-              'ml-2.5 overflow-hidden transition-all duration-300',
+              'overflow-hidden transition-all duration-300',
               collapsed ? 'lg:w-0 lg:opacity-0' : 'w-auto opacity-100',
             ].join(' ')}
           >
             <p className="text-sm font-extrabold tracking-tight text-textPrimary whitespace-nowrap">
               A<span className="text-brand-primary">D</span>VITIYAN<span className="text-brand-primary">S</span>
             </p>
+            <p className="text-[9px] font-semibold text-textMuted uppercase tracking-widest whitespace-nowrap -mt-0.5">
+              Student 360° Platform
+            </p>
           </div>
         </div>
 
-        {/* Scrollable Navigation */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden py-3">
+        {/* ── Scrollable Navigation ── */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-1.5">
           {activeNavGroups.map((group) => (
-            <div key={group.title} className="mb-2">
-              {/* Group title — hidden when collapsed on desktop */}
+            <div key={group.title} className="mb-3">
+              {/* Group header */}
               <div
                 className={[
                   'overflow-hidden transition-all duration-300',
                   collapsed ? 'lg:h-0 lg:opacity-0' : 'h-auto opacity-100',
                 ].join(' ')}
               >
-                <p className="px-4 pt-3 pb-1 text-[10px] font-bold text-textSecondary uppercase tracking-widest whitespace-nowrap">
+                <p className="px-3 pt-2 pb-1.5 text-[10px] font-bold text-textMuted uppercase tracking-widest whitespace-nowrap">
                   {group.title}
                 </p>
               </div>
@@ -196,14 +195,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
                     onClick={onClose}
                     title={item.label}
                     className={[
-                      'flex items-center mx-2 mb-0.5 rounded-lg text-sm font-medium transition-all duration-150 gap-3',
+                      'relative flex items-center mb-0.5 rounded-xl text-sm font-medium transition-all duration-150 gap-3',
                       collapsed ? 'lg:justify-center lg:px-0 lg:py-3 px-3 py-2.5' : 'px-3 py-2.5',
                       active && !item.soon
                         ? 'bg-brand-soft text-brand-primary font-semibold'
-                        : 'text-textSecondary hover:bg-background hover:text-textPrimary',
+                        : 'text-textSecondary hover:bg-surface-2 hover:text-textPrimary',
                     ].join(' ')}
                   >
-                    <Icon className="w-[18px] h-[18px] shrink-0" />
+                    {/* Active left bar */}
+                    {active && !item.soon && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-brand-primary" />
+                    )}
+
+                    <Icon className={`shrink-0 ${active && !item.soon ? 'w-[18px] h-[18px]' : 'w-[17px] h-[17px]'}`} />
+
                     <span
                       className={[
                         'truncate transition-all duration-300',
@@ -212,10 +217,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
                     >
                       {item.label}
                     </span>
+
                     {item.soon && (
                       <span
                         className={[
-                          'ml-auto text-[10px] bg-background text-textSecondary border border-borderLine px-1.5 py-0.5 rounded shrink-0',
+                          'ml-auto text-[9px] font-bold bg-surface-2 text-textMuted border border-borderLine px-1.5 py-0.5 rounded-md shrink-0',
                           collapsed ? 'lg:hidden' : '',
                         ].join(' ')}
                       >
@@ -229,22 +235,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
           ))}
         </div>
 
-        {/* User footer + Logout */}
+        {/* ── User Footer + Logout ── */}
         <div className="shrink-0 border-t border-borderLine p-2">
-          {/* User info — hidden when collapsed */}
+          {/* User card */}
           <div
             className={[
               'overflow-hidden transition-all duration-300 mb-1',
               collapsed ? 'lg:h-0 lg:opacity-0 lg:mb-0' : 'h-auto opacity-100',
             ].join(' ')}
           >
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-background">
-              <div className="w-7 h-7 rounded-full bg-brand-primary text-white font-bold flex items-center justify-center text-[10px] shrink-0">
+            <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-2 border border-borderLine">
+              <div className="w-8 h-8 rounded-full bg-brand-primary text-white font-bold flex items-center justify-center text-[10px] shrink-0 shadow-xs">
                 {footerInitials}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-textPrimary truncate">{footerDisplayName}</p>
-                <p className="text-[10px] text-brand-primary font-bold uppercase truncate">{role}</p>
+                <p className="text-xs font-semibold text-textPrimary truncate leading-snug">{footerDisplayName}</p>
+                <p className="text-[10px] text-brand-primary font-bold uppercase tracking-wider truncate">{role}</p>
               </div>
             </div>
           </div>
@@ -253,11 +259,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
             onClick={handleLogout}
             title="Log out"
             className={[
-              'w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors',
+              'w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-alert hover:bg-alert-soft transition-colors',
               collapsed ? 'lg:justify-center' : '',
             ].join(' ')}
           >
-            <LogOut className="w-[18px] h-[18px] shrink-0" />
+            <LogOut className="w-[17px] h-[17px] shrink-0" />
             <span className={collapsed ? 'lg:hidden' : ''}>Log out</span>
           </button>
         </div>

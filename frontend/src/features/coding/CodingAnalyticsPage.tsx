@@ -53,6 +53,7 @@ export const CodingAnalyticsPage: React.FC = () => {
   const [liveSnapshots, setLiveSnapshots] = useState<Record<string, { total: number; easy: number; medium: number; hard: number; rating: number }>>({});
   const [liveGhSnapshots, setLiveGhSnapshots] = useState<Record<string, { repos: number; stars: number; followers: number; topLang: string }>>({});
   const [loadingLive, setLoadingLive] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Fetch real students dynamically from Database Backend API
   const { data: students = [], isLoading, refetch } = useQuery({
@@ -104,7 +105,7 @@ export const CodingAnalyticsPage: React.FC = () => {
     if (uniqueStudents.length > 0) {
       loadLiveStats();
     }
-  }, [students]);
+  }, [students, refreshKey]);
 
   // Fetch real live GitHub stats for connected handles
   useEffect(() => {
@@ -138,7 +139,7 @@ export const CodingAnalyticsPage: React.FC = () => {
       loadGithubStats();
     }
     return () => { mounted = false; };
-  }, [students]);
+  }, [students, refreshKey]);
 
   // Map real database students to live analytics without any duplicate or hardcoded fake profiles
   const enrichedStudents: EnrichedStudent[] = uniqueStudents.map((s) => {
@@ -237,7 +238,7 @@ export const CodingAnalyticsPage: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={() => refetch()}
+          onClick={() => { refetch(); setRefreshKey(k => k + 1); }}
           className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-background hover:bg-surface border border-borderLine text-textSecondary text-xs font-semibold transition-all shrink-0"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading || loadingLive ? 'animate-spin' : ''}`} />
@@ -250,27 +251,31 @@ export const CodingAnalyticsPage: React.FC = () => {
         <StatCard
           icon={<GraduationCap className="w-5 h-5" />}
           iconBgColor="bg-brand-soft text-brand-primary"
+          accentColor="brand"
           label="Average CGPA"
           value={`${avgCgpa} / 10`}
-          subtext="CSE Program Average"
+          subtext="Data Science Program Average"
         />
         <StatCard
           icon={<Trophy className="w-5 h-5" />}
-          iconBgColor="bg-amber-50 text-amber-600"
+          iconBgColor="bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+          accentColor="amber"
           label="Top Contest Rating"
           value={topRating ? topRating : 'N/A'}
           subtext="Highest Verified Rating"
         />
         <StatCard
           icon={<Code2 className="w-5 h-5" />}
-          iconBgColor="bg-green-50 text-green-600"
+          iconBgColor="bg-success-soft text-success"
+          accentColor="success"
           label="Avg Problems Solved"
           value={totalSolvedAvg}
           subtext="Per linked coder"
         />
         <StatCard
-          icon={<Users className="w-5 h-5 text-indigo-600" />}
-          iconBgColor="bg-indigo-50"
+          icon={<Users className="w-5 h-5" />}
+          iconBgColor="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+          accentColor="indigo"
           label="Distinction Class (> 9.0)"
           value={`${distinctionCount} Students`}
           subtext="Academic Excellence"
@@ -278,37 +283,41 @@ export const CodingAnalyticsPage: React.FC = () => {
       </div>
 
       {/* Tab Switcher */}
-      <div className="flex border-b border-borderLine gap-6 text-sm font-semibold">
-        <button
-          onClick={() => setActiveTab('leetcode')}
-          className={`pb-3 flex items-center gap-2 transition-colors ${
-            activeTab === 'leetcode'
-              ? 'border-b-2 border-[#FFA116] text-[#FFA116]'
-              : 'text-textSecondary hover:text-textPrimary'
-          }`}
-        >
-          <span>⚡</span> LeetCode Rankings
-        </button>
-        <button
-          onClick={() => setActiveTab('github')}
-          className={`pb-3 flex items-center gap-2 transition-colors ${
-            activeTab === 'github'
-              ? 'border-b-2 border-textPrimary text-textPrimary'
-              : 'text-textSecondary hover:text-textPrimary'
-          }`}
-        >
-          <Github className="w-4 h-4" /> GitHub Rankings
-        </button>
-        <button
-          onClick={() => setActiveTab('cgpa')}
-          className={`pb-3 flex items-center gap-2 transition-colors ${
-            activeTab === 'cgpa'
-              ? 'border-b-2 border-[#5B4FE9] text-[#5B4FE9]'
-              : 'text-textSecondary hover:text-textPrimary'
-          }`}
-        >
-          <GraduationCap className="w-4 h-4" /> Academic CGPA Rankings
-        </button>
+      <div className="bg-surface border border-borderLine rounded-2xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <nav className="flex px-2 pt-2 pb-0 gap-1 border-b border-borderLine">
+            <button
+              onClick={() => setActiveTab('leetcode')}
+              className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all rounded-t-lg ${
+                activeTab === 'leetcode'
+                  ? 'border-[#FFA116] text-[#FFA116] bg-[#FFA116]/10'
+                  : 'border-transparent text-textSecondary hover:text-textPrimary hover:bg-surface-2'
+              }`}
+            >
+              <span>⚡</span> LeetCode Rankings
+            </button>
+            <button
+              onClick={() => setActiveTab('github')}
+              className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all rounded-t-lg ${
+                activeTab === 'github'
+                  ? 'border-textPrimary text-textPrimary bg-surface-2'
+                  : 'border-transparent text-textSecondary hover:text-textPrimary hover:bg-surface-2'
+              }`}
+            >
+              <Github className="w-3.5 h-3.5" /> GitHub Rankings
+            </button>
+            <button
+              onClick={() => setActiveTab('cgpa')}
+              className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all rounded-t-lg ${
+                activeTab === 'cgpa'
+                  ? 'border-brand-primary text-brand-primary bg-brand-soft'
+                  : 'border-transparent text-textSecondary hover:text-textPrimary hover:bg-surface-2'
+              }`}
+            >
+              <GraduationCap className="w-3.5 h-3.5" /> Academic CGPA Rankings
+            </button>
+          </nav>
+        </div>
       </div>
 
       {/* Filters */}
@@ -349,7 +358,7 @@ export const CodingAnalyticsPage: React.FC = () => {
 
       {/* ── LeetCode Table ── */}
       {activeTab === 'leetcode' && (
-        <div className="bg-surface border border-borderLine rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-surface border border-borderLine rounded-2xl shadow-xs overflow-hidden">
           <div className="px-5 py-4 border-b border-borderLine flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#FFA116' }}>
@@ -455,7 +464,7 @@ export const CodingAnalyticsPage: React.FC = () => {
 
       {/* ── GitHub Table ── */}
       {activeTab === 'github' && (
-        <div className="bg-surface border border-borderLine rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-surface border border-borderLine rounded-2xl shadow-xs overflow-hidden">
           <div className="px-5 py-4 border-b border-borderLine flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-textPrimary flex items-center justify-center">
               <Github className="w-4 h-4 text-surface" />
@@ -561,7 +570,7 @@ export const CodingAnalyticsPage: React.FC = () => {
 
       {/* ── CGPA Academic Table ── */}
       {activeTab === 'cgpa' && (
-        <div className="bg-surface border border-borderLine rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-surface border border-borderLine rounded-2xl shadow-xs overflow-hidden">
           <div className="px-5 py-4 border-b border-borderLine flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-[#5B4FE9] flex items-center justify-center text-white font-bold">
               <GraduationCap className="w-4 h-4" />

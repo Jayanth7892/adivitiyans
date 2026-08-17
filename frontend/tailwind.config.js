@@ -8,31 +8,71 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: 'var(--color-background)',
-        surface: 'var(--color-surface)',
-        borderLine: 'var(--color-borderLine)',
+        background:  'var(--color-background)',
+        surface:     'var(--color-surface)',
+        'surface-2': 'var(--color-surface-2)',
+        borderLine:  'var(--color-borderLine)',
+        borderStrong:'var(--color-borderStrong)',
+
         brand: {
           primary: 'var(--color-brand-primary)',
-          soft: 'var(--color-brand-soft)',
-          accent: '#F97316', // warm orange-red logo accent
+          hover:   'var(--color-brand-hover)',
+          soft:    'var(--color-brand-soft)',
+          subtle:  'var(--color-brand-subtle)',
+          accent:  '#F97316',
         },
+
         success: {
-          DEFAULT: '#16A34A',
-          soft: 'var(--color-success-soft)',
+          DEFAULT: 'var(--color-success)',
+          soft:    'var(--color-success-soft)',
         },
         alert: {
-          DEFAULT: '#DC2626',
-          soft: 'var(--color-alert-soft)',
+          DEFAULT: 'var(--color-alert)',
+          soft:    'var(--color-alert-soft)',
         },
-        textPrimary: 'var(--color-textPrimary)',
+        warning: {
+          DEFAULT: 'var(--color-warning)',
+          soft:    'var(--color-warning-soft)',
+        },
+
+        textPrimary:   'var(--color-textPrimary)',
         textSecondary: 'var(--color-textSecondary)',
+        textMuted:     'var(--color-textMuted)',
       },
+
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
+
+      fontSize: {
+        '2xs': ['0.65rem', { lineHeight: '1rem' }],
+      },
+
       borderRadius: {
-        'xl': '0.75rem',
+        'xl':  '0.75rem',
         '2xl': '1rem',
+        '3xl': '1.5rem',
+      },
+
+      boxShadow: {
+        xs:    'var(--shadow-xs)',
+        sm:    'var(--shadow-sm)',
+        DEFAULT: 'var(--shadow-md)',
+        md:    'var(--shadow-md)',
+        lg:    'var(--shadow-lg)',
+        xl:    'var(--shadow-xl)',
+        brand: 'var(--shadow-brand)',
+      },
+
+      spacing: {
+        '4.5': '1.125rem',
+        '13':  '3.25rem',
+        '15':  '3.75rem',
+        '18':  '4.5rem',
+      },
+
+      letterSpacing: {
+        widest: '0.15em',
       },
     },
   },

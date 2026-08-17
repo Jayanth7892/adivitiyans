@@ -577,335 +577,183 @@ export const HodDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* ── SLEEK EXECUTIVE HEADER ── */}
-      <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center shrink-0">
-            <Building2 className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-primary mb-1">
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span>{DEPARTMENT_NAME}</span>
-            </div>
-            <h1 className="text-xl font-bold text-textPrimary tracking-tight">HOD CSE(Data Science) Executive Dashboard</h1>
-            <p className="text-xs text-textSecondary">Real-time academic performance, student growth analytics, and directory</p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2.5 shrink-0 self-start md:self-auto">
-          <button
-            onClick={handleForceCronSync}
-            disabled={syncingCron}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-background border border-borderLine text-textPrimary text-xs font-bold shadow-sm hover:bg-surface transition-all"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-brand-primary ${syncingCron ? 'animate-spin' : ''}`} />
-            <span>{syncingCron ? 'Syncing...' : 'Sync Live Stats'}</span>
-          </button>
-
-          <button
-            onClick={() => setShowBulkImportModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-background border border-borderLine text-textPrimary text-xs font-bold shadow-sm hover:bg-surface transition-all"
-          >
-            <Upload className="w-3.5 h-3.5 text-brand-primary" />
-            <span>Bulk Import CSV</span>
-          </button>
-
-          <button
-            onClick={exportAnalyticsReport}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-primary text-white text-xs font-bold shadow-sm hover:bg-brand-primary/90 transition-all"
-          >
-            <Download className="w-4 h-4" />
-            <span>Export Department Report (CSV)</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ── UNIFIED FILTER ROW ── */}
-      <div className="bg-surface border border-borderLine rounded-2xl p-4 shadow-sm space-y-3">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Search Input */}
-          <div className="flex-1 flex items-center gap-2 px-3.5 py-2 rounded-xl border border-borderLine bg-background text-xs">
-            <Search className="w-4 h-4 text-textSecondary shrink-0" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search student by name or registration number..."
-              className="w-full bg-transparent focus:outline-none text-textPrimary"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="text-textSecondary hover:text-textPrimary">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Year Filter */}
-          <select
-            value={slicerYear}
-            onChange={(e) => setSlicerYear(e.target.value)}
-            className="px-3.5 py-2 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
-          >
-            <option value="All">All Academic Years</option>
-            {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-
-          {/* Section Filter */}
-          <select
-            value={slicerSection}
-            onChange={(e) => setSlicerSection(e.target.value)}
-            className="px-3.5 py-2 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
-          >
-            <option value="All">All Sections</option>
-            {SECTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-
-          {/* Standing Filter */}
-          <select
-            value={slicerStanding}
-            onChange={(e) => setSlicerStanding(e.target.value)}
-            className="px-3.5 py-2 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
-          >
-            <option value="All">All Academic Standings</option>
-            {STANDINGS.map((st) => <option key={st} value={st}>{st}</option>)}
-          </select>
-
-          {/* Reset Filters */}
-          {isFiltered && (
-            <button
-              onClick={resetAllFilters}
-              className="px-3 py-2 text-xs font-bold text-alert bg-alert/10 rounded-xl hover:bg-alert/20 transition-colors flex items-center gap-1 shrink-0"
-            >
-              <X className="w-3.5 h-3.5" /> Reset Filters
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── KEY PERFORMANCE INDICATOR CARDS ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={<Users className="w-5 h-5" />}
-          iconBgColor="bg-indigo-50 text-indigo-600"
-          label="Total Department Students"
-          value={`${summaryMetrics.count} Students`}
-          subtext={isFiltered ? 'Filtered dataset' : 'Enrolled in Data Science'}
-        />
-        <StatCard
-          icon={<GraduationCap className="w-5 h-5" />}
-          iconBgColor="bg-emerald-50 text-emerald-600"
-          label="Department Average CGPA"
-          value={`${summaryMetrics.avgCgpa} / 10`}
-          subtext="Overall cumulative GPA"
-        />
-        <StatCard
-          icon={<Trophy className="w-5 h-5" />}
-          iconBgColor="bg-amber-50 text-amber-600"
-          label="Distinction Rate"
-          value={summaryMetrics.distinctionRatio}
-          subtext="Students with >9.0 CGPA"
-        />
-        <StatCard
-          icon={<Code2 className="w-5 h-5" />}
-          iconBgColor="bg-[#FFA116]/10 text-[#FFA116]"
-          label="Avg LeetCode Solved"
-          value={`${summaryMetrics.avgLeetCode} Solved`}
-          subtext="Coding activity index"
-        />
-      </div>
-
       {/* ── TAB NAVIGATION ── */}
-      <div className="flex border-b border-borderLine space-x-6 text-sm font-semibold overflow-x-auto">
-        {[
-          { key: 'overview', label: '📊 Year-Wise Overview' },
-          { key: 'analytics', label: '📈 Academic Analytics' },
-          { key: 'placement', label: '🎯 Placement Eligibility Engine (T&P)' },
-          { key: 'students', label: '👨‍🎓 Student Directory & Inspection' },
-          { key: 'rankings', label: '🏆 Department Leaderboard' },
-          { key: 'mentees', label: `👤 My Mentees${hodMentees.length > 0 ? ` (${hodMentees.length})` : ''}` },
-          { key: 'settings', label: '⚙️ Account Settings' },
-        ].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key as any)}
-            className={`pb-3 transition-colors whitespace-nowrap ${
-              activeTab === t.key ? 'border-b-2 border-brand-primary text-brand-primary font-bold' : 'text-textSecondary hover:text-textPrimary'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="bg-surface border border-borderLine rounded-2xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <nav className="flex px-2 pt-2 pb-0 gap-1 border-b border-borderLine">
+            {[
+              { key: 'overview', label: '📊 Year-Wise Overview' },
+              { key: 'analytics', label: '📈 Academic Analytics' },
+              { key: 'placement', label: '🎯 Placement Eligibility Engine (T&P)' },
+              { key: 'students', label: '👨‍🎓 Student Directory & Inspection' },
+              { key: 'rankings', label: '🏆 Department Leaderboard' },
+              { key: 'mentees', label: `👤 My Mentees${hodMentees.length > 0 ? ` (${hodMentees.length})` : ''}` },
+              { key: 'settings', label: '⚙️ Account Settings' },
+            ].map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key as any)}
+                className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-bold border-b-2 whitespace-nowrap transition-all rounded-t-lg ${
+                  activeTab === t.key
+                    ? 'border-brand-primary text-brand-primary bg-brand-soft'
+                    : 'border-transparent text-textSecondary hover:text-textPrimary hover:bg-surface-2'
+                }`}
+              >
+                <span>{t.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
       </div>
 
-      {/* ── TAB: Placement Eligibility Engine ── */}
-      {activeTab === 'placement' && (
-        <PlacementEligibilitySection students={mergedStudentDataset} />
-      )}
-
-      {/* ── TAB: My Mentees (HOD as Mentor) ── */}
-      {activeTab === 'mentees' && (
-        <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <div>
-              <h3 className="text-base font-bold text-textPrimary">My Assigned Mentees</h3>
-              <p className="text-xs text-textSecondary">
-                {hodMentees.length > 0
-                  ? `${hodMentees.length} students assigned under you as mentor — grouped by academic year`
-                  : user?.email
-                    ? 'No mentees assigned yet. Upload a mentor assignment CSV from Admin panel.'
-                    : 'Loading...'}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-borderLine bg-background text-xs w-52">
-                <Search className="w-4 h-4 text-textSecondary shrink-0" />
-                <input type="text" value={menteeSearch} onChange={e => setMenteeSearch(e.target.value)}
-                  placeholder="Search name or roll no..." className="w-full bg-transparent focus:outline-none text-textPrimary" />
-              </div>
-              <select value={menteeYearFilter} onChange={e => setMenteeYearFilter(e.target.value)}
-                className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-medium">
-                <option value="">All Years</option>
-                {['4th Year','3rd Year','2nd Year','1st Year'].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {(() => {
-            const filtered = hodMentees.filter(m => {
-              const q = menteeSearch.toLowerCase();
-              const matchSearch = !q || (m.name || '').toLowerCase().includes(q) || m.roll_number.toLowerCase().includes(q);
-              const matchYear = !menteeYearFilter || m.year === menteeYearFilter;
-              return matchSearch && matchYear;
-            });
-            const YEAR_ORDER = ['4th Year','3rd Year','2nd Year','1st Year'];
-            // Unregistered students have no year — group them under 'Unregistered'
-            const groups = YEAR_ORDER.map(y => ({ year: y, list: filtered.filter(m => (m as any).registered !== false && m.year === y) })).filter(g => g.list.length > 0);
-            const unregistered = filtered.filter(m => (m as any).registered === false);
-            if (unregistered.length > 0) groups.push({ year: 'Unregistered', list: unregistered });
-            if (filtered.length === 0) return <p className="text-center text-textSecondary text-xs py-10">No mentees found.</p>;
-            return (
-              <div className="space-y-4">
-                {groups.map(({ year, list }) => {
-                  const isCollapsed = collapsedYears.has(year);
-                  const isUnregGroup = year === 'Unregistered';
-                  const atRisk = list.filter(m => Number((m as any).cgpa) > 0 && Number((m as any).cgpa) < 6.0).length;
-                  const validCgpa = list.filter(m => Number((m as any).cgpa) > 0);
-                  const avgCgpa = validCgpa.length > 0 ? (validCgpa.reduce((s,m) => s + Number((m as any).cgpa), 0) / validCgpa.length).toFixed(2) : '—';
-                  return (
-                    <div key={year} className="border border-borderLine rounded-xl overflow-hidden">
-                      <button onClick={() => toggleYear(year)} className={`w-full flex items-center justify-between px-4 py-3 transition-colors ${isUnregGroup ? 'bg-amber-50/50 hover:bg-amber-50' : 'bg-background hover:bg-brand-soft/10'}`}>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm font-bold text-textPrimary">{isUnregGroup ? '🕐 Not Yet Registered' : year}</span>
-                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${isUnregGroup ? 'bg-amber-100 text-amber-700' : 'bg-brand-soft text-brand-primary'}`}>{list.length} students</span>
-                          {!isUnregGroup && <span className="text-[11px] text-textSecondary">Avg CGPA: {avgCgpa}</span>}
-                          {atRisk > 0 && <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-600 font-semibold">⚠️ {atRisk} at risk</span>}
-                          {isUnregGroup && <span className="text-[11px] text-amber-600">Students assigned but not yet signed up</span>}
-                        </div>
-                        <span className="text-textSecondary text-sm">{isCollapsed ? '▶' : '▼'}</span>
-                      </button>
-                      {!isCollapsed && (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left border-collapse">
-                            <thead>
-                              <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
-                                <th className="py-3 px-4">Student</th>
-                                <th className="py-3 px-4">Roll No</th>
-                                <th className="py-3 px-4">Batch / Sec</th>
-                                <th className="py-3 px-4">CGPA</th>
-                                <th className="py-3 px-4">Standing</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-borderLine text-sm">
-                              {list.map(m => {
-                                const isReg = (m as any).registered !== false;
-
-                                // Not registered row
-                                if (!isReg) {
-                                  return (
-                                    <tr key={m.roll_number} className="bg-amber-50/30 hover:bg-amber-50/50 transition-colors">
-                                      <td className="py-3.5 px-4">
-                                        <div className="flex items-center gap-3">
-                                          <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 font-bold flex items-center justify-center text-xs">?</div>
-                                          <div>
-                                            <p className="font-semibold text-amber-700 leading-tight text-xs">Not Registered Yet</p>
-                                            <p className="text-[11px] text-amber-500">Student has not created an account</p>
-                                          </div>
-                                        </div>
-                                      </td>
-                                      <td className="py-3.5 px-4 font-bold text-amber-600 text-xs">{m.roll_number}</td>
-                                      <td className="py-3.5 px-4 text-xs text-textSecondary">—</td>
-                                      <td className="py-3.5 px-4 text-xs text-textSecondary">—</td>
-                                      <td className="py-3.5 px-4">
-                                        <span className="px-2.5 py-1 rounded-full text-xs font-bold border bg-amber-50 text-amber-600 border-amber-200">
-                                          🕐 Pending Registration
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  );
-                                }
-
-                                // Registered row
-                                const cgpa = Number((m as any).cgpa);
-                                const isAtRisk = cgpa > 0 && cgpa < 6.0;
-                                const initials = (m.name || '?').split(' ').map((n:string) => n[0]).join('');
-                                const standing = cgpa >= 9.0 ? 'Distinction' : cgpa >= 7.0 ? 'First Class' : cgpa >= 5.0 ? 'Second Class' : '—';
-                                return (
-                                  <tr key={m.roll_number}
-                                    className={`hover:bg-brand-soft/20 transition-colors cursor-pointer ${isAtRisk ? 'bg-red-50/30' : ''}`}
-                                    title="Click to view full student profile"
-                                    onClick={() => {
-                                      // Map StudentProfile-shaped mentee to HodStudentEntry so the inspect panel can load it
-                                      const entry: HodStudentEntry = mapStudentToHodEntry(m, 0);
-                                      setInspectStudent(entry);
-                                      setInspectTab('academics-graph');
-                                    }}
-                                  >
-                                    <td className="py-3.5 px-4">
-                                      <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs ${isAtRisk ? 'bg-red-100 text-red-600' : 'bg-brand-primary text-white'}`}>{initials}</div>
-                                        <div>
-                                          <p className="font-semibold text-textPrimary leading-tight">{isAtRisk && <span title="CGPA below 6.0">⚠️ </span>}{m.name}</p>
-                                          <p className="text-[11px] text-textSecondary">{m.email}</p>
-                                        </div>
-                                      </div>
-                                    </td>
-                                    <td className="py-3.5 px-4 font-bold text-brand-primary text-xs">{m.roll_number}</td>
-                                    <td className="py-3.5 px-4 text-xs">{(m as any).batch} • Sec {m.section}</td>
-                                    <td className="py-3.5 px-4 text-sm font-bold">{cgpa > 0 ? cgpa.toFixed(2) : '—'}</td>
-                                    <td className="py-3.5 px-4">
-                                      <div className="flex items-center gap-2">
-                                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
-                                          standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                          standing === 'First Class' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                          standing === 'Second Class' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                          'bg-background text-textSecondary border-borderLine'
-                                        }`}>{standing}</span>
-                                        <Eye className="w-3.5 h-3.5 text-textSecondary opacity-50" />
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
-      {/* ── TAB 1: Year-Wise Overview ── */}
+      {/* ── TAB 1: Department Overview ── */}
       {activeTab === 'overview' && (
         <div className="space-y-6">
+          {/* ── SLEEK EXECUTIVE HEADER ── */}
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center shrink-0">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-primary mb-1">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>{DEPARTMENT_NAME}</span>
+                </div>
+                <h1 className="text-xl font-bold text-textPrimary tracking-tight">HOD CSE(Data Science) Executive Dashboard</h1>
+                <p className="text-xs text-textSecondary">Real-time academic performance, student growth analytics, and directory</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5 shrink-0 self-start md:self-auto">
+              <button
+                onClick={handleForceCronSync}
+                disabled={syncingCron}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-background border border-borderLine text-textPrimary text-xs font-bold shadow-sm hover:bg-surface transition-all"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-brand-primary ${syncingCron ? 'animate-spin' : ''}`} />
+                <span>{syncingCron ? 'Syncing...' : 'Sync Live Stats'}</span>
+              </button>
+
+              <button
+                onClick={() => setShowBulkImportModal(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-background border border-borderLine text-textPrimary text-xs font-bold shadow-sm hover:bg-surface transition-all"
+              >
+                <Upload className="w-3.5 h-3.5 text-brand-primary" />
+                <span>Bulk Import CSV</span>
+              </button>
+
+              <button
+                onClick={exportAnalyticsReport}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-primary text-white text-xs font-bold shadow-sm hover:bg-brand-primary/90 transition-all"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export Department Report (CSV)</span>
+              </button>
+            </div>
+          </div>
+          {/* ── UNIFIED FILTER ROW ── */}
+          <div className="bg-surface border border-borderLine rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              {/* Search Input */}
+              <div className="flex-1 flex items-center gap-2 px-3.5 py-2 rounded-xl border border-borderLine bg-background text-xs">
+                <Search className="w-4 h-4 text-textSecondary shrink-0" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search student by name or registration number..."
+                  className="w-full bg-transparent focus:outline-none text-textPrimary"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="text-textSecondary hover:text-textPrimary">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Year Filter */}
+              <select
+                value={slicerYear}
+                onChange={(e) => setSlicerYear(e.target.value)}
+                className="px-3.5 py-2 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              >
+                <option value="All">All Academic Years</option>
+                {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+              </select>
+
+              {/* Section Filter */}
+              <select
+                value={slicerSection}
+                onChange={(e) => setSlicerSection(e.target.value)}
+                className="px-3.5 py-2 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              >
+                <option value="All">All Sections</option>
+                {SECTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+
+              {/* Standing Filter */}
+              <select
+                value={slicerStanding}
+                onChange={(e) => setSlicerStanding(e.target.value)}
+                className="px-3.5 py-2 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              >
+                <option value="All">All Academic Standings</option>
+                {STANDINGS.map((st) => <option key={st} value={st}>{st}</option>)}
+              </select>
+
+              {/* Reset Filters */}
+              {isFiltered && (
+                <button
+                  onClick={resetAllFilters}
+                  className="px-3 py-2 text-xs font-bold text-alert bg-alert/10 rounded-xl hover:bg-alert/20 transition-colors flex items-center gap-1 shrink-0"
+                >
+                  <X className="w-3.5 h-3.5" /> Reset Filters
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* ── KEY PERFORMANCE INDICATOR CARDS ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              icon={<Users className="w-5 h-5" />}
+              iconBgColor="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+              accentColor="indigo"
+              label="Total Department Students"
+              value={`${summaryMetrics.count} Students`}
+              subtext={isFiltered ? 'Filtered dataset' : 'Enrolled in Data Science'}
+            />
+            <StatCard
+              icon={<GraduationCap className="w-5 h-5" />}
+              iconBgColor="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+              accentColor="success"
+              label="Department Average CGPA"
+              value={`${summaryMetrics.avgCgpa} / 10`}
+              subtext="Overall cumulative GPA"
+            />
+            <StatCard
+              icon={<Trophy className="w-5 h-5" />}
+              iconBgColor="bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+              accentColor="amber"
+              label="Distinction Rate"
+              value={summaryMetrics.distinctionRatio}
+              subtext="Students with >9.0 CGPA"
+            />
+            <StatCard
+              icon={<Code2 className="w-5 h-5" />}
+              iconBgColor="bg-[#FFA116]/10 text-[#FFA116]"
+              accentColor="brand"
+              label="Avg LeetCode Solved"
+              value={`${summaryMetrics.avgLeetCode} Solved`}
+              subtext="Coding activity index"
+            />
+          </div>
+
+          {/* Year-Wise CGPA Breakdown Table */}
           <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
             <div className="mb-4">
-              <h3 className="text-base font-bold text-textPrimary">CSE Department Year-Wise CGPA Breakdown</h3>
+              <h3 className="text-base font-bold text-textPrimary">Data Science Department Year-Wise CGPA Breakdown</h3>
               <p className="text-xs text-textSecondary">Academic standing distribution across 1st to 4th year batches</p>
             </div>
             <div className="overflow-x-auto">
@@ -937,6 +785,46 @@ export const HodDashboardPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-textSecondary">{y.secondClass} Students</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Section-Wise CGPA Breakdown Table */}
+          <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
+            <div className="mb-4">
+              <h3 className="text-base font-bold text-textPrimary">Section-Wise CGPA Breakdown</h3>
+              <p className="text-xs text-textSecondary">Average CGPA and academic standing distribution across department sections</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
+                    <th className="py-3 px-4">Section</th>
+                    <th className="py-3 px-4">Enrolled Students</th>
+                    <th className="py-3 px-4">Avg CGPA</th>
+                    <th className="py-3 px-4">Distinction (&gt; 9.0)</th>
+                    <th className="py-3 px-4">First Class (8.0–9.0)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-borderLine text-sm">
+                  {sectionCgpaSummary.map((s) => (
+                    <tr key={s.section} className="hover:bg-background/50 transition-colors">
+                      <td className="py-3.5 px-4 font-bold text-textPrimary">{s.section}</td>
+                      <td className="py-3.5 px-4 text-textSecondary">{s.students} Students</td>
+                      <td className="py-3.5 px-4 font-extrabold text-brand-primary">{s.avgCgpa > 0 ? s.avgCgpa : '—'}</td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">
+                          {s.distinction} Students
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-brand-soft text-brand-primary">
+                          {s.firstClass} Students
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1053,14 +941,69 @@ export const HodDashboardPage: React.FC = () => {
       {/* ── TAB 3: Student Directory & 360 Inspection ── */}
       {activeTab === 'students' && (
         <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h3 className="text-base font-bold text-textPrimary">Student Directory & 360° Inspection</h3>
               <p className="text-xs text-textSecondary">Click "Inspect Profile" on any student to view their complete academic growth and coding stats</p>
             </div>
-            <span className="text-xs font-bold text-brand-primary bg-brand-soft px-3 py-1 rounded-full border border-brand-primary/20">
+            <span className="text-xs font-bold text-brand-primary bg-brand-soft px-3 py-1 rounded-full border border-brand-primary/20 shrink-0 self-start md:self-auto">
               Showing {filteredDataset.length} Students
             </span>
+          </div>
+
+          {/* Directory Search & Filters */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+            <div className="flex-1 flex items-center gap-2 px-3.5 py-2 rounded-xl border border-borderLine bg-background text-xs">
+              <Search className="w-4 h-4 text-textSecondary shrink-0" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search student by name or registration number..."
+                className="w-full bg-transparent focus:outline-none text-textPrimary"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="text-textSecondary hover:text-textPrimary">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <select
+              value={slicerYear}
+              onChange={(e) => setSlicerYear(e.target.value)}
+              className="px-3.5 py-2 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            >
+              <option value="All">All Academic Years</option>
+              {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+
+            <select
+              value={slicerSection}
+              onChange={(e) => setSlicerSection(e.target.value)}
+              className="px-3.5 py-2 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            >
+              <option value="All">All Sections</option>
+              {SECTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+
+            <select
+              value={slicerStanding}
+              onChange={(e) => setSlicerStanding(e.target.value)}
+              className="px-3.5 py-2 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-primary"
+            >
+              <option value="All">All Standings</option>
+              {STANDINGS.map((st) => <option key={st} value={st}>{st}</option>)}
+            </select>
+
+            {isFiltered && (
+              <button
+                onClick={resetAllFilters}
+                className="px-3 py-2 text-xs font-bold text-alert bg-alert/10 rounded-xl hover:bg-alert/20 transition-colors flex items-center gap-1 shrink-0"
+              >
+                <X className="w-3.5 h-3.5" /> Reset
+              </button>
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -1212,6 +1155,202 @@ export const HodDashboardPage: React.FC = () => {
                 ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── TAB: Placement Eligibility Engine (T&P Drive) ── */}
+      {activeTab === 'placement' && (
+        <PlacementEligibilitySection students={filteredDataset} />
+      )}
+
+      {/* ── TAB: My Mentees ── */}
+      {activeTab === 'mentees' && (
+        <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-base font-bold text-textPrimary">My Assigned Mentees</h3>
+              <p className="text-xs text-textSecondary">
+                {hodMentees.length > 0
+                  ? `${hodMentees.length} students assigned under you as mentor — grouped by academic year`
+                  : user?.email
+                    ? 'No mentees assigned yet. Upload a mentor assignment CSV from Admin panel.'
+                    : 'Loading...'}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-borderLine bg-background text-xs w-52">
+                <Search className="w-4 h-4 text-textSecondary shrink-0" />
+                <input
+                  type="text"
+                  value={menteeSearch}
+                  onChange={(e) => setMenteeSearch(e.target.value)}
+                  placeholder="Search name or roll no..."
+                  className="w-full bg-transparent focus:outline-none text-textPrimary"
+                />
+              </div>
+              <select
+                value={menteeYearFilter}
+                onChange={(e) => setMenteeYearFilter(e.target.value)}
+                className="px-3 py-1.5 text-xs rounded-xl border border-borderLine bg-background text-textPrimary font-semibold"
+              >
+                <option value="">All Years</option>
+                {['4th Year', '3rd Year', '2nd Year', '1st Year'].map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {(() => {
+            const filtered = hodMentees.filter((m: any) => {
+              const q = menteeSearch.toLowerCase();
+              const matchSearch = !q || (m.name || '').toLowerCase().includes(q) || m.roll_number.toLowerCase().includes(q);
+              const matchYear = !menteeYearFilter || m.year === menteeYearFilter;
+              return matchSearch && matchYear;
+            });
+            const YEAR_ORDER = ['4th Year', '3rd Year', '2nd Year', '1st Year'];
+            const groups = YEAR_ORDER.map((y) => ({
+              year: y,
+              list: filtered.filter((m: any) => (m as any).registered !== false && m.year === y),
+            })).filter((g) => g.list.length > 0);
+            const unregistered = filtered.filter((m: any) => (m as any).registered === false);
+            if (unregistered.length > 0) groups.push({ year: 'Unregistered', list: unregistered });
+
+            if (filtered.length === 0) {
+              return <p className="text-center text-textSecondary text-xs py-10">No mentees found matching your criteria.</p>;
+            }
+
+            return (
+              <div className="space-y-4">
+                {groups.map(({ year, list }) => {
+                  const isCollapsed = collapsedYears.has(year);
+                  const isUnregGroup = year === 'Unregistered';
+                  const atRisk = list.filter((m: any) => Number(m.cgpa) > 0 && Number(m.cgpa) < 6.0).length;
+                  const validCgpa = list.filter((m: any) => Number(m.cgpa) > 0);
+                  const avgCgpa = validCgpa.length > 0 ? (validCgpa.reduce((s: number, m: any) => s + Number(m.cgpa), 0) / validCgpa.length).toFixed(2) : '—';
+                  return (
+                    <div key={year} className="border border-borderLine rounded-2xl overflow-hidden">
+                      <button
+                        onClick={() => toggleYear(year)}
+                        className={`w-full flex items-center justify-between px-4 py-3 transition-colors ${
+                          isUnregGroup ? 'bg-amber-50/50 hover:bg-amber-50 dark:bg-amber-950/20' : 'bg-background hover:bg-brand-soft/10'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm font-bold text-textPrimary">{isUnregGroup ? '🕐 Not Yet Registered' : year}</span>
+                          <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold ${isUnregGroup ? 'bg-amber-100 text-amber-700' : 'bg-brand-soft text-brand-primary'}`}>
+                            {list.length} students
+                          </span>
+                          {!isUnregGroup && <span className="text-[11px] font-semibold text-textSecondary">Avg CGPA: {avgCgpa}</span>}
+                          {atRisk > 0 && (
+                            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-red-50 text-red-600 font-bold border border-red-200">
+                              ⚠️ {atRisk} at risk
+                            </span>
+                          )}
+                          {isUnregGroup && <span className="text-[11px] text-amber-600">Students assigned but not yet signed up</span>}
+                        </div>
+                        <span className="text-textSecondary text-sm font-bold">{isCollapsed ? '▶' : '▼'}</span>
+                      </button>
+
+                      {!isCollapsed && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
+                                <th className="py-3 px-4">Student</th>
+                                <th className="py-3 px-4">Roll No</th>
+                                <th className="py-3 px-4">Batch / Sec</th>
+                                <th className="py-3 px-4">CGPA</th>
+                                <th className="py-3 px-4">Standing</th>
+                                <th className="py-3 px-4 text-right">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-borderLine text-sm">
+                              {list.map((m: any) => {
+                                const isReg = m.registered !== false;
+                                if (!isReg) {
+                                  return (
+                                    <tr key={m.roll_number} className="bg-amber-50/20 hover:bg-amber-50/40 transition-colors">
+                                      <td className="py-3.5 px-4">
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 font-bold flex items-center justify-center text-xs">?</div>
+                                          <div>
+                                            <p className="font-semibold text-amber-700 leading-tight text-xs">Not Registered Yet</p>
+                                            <p className="text-[11px] text-amber-500">Student has not created an account</p>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="py-3.5 px-4 font-bold text-amber-600 text-xs font-mono">{m.roll_number}</td>
+                                      <td className="py-3.5 px-4 text-xs text-textSecondary">—</td>
+                                      <td className="py-3.5 px-4 text-xs text-textSecondary">—</td>
+                                      <td className="py-3.5 px-4">
+                                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-600 border border-amber-200">
+                                          🕐 Pending Registration
+                                        </span>
+                                      </td>
+                                      <td className="py-3.5 px-4 text-right">—</td>
+                                    </tr>
+                                  );
+                                }
+
+                                const cgpa = Number(m.cgpa);
+                                const isAtRisk = cgpa > 0 && cgpa < 6.0;
+                                const initials = (m.name || '?').split(' ').map((n: string) => n[0]).join('');
+                                const standing = cgpa >= 9.0 ? 'Distinction' : cgpa >= 7.0 ? 'First Class' : cgpa >= 5.0 ? 'Second Class' : 'Pass';
+
+                                return (
+                                  <tr
+                                    key={m.roll_number}
+                                    className={`hover:bg-background/80 transition-colors ${isAtRisk ? 'bg-red-50/20' : ''}`}
+                                  >
+                                    <td className="py-3.5 px-4">
+                                      <div className="flex items-center gap-3">
+                                        <div className={`w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs ${isAtRisk ? 'bg-red-100 text-red-600' : 'bg-brand-primary text-white'}`}>
+                                          {initials}
+                                        </div>
+                                        <div>
+                                          <p className="font-semibold text-textPrimary leading-tight">
+                                            {isAtRisk && <span title="CGPA below 6.0">⚠️ </span>}{m.name}
+                                          </p>
+                                          <p className="text-[11px] text-textSecondary">{m.email}</p>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="py-3.5 px-4 font-bold text-brand-primary text-xs font-mono">{m.roll_number}</td>
+                                    <td className="py-3.5 px-4 text-xs text-textSecondary">{m.batch || '2023-2027'} • Sec {m.section || 'A'}</td>
+                                    <td className="py-3.5 px-4 text-sm font-extrabold text-brand-primary">{cgpa > 0 ? cgpa.toFixed(2) : '—'}</td>
+                                    <td className="py-3.5 px-4">
+                                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                        standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700' : 'bg-brand-soft text-brand-primary'
+                                      }`}>
+                                        {standing}
+                                      </span>
+                                    </td>
+                                    <td className="py-3.5 px-4 text-right">
+                                      <button
+                                        onClick={() => {
+                                          setInspectStudent(mapStudentToHodEntry(m, 0));
+                                          setInspectTab('academics-graph');
+                                        }}
+                                        className="px-3 py-1.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:bg-brand-primary/90 transition-all inline-flex items-center gap-1.5 shadow-sm"
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                        <span>Inspect Profile</span>
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
