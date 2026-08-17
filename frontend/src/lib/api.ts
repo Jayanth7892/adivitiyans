@@ -395,7 +395,7 @@ export const api = {
   },
 
   // Upload mentor assignment CSV rows
-  uploadMentorAssignments: async (rows: { roll1: string; roll2?: string; facultyName: string }[]): Promise<any> => {
+  uploadMentorAssignments: async (rows: { rolls: string[]; facultyName: string }[]): Promise<any> => {
     return fetchWithAuth(`/mentor-assignments/upload`, {
       method: 'POST',
       body: JSON.stringify({ rows }),

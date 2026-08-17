@@ -3000,9 +3000,19 @@ app.delete('/mentor-assignments/:facultyId/:rollNumber', requireRole('admin'), a
 // POST /mentor-assignments/upload — Bulk assign students to faculty mentors from CSV data
 app.post('/mentor-assignments/upload', requireRole('admin'), async (req: Request, res: Response) => {
   try {
-    type AssignRow = { roll1: string; roll2?: string; facultyName: string };
-    const rows: AssignRow[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
-    if (rows.length === 0) return res.status(400).json({ error: 'rows array is required and must be non-empty' });
+    type AssignRow = { rolls: string[]; facultyName: string };
+    const rawRows: any[] = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    if (rawRows.length === 0) return res.status(400).json({ error: 'rows array is required and must be non-empty' });
+
+    // Normalize rows: support both new { rolls[], facultyName } and legacy { roll1, roll2?, facultyName }
+    const rows: AssignRow[] = rawRows.map((r: any) => ({
+      rolls: Array.isArray(r.rolls)
+        ? r.rolls.filter(Boolean).map((x: string) => String(x).trim().toUpperCase())
+        : [r.roll1, r.roll2].filter(Boolean).map((x: string) => String(x).trim().toUpperCase()),
+      facultyName: String(r.facultyName || '').trim(),
+    })).filter(r => r.rolls.length > 0 && r.facultyName);
+
+    if (rows.length === 0) return res.status(400).json({ error: 'No valid assignment rows after normalization' });
 
     const updated: string[] = [];
     const notFoundRolls: string[] = [];
@@ -3076,7 +3086,7 @@ app.post('/mentor-assignments/upload', requireRole('admin'), async (req: Request
       const facId = facultyCache[normalize(row.facultyName.trim())];
       if (!facId) continue;
 
-      const rolls = [row.roll1, row.roll2].filter(Boolean) as string[];
+      const rolls = row.rolls;
       for (const roll of rolls) {
         const cleanRoll = roll.trim().toUpperCase();
         if (!cleanRoll) continue;

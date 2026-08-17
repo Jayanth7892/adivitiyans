@@ -162,7 +162,7 @@ export const AdminDashboardPage: React.FC = () => {
 
   // CSV Mentor Assignment state
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvPreview, setCsvPreview] = useState<{ roll1: string; roll2?: string; facultyName: string }[]>([]);
+  const [csvPreview, setCsvPreview] = useState<{ rolls: string[]; facultyName: string }[]>([]);
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvResult, setCsvResult] = useState<any | null>(null);
   const [csvError, setCsvError] = useState('');
@@ -421,25 +421,57 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   // CSV Mentor Assignment handlers
-  const parseCSV = (text: string): { roll1: string; roll2?: string; facultyName: string }[] => {
+  const parseCSV = (text: string): { rolls: string[]; facultyName: string }[] => {
     const lines = text.split(/\r?\n/).filter(l => l.trim());
-    const parsed: { roll1: string; roll2?: string; facultyName: string }[] = [];
+    const parsed: { rolls: string[]; facultyName: string }[] = [];
+
+    /**
+     * Matches RGMCET-style roll numbers in any reasonable format:
+     *   24091A32A3  24091A32E9  24091A32J7  23091A3251  20091A0588
+     * Pattern: 5 digits + 1 letter + rest (2-5 alphanumeric chars), total 8-11 chars.
+     */
+    const isRollNo = (val: string) =>
+      /^\d{5}[A-Za-z][A-Za-z0-9]{2,5}$/.test(val.trim());
+
+    /**
+     * Auto-detect column separator:
+     *   1. Comma  -> standard CSV
+     *   2. Tab    -> TSV / Excel "Save as Tab"
+     *   3. 2+ spaces -> Excel copy-paste space-padded table
+     */
+    const splitLine = (line: string): string[] => {
+      if (line.includes(',')) return line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+      if (line.includes('\t')) return line.split('\t').map(c => c.trim().replace(/^"|"$/g, ''));
+      return line.split(/\s{2,}/).map(c => c.trim());
+    };
+
+    // Recognise any common column header label so header rows are skipped
+    const isHeaderLabel = (v: string) =>
+      /^(regd?\s*no\.?|reg\s*no\.?|roll(\s*(no\.?|number))?|s\.?\s*no\.?|mentor[s]?|faculty|name)$/i.test(v.trim());
+
     for (const line of lines) {
-      const sep = line.includes(',') ? ',' : '\t';
-      const cols = line.split(sep).map(c => c.trim().replace(/^"|"$/g, ''));
-      if (cols.length < 3) continue;
-      const roll1 = cols[1]?.trim().toUpperCase();
-      if (!roll1 || !/^\d{2}0\d{2}[A-Z0-9]{3,7}$/i.test(roll1)) continue;
-      let roll2 = '';
+      const cols = splitLine(line);
+      if (cols.length < 2) continue;
+
+      const rolls: string[] = [];
       let facultyName = '';
-      if (cols[2] && /^\d{2}0\d{2}[A-Z0-9]{3,7}$/i.test(cols[2].trim())) {
-        roll2 = cols[2].trim().toUpperCase();
-        facultyName = cols[3]?.trim() || '';
-      } else {
-        facultyName = cols[2]?.trim() || '';
+
+      for (const col of cols) {
+        const v = col.trim();
+        if (!v) continue;
+        if (isRollNo(v)) {
+          rolls.push(v.toUpperCase());
+        } else if (!/^\d+$/.test(v)) {
+          // Non-numeric, non-roll text -> faculty name candidate (last one wins)
+          facultyName = v;
+        }
       }
-      if (!facultyName || /^\d+$/.test(facultyName)) continue;
-      parsed.push({ roll1, ...(roll2 ? { roll2 } : {}), facultyName });
+
+      // Skip rows with no rolls, no name, or where the "name" is actually a header label
+      if (rolls.length === 0 || !facultyName) continue;
+      if (isHeaderLabel(facultyName)) continue;
+
+      parsed.push({ rolls, facultyName });
     }
     return parsed;
   };
@@ -832,7 +864,10 @@ export const AdminDashboardPage: React.FC = () => {
           <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
             <div className="mb-4">
               <h3 className="text-base font-bold text-textPrimary">Upload Mentor Assignment CSV</h3>
-              <p className="text-xs text-textSecondary mt-0.5">Format: S.No | Roll 1 | Roll 2 (optional) | Faculty Name | PS No (optional)</p>
+              <p className="text-xs text-textSecondary mt-0.5">
+                Format: <span className="font-mono bg-background px-1 rounded">S.No | Regd No.1 | Regd No.2 | Regd No.3 (If present) | Mentor Name</span>
+                &nbsp;— any number of reg. number columns, tab or comma separated
+              </p>
             </div>
 
             {/* Drop zone */}
@@ -865,34 +900,45 @@ export const AdminDashboardPage: React.FC = () => {
             {csvPreview.length > 0 && (
               <div className="mt-4">
                 <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                  <p className="text-xs font-semibold text-textPrimary">{csvPreview.length} rows parsed</p>
+                  <p className="text-xs font-semibold text-textPrimary">
+                    {csvPreview.length} rows parsed &nbsp;·&nbsp;
+                    {csvPreview.reduce((sum, r) => sum + r.rolls.length, 0)} students total
+                  </p>
                   <div className="flex flex-wrap gap-1.5">
                     {[...new Set(csvPreview.map(r => r.facultyName))].map(name => (
                       <span key={name} className="text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
-                        {name} → {csvPreview.filter(r => r.facultyName === name).length} rows
+                        {name} → {csvPreview.filter(r => r.facultyName === name).reduce((s, r) => s + r.rolls.length, 0)} students
                       </span>
                     ))}
                   </div>
                 </div>
-                <div className="max-h-44 overflow-y-auto border border-borderLine rounded-lg">
+                <div className="max-h-52 overflow-y-auto border border-borderLine rounded-lg">
                   <table className="w-full text-xs">
                     <thead className="bg-background border-b border-borderLine sticky top-0">
                       <tr>
-                        <th className="px-3 py-2 text-left font-semibold">Roll 1</th>
-                        <th className="px-3 py-2 text-left font-semibold">Roll 2</th>
-                        <th className="px-3 py-2 text-left font-semibold">Faculty Name</th>
+                        <th className="px-3 py-2 text-left font-semibold">#</th>
+                        <th className="px-3 py-2 text-left font-semibold">Registration Numbers</th>
+                        <th className="px-3 py-2 text-left font-semibold">Mentor Name</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-borderLine">
-                      {csvPreview.slice(0, 12).map((row, i) => (
+                      {csvPreview.slice(0, 20).map((row, i) => (
                         <tr key={i} className="hover:bg-background/50">
-                          <td className="px-3 py-1.5 font-mono font-bold text-brand-primary">{row.roll1}</td>
-                          <td className="px-3 py-1.5 font-mono text-textSecondary">{row.roll2 || '—'}</td>
-                          <td className="px-3 py-1.5 text-textPrimary">{row.facultyName}</td>
+                          <td className="px-3 py-1.5 text-textSecondary">{i + 1}</td>
+                          <td className="px-3 py-1.5">
+                            <div className="flex flex-wrap gap-1">
+                              {row.rolls.map((roll, ri) => (
+                                <span key={ri} className="font-mono font-bold text-brand-primary bg-brand-soft px-1.5 py-0.5 rounded text-[10px]">
+                                  {roll}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-3 py-1.5 text-textPrimary font-medium">{row.facultyName}</td>
                         </tr>
                       ))}
-                      {csvPreview.length > 12 && (
-                        <tr><td colSpan={3} className="px-3 py-1.5 text-center text-textSecondary">+ {csvPreview.length - 12} more rows</td></tr>
+                      {csvPreview.length > 20 && (
+                        <tr><td colSpan={3} className="px-3 py-1.5 text-center text-textSecondary">+ {csvPreview.length - 20} more rows</td></tr>
                       )}
                     </tbody>
                   </table>

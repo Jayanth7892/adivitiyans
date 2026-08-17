@@ -48,47 +48,7 @@ const CODING_LEVELS = ['All Coders', 'Top Coders (>300 LC)', 'Active GitHub (>20
 // HOD Department context
 const DEPARTMENT_NAME = 'CSE(Data Science)';
 
-// Enhanced Student Directory dataset for fallback when API data is empty
-const FULL_CSE_STUDENTS = [
-  { rank: 1, name: 'Jayanth Kumar', regNo: '23091A3251', email: 'jayanth@rgmcet.edu.in', section: 'Sec A', year: '3rd Year', cgpa: 9.45, semGpas: [8.80, 8.95, 9.15, 9.30, 9.45], leetcode: 412, isLcLinked: true, github: 42, isGhLinked: true, standing: 'Distinction', placementStatus: 'Placed (18 LPA)' },
-  { rank: 2, name: 'Ananya Sharma', regNo: '23091A3252', email: 'ananya@rgmcet.edu.in', section: 'Sec B', year: '3rd Year', cgpa: 9.30, semGpas: [8.70, 8.85, 9.05, 9.20, 9.30], leetcode: 378, isLcLinked: true, github: 28, isGhLinked: true, standing: 'Distinction', placementStatus: 'Interview Ready' },
-  { rank: 3, name: 'Vikram Reddy', regNo: '20091A0588', email: 'vikram@rgmcet.edu.in', section: 'Sec A', year: '4th Year', cgpa: 9.25, semGpas: [8.60, 8.80, 9.00, 9.15, 9.25, 9.30, 9.25], leetcode: 450, isLcLinked: true, github: 48, isGhLinked: true, standing: 'Distinction', placementStatus: 'Placed (16 LPA)' },
-  { rank: 4, name: 'Sneha Patel', regNo: '24091A0512', email: 'sneha@rgmcet.edu.in', section: 'Sec C', year: '2nd Year', cgpa: 9.10, semGpas: [8.90, 9.00, 9.10], leetcode: 295, isLcLinked: true, github: 18, isGhLinked: true, standing: 'Distinction', placementStatus: 'Training Ongoing' },
-  { rank: 5, name: 'Karthik Raja', regNo: '21091A0544', email: 'karthik@rgmcet.edu.in', section: 'Sec B', year: '4th Year', cgpa: 9.05, semGpas: [8.50, 8.70, 8.85, 8.95, 9.00, 9.05], leetcode: 380, isLcLinked: true, github: 32, isGhLinked: true, standing: 'Distinction', placementStatus: 'Placed (14 LPA)' },
-  { rank: 6, name: 'Priya Nair', regNo: '23091A3256', email: 'priya@rgmcet.edu.in', section: 'Sec A', year: '3rd Year', cgpa: 8.90, semGpas: [8.40, 8.60, 8.75, 8.85, 8.90], leetcode: 310, isLcLinked: true, github: 22, isGhLinked: true, standing: 'First Class', placementStatus: 'Interview Ready' },
-  { rank: 7, name: 'Arjun Singh', regNo: '24091A0590', email: 'arjun@rgmcet.edu.in', section: 'Sec B', year: '2nd Year', cgpa: 8.85, semGpas: [8.60, 8.75, 8.85], leetcode: 240, isLcLinked: true, github: 15, isGhLinked: true, standing: 'First Class', placementStatus: 'Training Ongoing' },
-  { rank: 8, name: 'Rohan Gupta', regNo: '25091A0501', email: 'rohan@rgmcet.edu.in', section: 'Sec A', year: '1st Year', cgpa: 8.80, semGpas: [8.80], leetcode: 160, isLcLinked: true, github: 10, isGhLinked: true, standing: 'First Class', placementStatus: 'Foundational Phase' },
-  { rank: 9, name: 'Divya Sri', regNo: '23091A3260', email: 'divya@rgmcet.edu.in', section: 'Sec C', year: '3rd Year', cgpa: 8.75, semGpas: [8.20, 8.40, 8.60, 8.70, 8.75], leetcode: 280, isLcLinked: true, github: 19, isGhLinked: true, standing: 'First Class', placementStatus: 'Interview Ready' },
-  { rank: 10, name: 'Manish Kumar', regNo: '24091A0545', email: 'manish@rgmcet.edu.in', section: 'Sec A', year: '2nd Year', cgpa: 8.65, semGpas: [8.30, 8.50, 8.65], leetcode: 210, isLcLinked: true, github: 14, isGhLinked: true, standing: 'First Class', placementStatus: 'Training Ongoing' },
-  { rank: 11, name: 'Bhavana Reddy', regNo: '21091A0518', email: 'bhavana@rgmcet.edu.in', section: 'Sec C', year: '4th Year', cgpa: 8.50, semGpas: [8.10, 8.25, 8.35, 8.45, 8.50], leetcode: 230, isLcLinked: true, github: 16, isGhLinked: true, standing: 'First Class', placementStatus: 'Placed (10 LPA)' },
-  { rank: 12, name: 'Siddharth Rao', regNo: '25091A0530', email: 'siddharth@rgmcet.edu.in', section: 'Sec B', year: '1st Year', cgpa: 8.40, semGpas: [8.40], leetcode: 120, isLcLinked: true, github: 8, isGhLinked: true, standing: 'First Class', placementStatus: 'Foundational Phase' },
-];
 
-// Year-Wise Academic Distribution Summary
-const YEAR_CGPA_SUMMARY = [
-  { year: '1st Year', avgCgpa: 8.85, students: 120, distinction: 42, firstClass: 55, secondClass: 18 },
-  { year: '2nd Year', avgCgpa: 8.95, students: 115, distinction: 45, firstClass: 50, secondClass: 15 },
-  { year: '3rd Year', avgCgpa: 9.12, students: 125, distinction: 54, firstClass: 55, secondClass: 13 },
-  { year: '4th Year', avgCgpa: 9.25, students: 110, distinction: 52, firstClass: 46, secondClass: 10 },
-];
-
-// Semester Progression Data — Year Batches across Semesters
-const SEMESTER_PROGRESSION_DATA = [
-  { semester: 'Sem 1', Year1: 8.85, Year2: 8.70, Year3: 8.60, Year4: 8.80 },
-  { semester: 'Sem 2', Year1: 8.90, Year2: 8.80, Year3: 8.75, Year4: 8.95 },
-  { semester: 'Sem 3', Year1: null, Year2: 8.95, Year3: 8.90, Year4: 9.05 },
-  { semester: 'Sem 4', Year1: null, Year2: 9.00, Year3: 9.05, Year4: 9.15 },
-  { semester: 'Sem 5', Year1: null, Year2: null, Year3: 9.12, Year4: 9.20 },
-  { semester: 'Sem 6', Year1: null, Year2: null, Year3: 9.20, Year4: 9.25 },
-  { semester: 'Sem 7', Year1: null, Year2: null, Year3: null, Year4: 9.30 },
-];
-
-// Section-Wise Breakdown (Sec A, Sec B, Sec C)
-const SECTION_CGPA_SUMMARY = [
-  { section: 'Section A', avgCgpa: 9.15, students: 155, distinction: 68, firstClass: 72 },
-  { section: 'Section B', avgCgpa: 9.02, students: 160, distinction: 64, firstClass: 78 },
-  { section: 'Section C', avgCgpa: 8.95, students: 155, distinction: 61, firstClass: 76 },
-];
 
 interface HodStudentEntry {
   rank: number;
@@ -333,13 +293,8 @@ export const HodDashboardPage: React.FC = () => {
         return mapStudentToHodEntry(s, idx, liveSolved);
       });
     } else {
-      dataset = FULL_CSE_STUDENTS.map((s, idx) => ({
-        ...s,
-        leetcodeHandle: 'demo',
-        isLcLinked: true,
-        githubHandle: 'demo',
-        isGhLinked: true,
-      }));
+      // No real students yet — return empty dataset (no fake fallback)
+      dataset = [];
     }
     return dataset.map((s, idx) => ({ ...s, rank: idx + 1 }));
   }, [students, liveSnapshots]);

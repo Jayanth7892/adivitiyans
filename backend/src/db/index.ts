@@ -87,17 +87,8 @@ const mockPlacementStore = new Map<string, any>();
 if (USE_MOCK) {
   console.log('[DB] Running in MOCK mode (USE_MOCK=true). No database connection.');
 
-  const SAMPLE_STUDENTS = [
-    {
-      roll_number: '23091A3251', name: 'Jayanth Kumar', email: 'jayanth@rgmcet.edu.in',
-      year: '', phone: '', address: '',
-      native_place: '', department: '', batch: '', section: '',
-      hostel_day_scholar: '', driving_license: false, passport: false,
-      relocation_willingness: false, family_business: '',
-      financial_background: '', faculty_mentor_id: 'FAC001',
-      linkedin_url: '',
-    },
-  ];
+  const SAMPLE_STUDENTS: any[] = [];
+
 
   SAMPLE_STUDENTS.forEach((s) => {
     mockStudentsStore.set(s.roll_number, s);
