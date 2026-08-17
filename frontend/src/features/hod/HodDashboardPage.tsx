@@ -1203,6 +1203,74 @@ export const HodDashboardPage: React.FC = () => {
         </div>
       )}
 
+      {/* ── TAB: Placement Eligibility Engine (T&P Drive) ── */}
+      {activeTab === 'placement' && (
+        <PlacementEligibilitySection students={filteredDataset} />
+      )}
+
+      {/* ── TAB: My Mentees ── */}
+      {activeTab === 'mentees' && (
+        <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-base font-bold text-textPrimary">My Mentees Directory ({hodMentees.length})</h3>
+              <p className="text-xs text-textSecondary">Students assigned directly under your mentorship</p>
+            </div>
+            <span className="text-xs font-bold text-brand-primary bg-brand-soft px-3 py-1 rounded-full border border-brand-primary/20 shrink-0 self-start md:self-auto">
+              {hodMentees.length} Mentees Assigned
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-borderLine bg-background text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
+                  <th className="py-3 px-4">Student Name</th>
+                  <th className="py-3 px-4">Reg Number</th>
+                  <th className="py-3 px-4">Year & Sec</th>
+                  <th className="py-3 px-4">CGPA</th>
+                  <th className="py-3 px-4">LeetCode</th>
+                  <th className="py-3 px-4">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-borderLine text-sm">
+                {hodMentees.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-textSecondary text-xs">
+                      No mentees currently assigned to your profile. Mentees can be assigned via Admin Faculty Management or CSV upload.
+                    </td>
+                  </tr>
+                ) : (
+                  hodMentees.map((m: any) => (
+                    <tr key={m.roll_number} className="hover:bg-background/50 transition-colors">
+                      <td className="py-3 px-4 font-bold text-textPrimary">{m.name}</td>
+                      <td className="py-3 px-4 font-mono text-xs text-brand-primary">{m.roll_number}</td>
+                      <td className="py-3 px-4 text-xs text-textSecondary">{m.year || '3rd Year'} • {m.section || 'Sec A'}</td>
+                      <td className="py-3 px-4 font-black text-brand-primary">{m.cgpa ? `${m.cgpa} CGPA` : '—'}</td>
+                      <td className="py-3 px-4 text-xs font-bold text-[#FFA116]">
+                        {m.leetcode_solved ? `${m.leetcode_solved} Solved` : (m.leetcode_handle ? 'Linked' : 'Not Linked')}
+                      </td>
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => {
+                            setInspectStudent(mapStudentToHodEntry(m, 0));
+                            setInspectTab('academics-graph');
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:bg-brand-primary/90 transition-all inline-flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Inspect Profile</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ── 360° STUDENT INSPECTION MODAL DRAWER ── */}
       {inspectStudent && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
