@@ -23,8 +23,9 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      staleTime: 0,
-      refetchOnMount: 'always',
+      staleTime: 2 * 60 * 1000, // 2 minutes cache to avoid redundant API/Lambda calls on tab switching
+      refetchOnMount: false,
+      retry: 1,
     },
   },
 });

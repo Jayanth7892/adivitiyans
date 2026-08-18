@@ -3,7 +3,7 @@ import cors from 'cors';
 import serverless from 'serverless-http';
 import { db } from '../db';
 import { calculateEmployabilityScore } from '../services/employability';
-import { runCodingProfileCronSync } from '../services/cronSync';
+import { runCodingProfileCronSync, fetchLeetCodeStatsDirect, fetchGitHubStatsDirect } from '../services/cronSync';
 import { cachedFetch } from '../services/platformCache';
 import { deleteCognitoUsers, deleteAllCognitoUsers } from '../services/cognitoService';
 import {
@@ -1735,69 +1735,47 @@ app.post('/students/:id/coding-profiles', requireOwnerOrRole('id', 'faculty', 'h
        validated.repositories_count, validated.commits_count, validated.prs_merged]
     );
 
-    // If platform is LeetCode, touch student record
-    if (validated.platform === 'LeetCode') {
-      await db.query(
-        'UPDATE students SET updated_at = CURRENT_TIMESTAMP WHERE UPPER(roll_number) = $1',
-        [studentId]
-      ).catch(() => {});
+    // If platform is LeetCode, immediately fetch real stats from LeetCode GraphQL in background
+    if (validated.platform === 'LeetCode' && validated.handle && validated.handle !== 'Not Linked') {
+      (async () => {
+        try {
+          const lcData = await fetchLeetCodeStatsDirect(validated.handle);
+          if (lcData) {
+            await db.query(
+              `UPDATE coding_profiles
+               SET score_rating = $1, easy_count = $2, medium_count = $3, hard_count = $4,
+                   streak = COALESCE($5, streak), updated_at = CURRENT_TIMESTAMP
+               WHERE student_id = $6 AND LOWER(platform) = 'leetcode'`,
+              [lcData.solved, lcData.easy, lcData.medium, lcData.hard, lcData.streak || 0, studentId]
+            ).catch(() => {});
+            await db.query('UPDATE students SET updated_at = CURRENT_TIMESTAMP WHERE UPPER(roll_number) = $1', [studentId]).catch(() => {});
+            console.log(`[LeetCode Sync] ${validated.handle} -> ${lcData.solved} solved (E:${lcData.easy}, M:${lcData.medium}, H:${lcData.hard})`);
+          }
+        } catch (e: any) {
+          console.warn(`[LeetCode Sync] Failed for ${validated.handle}:`, e.message);
+        }
+      })();
     }
 
     // If platform is GitHub, immediately fetch stats from GitHub API in background
     if (validated.platform === 'GitHub' && validated.handle && validated.handle !== 'Not Linked') {
-      const cleanHandle = validated.handle.replace(/^@/, '').trim();
-      if (cleanHandle) {
-        // Fire-and-forget: fetch GitHub user + repo list and write real stats
-        (async () => {
-          try {
-            const https = require('https');
-            const fetchJson = (url: string): Promise<any> => new Promise((resolve, reject) => {
-              const r = https.get(url, { headers: { 'User-Agent': 'Advitiyans-App' } }, (res: any) => {
-                let d = '';
-                res.on('data', (c: any) => (d += c));
-                res.on('end', () => {
-                  try {
-                    if (res.statusCode >= 200 && res.statusCode < 300) resolve(JSON.parse(d));
-                    else reject(new Error(`HTTP ${res.statusCode}`));
-                  } catch (e) { reject(e); }
-                });
-              });
-              r.on('error', reject);
-              r.setTimeout(8000, () => { r.destroy(); reject(new Error('timeout')); });
-            });
-
-            const user = await fetchJson(`https://api.github.com/users/${cleanHandle}`);
-            if (user && typeof user.public_repos === 'number') {
-              const repos: number = user.public_repos;
-              const followers: number = user.followers || 0;
-              let stars = 0;
-              let topLanguage = '';
-              try {
-                const repoList: any[] = await fetchJson(`https://api.github.com/users/${cleanHandle}/repos?per_page=100&sort=pushed`);
-                if (Array.isArray(repoList)) {
-                  stars = repoList.reduce((sum: number, r: any) => sum + (r.stargazers_count || 0), 0);
-                  const langCounts: Record<string, number> = {};
-                  for (const r of repoList) {
-                    if (r.language) langCounts[r.language] = (langCounts[r.language] || 0) + 1;
-                  }
-                  topLanguage = Object.entries(langCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-                }
-              } catch { /* repos fetch failed, still save user stats */ }
-
-              await db.query(
-                `UPDATE coding_profiles
-                 SET repositories_count = $1, followers_count = $2, stars_count = $3,
-                     top_language = $4, updated_at = CURRENT_TIMESTAMP
-                 WHERE student_id = $5 AND LOWER(platform) = 'github'`,
-                [repos, followers, stars, topLanguage, studentId]
-              ).catch(() => {});
-              console.log(`[GitHub Sync] ${cleanHandle}: repos=${repos}, stars=${stars}, followers=${followers}, lang=${topLanguage}`);
-            }
-          } catch (e: any) {
-            console.warn(`[GitHub Sync] Failed for ${cleanHandle}:`, e.message);
+      (async () => {
+        try {
+          const ghData = await fetchGitHubStatsDirect(validated.handle);
+          if (ghData) {
+            await db.query(
+              `UPDATE coding_profiles
+               SET repositories_count = $1, followers_count = $2, stars_count = $3,
+                   top_language = $4, updated_at = CURRENT_TIMESTAMP
+               WHERE student_id = $5 AND LOWER(platform) = 'github'`,
+              [ghData.repos, ghData.followers, ghData.stars, ghData.topLanguage, studentId]
+            ).catch(() => {});
+            console.log(`[GitHub Sync] ${validated.handle}: repos=${ghData.repos}, stars=${ghData.stars}, followers=${ghData.followers}, lang=${ghData.topLanguage}`);
           }
-        })();
-      }
+        } catch (e: any) {
+          console.warn(`[GitHub Sync] Failed for ${validated.handle}:`, e.message);
+        }
+      })();
     }
 
     const result = await db.query(
@@ -1807,6 +1785,17 @@ app.post('/students/:id/coding-profiles', requireOwnerOrRole('id', 'faculty', 'h
     res.json({ message: 'Coding profile updated', profiles: result.rows });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /admin/sync-coding-profiles — Admin/HOD triggers batch sync for student coding profiles
+app.post('/admin/sync-coding-profiles', requireRole('admin', 'hod'), async (req: Request, res: Response) => {
+  try {
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+    const result = await runCodingProfileCronSync(limit);
+    res.json({ success: true, result });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -16,7 +16,7 @@ import { api } from '../lib/api';
 // but is cleared when the tab is closed. Users must log in again in a new tab.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SESSION_POLL_INTERVAL_MS = 30_000; // 30 seconds
+const SESSION_POLL_INTERVAL_MS = 180_000; // 3 minutes (reduced from 30s to prevent unnecessary Lambda usage)
 
 // All auth keys stored in sessionStorage (tab-isolated)
 const AUTH_USER_KEY      = 'advitiyans_auth_user';
@@ -43,12 +43,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [sessionKickedOut, setSessionKickedOut] = useState(false);
 
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const visibilityListenerRef = useRef<(() => void) | null>(null);
 
-  // ── Stop background poll ──────────────────────────────────────────────────
+  // ── Stop background poll & visibility listeners ────────────────────────────
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
       clearInterval(pollTimerRef.current);
       pollTimerRef.current = null;
+    }
+    if (visibilityListenerRef.current) {
+      document.removeEventListener('visibilitychange', visibilityListenerRef.current);
+      visibilityListenerRef.current = null;
     }
   }, []);
 
@@ -66,17 +71,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [stopPolling]);
 
-  // ── Poll backend to check this session is still the active one ────────────
+  // ── Smart visibility-aware session polling ────────────────────────────────
   const startPolling = useCallback((email: string, token: string) => {
     stopPolling();
-    pollTimerRef.current = setInterval(async () => {
+
+    const checkSession = async () => {
+      if (document.visibilityState !== 'visible') return;
       const result = await api.validateSession(email, token);
-      // Only force-logout if another device has actively superseded this session.
-      // Ignore 'no_session' (race on registration) and 'session_expired' (network/db issue).
       if (!result.valid && result.reason === 'session_superseded') {
         forceLogout('session_superseded');
       }
-    }, SESSION_POLL_INTERVAL_MS);
+    };
+
+    // Start interval if tab is currently visible
+    if (document.visibilityState === 'visible') {
+      pollTimerRef.current = setInterval(checkSession, SESSION_POLL_INTERVAL_MS);
+    }
+
+    // Pause polling when browser tab is minimized/hidden to save Lambda invocations
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkSession();
+        if (!pollTimerRef.current) {
+          pollTimerRef.current = setInterval(checkSession, SESSION_POLL_INTERVAL_MS);
+        }
+      } else {
+        if (pollTimerRef.current) {
+          clearInterval(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
+      }
+    };
+
+    visibilityListenerRef.current = handleVisibilityChange;
+    document.addEventListener('visibilitychange', handleVisibilityChange);
   }, [stopPolling, forceLogout]);
 
   // ── Register this tab's login as the active session in the backend ─────────
