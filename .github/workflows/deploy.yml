@@ -53,4 +53,6 @@ jobs:
           HOD_MASTER_PASS: ${{ secrets.HOD_MASTER_PASS }}
           ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
           FACULTY_SECRET_KEY: ${{ secrets.FACULTY_SECRET_KEY }}
+          GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
         run: ./deploy.sh
+

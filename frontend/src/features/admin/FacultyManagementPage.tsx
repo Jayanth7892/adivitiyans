@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
-import { Search, Mail, Pencil, Link, Trash2, AlertTriangle, Users, Check, X, ShieldAlert, UserCheck } from 'lucide-react';
+import { Search, Mail, Pencil, Link, Trash2, AlertTriangle, Users, Check, X, ShieldAlert, UserCheck, RefreshCw, UserPlus } from 'lucide-react';
+import { AddMenteeModal } from './components/AddMenteeModal';
 
 interface FacultyRow {
   faculty_id: string;
@@ -10,6 +11,10 @@ interface FacultyRow {
   department: string;
   role: string;
   mentee_count: number;
+  year1_count?: number;
+  year2_count?: number;
+  year3_count?: number;
+  year4_count?: number;
 }
 
 interface MenteeRow {
@@ -31,6 +36,7 @@ interface BlockedEmail {
 export default function FacultyManagementPage() {
   const qc = useQueryClient();
   const [selectedFaculty, setSelectedFaculty] = useState<FacultyRow | null>(null);
+  const [showAddMenteeModal, setShowAddMenteeModal] = useState(false);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [linkEmailId, setLinkEmailId] = useState<string | null>(null);
@@ -90,6 +96,20 @@ export default function FacultyManagementPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['facultyMenteeDetail', selectedFaculty?.faculty_id] }),
   });
 
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+  const syncMut = useMutation({
+    mutationFn: () => api.syncMentorAssignments(),
+    onSuccess: (data) => {
+      setSyncResult(data.message);
+      qc.invalidateQueries({ queryKey: ['adminFaculty'] });
+      setTimeout(() => setSyncResult(null), 6000);
+    },
+    onError: (e: any) => setSyncResult(`Sync failed: ${e.message}`),
+  });
+
+  // Detect unlinked faculty with mentees (possible duplicates or orphaned records)
+  const unlinkedWithMentees = faculty.filter(f => f.email?.startsWith('pending_') && (f.mentee_count ?? 0) > 0);
+
   const filtered = faculty.filter(f =>
     (f.name || '').toLowerCase().includes(search.toLowerCase()) ||
     (f.email || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -111,18 +131,61 @@ export default function FacultyManagementPage() {
             {faculty.length} faculty members — select a row to view assigned mentees
           </p>
         </div>
-        <button
-          onClick={() => setShowBlocked(p => !p)}
-          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-xs font-bold transition-colors ${
-            showBlocked
-              ? 'bg-alert border-alert text-white'
-              : 'bg-surface border-alert/50 text-alert hover:bg-alert-soft'
-          }`}
-        >
-          <ShieldAlert className="w-3.5 h-3.5" />
-          <span>{showBlocked ? 'Hide' : 'Show'} Blocked Emails</span>
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          {/* Sync button: reconciles mentor_assignments ↔ students.faculty_mentor_id */}
+          <button
+            id="sync-mentor-assignments-btn"
+            onClick={() => syncMut.mutate()}
+            disabled={syncMut.isPending}
+            title="Reconcile mentor_assignments table with students.faculty_mentor_id"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-brand-primary/40 bg-brand-soft text-brand-primary text-xs font-bold hover:bg-brand-primary hover:text-white transition-colors disabled:opacity-60"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncMut.isPending ? 'animate-spin' : ''}`} />
+            <span>{syncMut.isPending ? 'Syncing…' : 'Sync Assignments'}</span>
+          </button>
+          <button
+            onClick={() => setShowBlocked(p => !p)}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-xs font-bold transition-colors ${
+              showBlocked
+                ? 'bg-alert border-alert text-white'
+                : 'bg-surface border-alert/50 text-alert hover:bg-alert-soft'
+            }`}
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>{showBlocked ? 'Hide' : 'Show'} Blocked Emails</span>
+          </button>
+        </div>
       </div>
+
+      {/* Sync result toast */}
+      {syncResult && (
+        <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-semibold ${
+          syncResult.startsWith('Sync failed')
+            ? 'bg-alert-soft border-alert/40 text-alert'
+            : 'bg-success-soft border-success/40 text-success'
+        }`}>
+          <RefreshCw className="w-3.5 h-3.5" />
+          {syncResult}
+        </div>
+      )}
+
+      {/* Unlinked-with-mentees warning banner */}
+      {unlinkedWithMentees.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300/60 rounded-2xl p-4 flex gap-3 items-start shadow-xs">
+          <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+              {unlinkedWithMentees.length} unlinked faculty record{unlinkedWithMentees.length > 1 ? 's' : ''} with mentees assigned
+            </p>
+            <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-0.5">
+              These records were auto-created from CSV but don't have a real email linked yet.
+              Faculty cannot log in until you click <strong>Link Email</strong> on their row.
+              Records: {unlinkedWithMentees.map(f => f.name).join(', ')}
+            </p>
+          </div>
+        </div>
+      )}
+
 
       {/* Blocked Emails panel */}
       {showBlocked && (
@@ -215,9 +278,42 @@ export default function FacultyManagementPage() {
                         )}
                         <div className="text-[11px] text-textSecondary mt-0.5">{f.faculty_id}</div>
                       </div>
-                      <span className="bg-brand-soft text-brand-primary rounded-full px-2.5 py-0.5 text-[10px] font-bold whitespace-nowrap">
-                        {f.mentee_count ?? 0} mentees
-                      </span>
+                      {/* Mentee count badge with year breakdown */}
+                      <div className="flex flex-col items-end gap-0.5 shrink-0">
+                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold whitespace-nowrap ${
+                          !isLinked && (f.mentee_count ?? 0) > 0
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 ring-1 ring-amber-300'
+                            : 'bg-brand-soft text-brand-primary'
+                        }`}>
+                          {f.mentee_count ?? 0} mentees
+                          {!isLinked && (f.mentee_count ?? 0) > 0 && ' ⚠️'}
+                        </span>
+                        {/* Year mini-pills — only shown when mentees exist */}
+                        {(f.mentee_count ?? 0) > 0 && (
+                          <div className="flex gap-1 flex-wrap justify-end">
+                            {(f.year4_count ?? 0) > 0 && (
+                              <span className="rounded-full px-1.5 py-px text-[9px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">
+                                4th:{f.year4_count}
+                              </span>
+                            )}
+                            {(f.year3_count ?? 0) > 0 && (
+                              <span className="rounded-full px-1.5 py-px text-[9px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">
+                                3rd:{f.year3_count}
+                              </span>
+                            )}
+                            {(f.year2_count ?? 0) > 0 && (
+                              <span className="rounded-full px-1.5 py-px text-[9px] font-bold bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400">
+                                2nd:{f.year2_count}
+                              </span>
+                            )}
+                            {(f.year1_count ?? 0) > 0 && (
+                              <span className="rounded-full px-1.5 py-px text-[9px] font-bold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400">
+                                1st:{f.year1_count}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="mt-1.5">
@@ -311,12 +407,47 @@ export default function FacultyManagementPage() {
             </div>
           ) : (
             <>
-              <div className="px-5 py-4 border-b border-borderLine bg-surface-2">
-                <h3 className="text-sm font-bold text-textPrimary">{selectedFaculty.name}</h3>
-                <p className="text-xs text-textMuted mt-0.5">
-                  {selectedFaculty.faculty_id} &middot; {mentees.length} assigned mentees
-                </p>
+              <div className="px-5 py-4 border-b border-borderLine bg-surface-2 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-textPrimary">{selectedFaculty.name}</h3>
+                  <p className="text-xs text-textMuted mt-0.5">
+                    {selectedFaculty.faculty_id} &middot; {mentees.length} assigned mentees
+                  </p>
+                </div>
+                <button
+                  id="admin-add-mentees-btn"
+                  onClick={() => setShowAddMenteeModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-primary text-white text-xs font-bold hover:bg-brand-hover shadow-xs transition-colors shrink-0"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Add Mentees</span>
+                </button>
               </div>
+              {/* Year breakdown bar */}
+              {mentees.length > 0 && !menteesLoading && (() => {
+                const yr4 = mentees.filter(m => m.year === '4th Year').length;
+                const yr3 = mentees.filter(m => m.year === '3rd Year').length;
+                const yr2 = mentees.filter(m => m.year === '2nd Year').length;
+                const yr1 = mentees.filter(m => m.year === '1st Year').length;
+                const total = mentees.length || 1;
+                return (
+                  <div className="px-5 pt-3 pb-2">
+                    <div className="text-[10px] font-semibold text-textSecondary mb-1.5 uppercase tracking-wide">Mentees by Year</div>
+                    <div className="flex h-2.5 rounded-full overflow-hidden gap-px">
+                      {yr4 > 0 && <div className="bg-green-500" style={{ width: `${(yr4/total)*100}%` }} title={`4th Year: ${yr4}`} />}
+                      {yr3 > 0 && <div className="bg-blue-500" style={{ width: `${(yr3/total)*100}%` }} title={`3rd Year: ${yr3}`} />}
+                      {yr2 > 0 && <div className="bg-orange-500" style={{ width: `${(yr2/total)*100}%` }} title={`2nd Year: ${yr2}`} />}
+                      {yr1 > 0 && <div className="bg-yellow-400" style={{ width: `${(yr1/total)*100}%` }} title={`1st Year: ${yr1}`} />}
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                      {yr4 > 0 && <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">4th: {yr4}</span>}
+                      {yr3 > 0 && <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">3rd: {yr3}</span>}
+                      {yr2 > 0 && <span className="text-[10px] text-orange-600 dark:text-orange-400 font-semibold">2nd: {yr2}</span>}
+                      {yr1 > 0 && <span className="text-[10px] text-yellow-600 dark:text-yellow-400 font-semibold">1st: {yr1}</span>}
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="overflow-y-auto flex-1">
                 {menteesLoading
                   ? <div className="p-10 text-center text-textSecondary text-sm">Loading mentees...</div>
@@ -358,6 +489,19 @@ export default function FacultyManagementPage() {
         </div>
 
       </div>
+
+      {/* Add Mentee Modal (Admin Only) */}
+      <AddMenteeModal
+        isOpen={showAddMenteeModal}
+        onClose={() => setShowAddMenteeModal(false)}
+        faculty={selectedFaculty}
+        onSuccess={() => {
+          qc.invalidateQueries({ queryKey: ['adminFaculty'] });
+          if (selectedFaculty) {
+            qc.invalidateQueries({ queryKey: ['facultyMenteeDetail', selectedFaculty.faculty_id] });
+          }
+        }}
+      />
     </div>
   );
 }

@@ -262,6 +262,7 @@ export class AdvitiyansStack extends cdk.Stack {
         ADMIN_SECRET: process.env.ADMIN_SECRET || '',
         // Faculty registration security key — required for faculty/HOD self-registration
         FACULTY_SECRET_KEY: process.env.FACULTY_SECRET_KEY || '',
+        GITHUB_PAT: process.env.GITHUB_PAT || '',
         BUILD_TIMESTAMP: new Date().toISOString(),
       },
     });

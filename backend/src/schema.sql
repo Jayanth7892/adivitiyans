@@ -174,6 +174,15 @@ CREATE TABLE IF NOT EXISTS user_sessions (
     expires_at TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP + INTERVAL '24 hours')
 );
 
+-- 12. Mentor Assignments — source of truth for faculty–student mentor relationships.
+-- One mentor per student (PRIMARY KEY on roll_number).
+-- Admin uploads a CSV → rows inserted here; faculty dashboard reads from here.
+CREATE TABLE IF NOT EXISTS mentor_assignments (
+    roll_number  VARCHAR(10) NOT NULL PRIMARY KEY REFERENCES students(roll_number) ON DELETE CASCADE,
+    faculty_id   VARCHAR(50) NOT NULL REFERENCES faculty(faculty_id) ON DELETE CASCADE,
+    assigned_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_students_dept_batch ON students(department, batch);
 CREATE INDEX IF NOT EXISTS idx_students_email ON students(email);

@@ -89,6 +89,19 @@ export const FacultyDashboardPage: React.FC = () => {
     return (withCgpa.reduce((s: number, m: any) => s + Number(m.cgpa), 0) / withCgpa.length).toFixed(2);
   }, [mentees]);
 
+  // Year-wise breakdown — comes from API response via yearBreakdown property attached to the array
+  const yearBreakdown = useMemo(() => {
+    const bd = (mentees as any).yearBreakdown;
+    if (bd) return bd as Record<string, number>;
+    // Fallback: compute locally
+    return {
+      '1st Year': mentees.filter((m: any) => m.year === '1st Year').length,
+      '2nd Year': mentees.filter((m: any) => m.year === '2nd Year').length,
+      '3rd Year': mentees.filter((m: any) => m.year === '3rd Year').length,
+      '4th Year': mentees.filter((m: any) => m.year === '4th Year').length,
+    };
+  }, [mentees]);
+
   // Queries for inspected mentee sub-resources
   const menteeId = inspectMentee?.roll_number || '';
   const { data: inspectAcademics = [] } = useQuery({
@@ -225,39 +238,105 @@ export const FacultyDashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stat Cards — Total + Year Breakdown + Top GPA */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {/* Total Mentees */}
         <StatCard
           icon={<Users className="w-5 h-5" />}
           iconBgColor="bg-brand-soft text-brand-primary"
           accentColor="brand"
-          label="Assigned Mentees"
+          label="Total Mentees"
           value={mentees.length}
           subtext="Under your guidance"
         />
-        <StatCard
-          icon={<BookOpen className="w-5 h-5" />}
-          iconBgColor="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
-          accentColor="indigo"
-          label="Department Avg GPA"
-          value={realAvgGpa || deptReport?.avgGpa || '—'}
-          subtext="Computed from mentee records"
-        />
-        <StatCard
-          icon={<TrendingUp className="w-5 h-5" />}
-          iconBgColor="bg-success-soft text-success"
-          accentColor="success"
-          label="Avg Academic Score"
-          value={`${deptReport?.avgEmployabilityScore || 88.5} / 100`}
-          subtext="High performance standing"
-        />
+        {/* 1st Year */}
+        <div
+          role="button"
+          tabIndex={0}
+          title="Click to filter 1st Year mentees"
+          onClick={() => setYearFilter(prev => prev === '1st Year' ? '' : '1st Year')}
+          onKeyDown={e => e.key === 'Enter' && setYearFilter(prev => prev === '1st Year' ? '' : '1st Year')}
+          className={`cursor-pointer rounded-xl transition-all ring-2 ${
+            yearFilter === '1st Year' ? 'ring-yellow-400 scale-[1.03]' : 'ring-transparent hover:ring-yellow-200'
+          }`}
+        >
+          <StatCard
+            icon={<BookOpen className="w-5 h-5" />}
+            iconBgColor="bg-yellow-50 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400"
+            accentColor="amber"
+            label="1st Year"
+            value={yearBreakdown['1st Year'] ?? 0}
+            subtext={yearFilter === '1st Year' ? '▶ Filtered' : 'Click to filter'}
+          />
+        </div>
+        {/* 2nd Year */}
+        <div
+          role="button"
+          tabIndex={0}
+          title="Click to filter 2nd Year mentees"
+          onClick={() => setYearFilter(prev => prev === '2nd Year' ? '' : '2nd Year')}
+          onKeyDown={e => e.key === 'Enter' && setYearFilter(prev => prev === '2nd Year' ? '' : '2nd Year')}
+          className={`cursor-pointer rounded-xl transition-all ring-2 ${
+            yearFilter === '2nd Year' ? 'ring-orange-400 scale-[1.03]' : 'ring-transparent hover:ring-orange-200'
+          }`}
+        >
+          <StatCard
+            icon={<BookOpen className="w-5 h-5" />}
+            iconBgColor="bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
+            accentColor="amber"
+            label="2nd Year"
+            value={yearBreakdown['2nd Year'] ?? 0}
+            subtext={yearFilter === '2nd Year' ? '▶ Filtered' : 'Click to filter'}
+          />
+        </div>
+        {/* 3rd Year */}
+        <div
+          role="button"
+          tabIndex={0}
+          title="Click to filter 3rd Year mentees"
+          onClick={() => setYearFilter(prev => prev === '3rd Year' ? '' : '3rd Year')}
+          onKeyDown={e => e.key === 'Enter' && setYearFilter(prev => prev === '3rd Year' ? '' : '3rd Year')}
+          className={`cursor-pointer rounded-xl transition-all ring-2 ${
+            yearFilter === '3rd Year' ? 'ring-blue-400 scale-[1.03]' : 'ring-transparent hover:ring-blue-200'
+          }`}
+        >
+          <StatCard
+            icon={<BookOpen className="w-5 h-5" />}
+            iconBgColor="bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+            accentColor="indigo"
+            label="3rd Year"
+            value={yearBreakdown['3rd Year'] ?? 0}
+            subtext={yearFilter === '3rd Year' ? '▶ Filtered' : 'Click to filter'}
+          />
+        </div>
+        {/* 4th Year */}
+        <div
+          role="button"
+          tabIndex={0}
+          title="Click to filter 4th Year mentees"
+          onClick={() => setYearFilter(prev => prev === '4th Year' ? '' : '4th Year')}
+          onKeyDown={e => e.key === 'Enter' && setYearFilter(prev => prev === '4th Year' ? '' : '4th Year')}
+          className={`cursor-pointer rounded-xl transition-all ring-2 ${
+            yearFilter === '4th Year' ? 'ring-green-400 scale-[1.03]' : 'ring-transparent hover:ring-green-200'
+          }`}
+        >
+          <StatCard
+            icon={<BookOpen className="w-5 h-5" />}
+            iconBgColor="bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+            accentColor="success"
+            label="4th Year"
+            value={yearBreakdown['4th Year'] ?? 0}
+            subtext={yearFilter === '4th Year' ? '▶ Filtered' : 'Click to filter'}
+          />
+        </div>
+        {/* Top GPA */}
         <StatCard
           icon={<Award className="w-5 h-5" />}
           iconBgColor="bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
           accentColor="amber"
-          label="Top Standing (9.0+)"
+          label="Top GPA (9.0+)"
           value={topStandingCount}
-          subtext={`Out of ${mentees.length} mentees`}
+          subtext={`Avg GPA: ${realAvgGpa || '—'}`}
         />
       </div>
 

@@ -2187,6 +2187,72 @@ app.post('/students/:id/tech-skills', requireOwnerOrRole('id', 'faculty', 'hod',
 });
 
 // ============================================================================
+// Helper to extract clean S3 key from a full S3 URL or partial path
+function extractS3Key(urlOrKey: string | null | undefined): string | null {
+  if (!urlOrKey) return null;
+  const raw = String(urlOrKey).trim();
+  if (!raw) return null;
+  const withoutQuery = raw.split('?')[0].trim();
+  const idx = withoutQuery.indexOf('students/');
+  if (idx !== -1) {
+    try {
+      return decodeURIComponent(withoutQuery.substring(idx));
+    } catch {
+      return withoutQuery.substring(idx);
+    }
+  }
+  return null;
+}
+
+// Clean S3 URL for DB storage (strip temporary expired query params)
+function cleanS3UrlForStorage(urlOrKey: string | null | undefined): string | null {
+  if (!urlOrKey) return null;
+  const key = extractS3Key(urlOrKey);
+  if (key) return key;
+  // Fallback: strip query string if it looks like an S3 presigned URL
+  return String(urlOrKey).replace(/\?X-Amz-[\s\S]*$/i, '').trim() || null;
+}
+
+// Dynamic S3 signing for certification rows (ensures view URLs never expire)
+async function signCertificationRows(rows: any[]): Promise<any[]> {
+  const bucketName = process.env.UPLOADS_BUCKET_NAME;
+  if (!bucketName || !Array.isArray(rows) || rows.length === 0) return rows;
+
+  try {
+    const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
+    const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
+    const s3Client = new S3Client({});
+
+    return await Promise.all(
+      rows.map(async (row) => {
+        if (!row.certificate_file_url) return row;
+        const key = extractS3Key(row.certificate_file_url);
+        if (!key) return row;
+
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: bucketName,
+            Key: key,
+          });
+          // 24-hour expiration for dynamically generated signed URLs
+          const freshUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 86400 });
+          return {
+            ...row,
+            certificate_file_url: freshUrl,
+            file_key: key,
+          };
+        } catch (err: any) {
+          console.warn(`[S3] Failed to re-sign cert key ${key}:`, err.message);
+          return { ...row, file_key: key };
+        }
+      })
+    );
+  } catch (err: any) {
+    console.warn('[S3] S3 signer initialization failed:', err.message);
+    return rows;
+  }
+}
+
 // Certifications
 // ============================================================================
 app.get('/students/:id/certifications', async (req: Request, res: Response) => {
@@ -2201,7 +2267,8 @@ app.get('/students/:id/certifications', async (req: Request, res: Response) => {
       'SELECT * FROM certifications WHERE student_id = $1 ORDER BY date_completed DESC NULLS LAST',
       [studentId]
     );
-    res.json(result.rows);
+    const signedRows = await signCertificationRows(result.rows);
+    res.json(signedRows);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -2211,10 +2278,11 @@ app.post('/students/:id/certifications', requireOwnerOrRole('id', 'faculty', 'ho
   try {
     const studentId = req.params.id.toUpperCase();
     const validated = certificationSchema.parse(req.body);
+    const storageUrl = cleanS3UrlForStorage(validated.certificate_file_url);
 
     if (db.isMock) {
       const existing = db.mockStore.certifications.get(studentId) || [];
-      existing.push({ ...validated, id: String(Date.now()) });
+      existing.push({ ...validated, certificate_file_url: storageUrl || undefined, id: String(Date.now()) });
       db.mockStore.certifications.set(studentId, existing);
       return res.json({ message: 'Certification added', certifications: existing });
     }
@@ -2223,14 +2291,15 @@ app.post('/students/:id/certifications', requireOwnerOrRole('id', 'faculty', 'ho
       `INSERT INTO certifications (student_id, provider, title, date_completed, certificate_file_url, suggested)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [studentId, validated.provider, validated.title, validated.date_completed || null,
-       validated.certificate_file_url || null, validated.suggested]
+       storageUrl, validated.suggested]
     );
 
     const result = await db.query(
       'SELECT * FROM certifications WHERE student_id = $1 ORDER BY date_completed DESC NULLS LAST',
       [studentId]
     );
-    res.json({ message: 'Certification added', certifications: result.rows });
+    const signedRows = await signCertificationRows(result.rows);
+    res.json({ message: 'Certification added', certifications: signedRows });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -2241,11 +2310,12 @@ app.put('/students/:id/certifications/:certId', requireOwnerOrRole('id', 'facult
     const studentId = req.params.id.toUpperCase();
     const certId = req.params.certId;
     const validated = certificationSchema.parse(req.body);
+    const storageUrl = cleanS3UrlForStorage(validated.certificate_file_url);
 
     if (db.isMock) {
       const existing = db.mockStore.certifications.get(studentId) || [];
       const idx = existing.findIndex((c: any) => c.id === certId);
-      if (idx >= 0) existing[idx] = { ...existing[idx], ...validated };
+      if (idx >= 0) existing[idx] = { ...existing[idx], ...validated, certificate_file_url: storageUrl || undefined };
       db.mockStore.certifications.set(studentId, existing);
       return res.json({ message: 'Certification updated', certifications: existing });
     }
@@ -2254,14 +2324,15 @@ app.put('/students/:id/certifications/:certId', requireOwnerOrRole('id', 'facult
       `UPDATE certifications SET provider = $1, title = $2, date_completed = $3, certificate_file_url = $4, suggested = $5
        WHERE id = $6 AND student_id = $7`,
       [validated.provider, validated.title, validated.date_completed || null,
-       validated.certificate_file_url || null, validated.suggested, certId, studentId]
+       storageUrl, validated.suggested, certId, studentId]
     );
 
     const result = await db.query(
       'SELECT * FROM certifications WHERE student_id = $1 ORDER BY date_completed DESC NULLS LAST',
       [studentId]
     );
-    res.json({ message: 'Certification updated', certifications: result.rows });
+    const signedRows = await signCertificationRows(result.rows);
+    res.json({ message: 'Certification updated', certifications: signedRows });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -2288,7 +2359,8 @@ app.delete('/students/:id/certifications/:certId', requireOwnerOrRole('id', 'fac
       'SELECT * FROM certifications WHERE student_id = $1 ORDER BY date_completed DESC NULLS LAST',
       [studentId]
     );
-    res.json({ message: 'Certification deleted', certifications: result.rows });
+    const signedRows = await signCertificationRows(result.rows);
+    res.json({ message: 'Certification deleted', certifications: signedRows });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -2553,17 +2625,19 @@ app.get('/students/:id/view-url', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'fileKey query param and UPLOADS_BUCKET_NAME are required' });
     }
 
+    const key = extractS3Key(String(fileKey)) || String(fileKey).replace(/^\//, '').split('?')[0];
+
     const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
     const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
 
     const s3Client = new S3Client({});
     const getCommand = new GetObjectCommand({
       Bucket: bucketName,
-      Key: String(fileKey),
+      Key: key,
     });
-    const viewUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 3600 });
+    const viewUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 86400 });
 
-    res.json({ viewUrl, expiresInSeconds: 3600 });
+    res.json({ viewUrl, expiresInSeconds: 86400, fileKey: key });
   } catch (err: any) {
     res.status(500).json({ error: `Failed to generate view URL: ${err.message}` });
   }
@@ -2596,55 +2670,95 @@ app.post('/faculty', async (req: Request, res: Response) => {
     const newFac = result.rows[0];
     const finalId = newFac.faculty_id.toUpperCase();
 
-    // ── Auto-merge: find placeholder CSV records for this same person ──────────
-    // Normalize: strip titles, strip single-char initials, keep alpha+spaces
+    // ── Auto-merge: find placeholder CSV records for this same person ──────────────────
+    // When a faculty registers with their real email, we scan for any placeholder records
+    // (auto-created from CSV upload with pending_ email) whose name matches, and migrate
+    // all their mentees to the newly registered faculty_id.
+    //
+    // Safety rules (prevents false merges):
+    //   1. Only consider placeholder (pending_*) records — never merge two real faculty.
+    //   2. Require >= 2 significant words (length >= 4) to match in at least one direction.
+    //      A single shared word like "Reddy", "Rao", "Basha" is NOT sufficient.
+    //   3. Fallback: single-word names (like "Samunissa") use Levenshtein distance ≤ 2
+    //      to catch typo variants ("samunissa" vs "samunnisa" = distance 1 → safe merge).
+    const levenshtein = (a: string, b: string): number => {
+      const m = a.length, n = b.length;
+      const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+        Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0));
+      for (let i = 1; i <= m; i++)
+        for (let j = 1; j <= n; j++)
+          dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1]
+            : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+      return dp[m][n];
+    };
+
     const normName = (s: string) => s.toLowerCase()
       .replace(/^(dr|prof|mr|mrs|ms|er)\.?\s*/i, '')
-      .replace(/\b[a-z]\.\s*/g, '')
+      .replace(/\b[a-z]\.\s*/g, '')   // strip single-letter initials
       .replace(/[^a-z\s]/g, '')
+      .replace(/\s+/g, ' ')
       .trim();
 
-    const myNorm = normName(name || '');
-    // Significant words: length >= 4, sorted longest-first (most discriminating)
-    const myWords = myNorm.split(/\s+/)
-      .filter((w: string) => w.length >= 4)
-      .sort((a: string, b: string) => b.length - a.length);
+    const myNorm  = normName(name || '');
+    const myWords = myNorm.split(' ').filter((w: string) => w.length >= 4);
+    const MIN_MERGE_WORDS = 2;
 
-    if (myWords.length > 0) {
+    if (myWords.length >= 1) {
       const allFac = await db.query('SELECT faculty_id, name, email FROM faculty');
       const placeholders = allFac.rows.filter((f: any) => {
         if (f.faculty_id.toUpperCase() === finalId) return false;
-        // Only consider placeholder records (unlinked email)
-        if (f.email && !f.email.startsWith('pending_')) return false;
-        const theirNorm = normName(f.name || '');
-        const theirWords = theirNorm.split(/\s+/).filter((w: string) => w.length >= 4);
-        // ALL of my significant words must appear in their normalized name (AND match)
-        return myWords.every((w: string) => theirNorm.includes(w))
-          || theirWords.every((w: string) => myNorm.includes(w));
+        // Only merge placeholder (CSV-auto-created) records, never real-email faculty
+        if (!f.email || !String(f.email).startsWith('pending_')) return false;
+        const theirNorm  = normName(f.name || '');
+        const theirWords = theirNorm.split(' ').filter((w: string) => w.length >= 4);
+        // Primary check: >= 2 significant words match in at least one direction
+        const myMatchCount    = myWords.filter((w: string) => theirNorm.includes(w)).length;
+        const theirMatchCount = theirWords.filter((w: string) => myNorm.includes(w)).length;
+        const multiWordMatch =
+          (myWords.length    >= MIN_MERGE_WORDS && myMatchCount    >= MIN_MERGE_WORDS) ||
+          (theirWords.length >= MIN_MERGE_WORDS && theirMatchCount >= MIN_MERGE_WORDS);
+        if (multiWordMatch) return true;
+        // Fallback: both reduce to a single significant word — use Levenshtein ≤ 2
+        // Catches typos like "samunissa" vs "samunnisa" (dist=1), safe because both are placeholders
+        if (myWords.length === 1 && theirWords.length === 1) {
+          return levenshtein(myWords[0], theirWords[0]) <= 2;
+        }
+        return false;
       });
 
       for (const old of placeholders) {
         const oldId = old.faculty_id.toUpperCase();
         try {
-          // Migrate mentor_assignments to the new (registered) faculty_id
+          // Migrate mentor_assignments → new faculty_id.
+          // ON CONFLICT (roll_number) DO UPDATE: works with our new single-PK schema.
+          // The real (registered) faculty always wins — their assignment takes precedence.
           await db.query(
             `INSERT INTO mentor_assignments (roll_number, faculty_id, assigned_at)
              SELECT roll_number, $1, assigned_at FROM mentor_assignments WHERE UPPER(faculty_id) = $2
-             ON CONFLICT (roll_number, faculty_id) DO NOTHING`,
+             ON CONFLICT (roll_number) DO UPDATE
+               SET faculty_id = EXCLUDED.faculty_id, assigned_at = NOW()`,
             [finalId, oldId]
           ).catch(() => {});
-          await db.query('DELETE FROM mentor_assignments WHERE UPPER(faculty_id) = $1', [oldId]).catch(() => {});
 
-          // Update any students still pointing to old faculty_id
+          // Remove the old placeholder rows
           await db.query(
-            'UPDATE students SET faculty_mentor_id = $1 WHERE UPPER(faculty_mentor_id) = $2',
+            'DELETE FROM mentor_assignments WHERE UPPER(faculty_id) = $1',
+            [oldId]
+          ).catch(() => {});
+
+          // Update students.faculty_mentor_id for anyone still pointing at the placeholder
+          await db.query(
+            'UPDATE students SET faculty_mentor_id = $1, updated_at = NOW() WHERE UPPER(faculty_mentor_id) = $2',
             [finalId, oldId]
           ).catch(() => {});
 
           // Delete the placeholder faculty record
-          await db.query('DELETE FROM faculty WHERE UPPER(faculty_id) = $1', [oldId]).catch(() => {});
+          await db.query(
+            'DELETE FROM faculty WHERE UPPER(faculty_id) = $1',
+            [oldId]
+          ).catch(() => {});
 
-          console.log(`[Faculty] Auto-merged placeholder ${oldId} into ${finalId} for "${name}"`);
+          console.log(`[Faculty] Auto-merged placeholder ${oldId} → ${finalId} for "${name}" (${myWords.join(', ')} matched)`);
         } catch (mergeErr: any) {
           console.warn(`[Faculty] Merge failed for ${oldId} → ${finalId}:`, mergeErr.message);
         }
@@ -2652,14 +2766,15 @@ app.post('/faculty', async (req: Request, res: Response) => {
     }
     // ────────────────────────────────────────────────────────────────────────────
 
-    // Also check mentor_assignments for this faculty_id (in case CSV was already correct)
+    // Final sync: ensure ALL students whose mentor_assignment points to finalId
+    // have their faculty_mentor_id updated — catches both direct CSV and post-merge cases.
     await db.query(
       `UPDATE students s
-       SET faculty_mentor_id = $1
+       SET faculty_mentor_id = $1, updated_at = NOW()
        FROM mentor_assignments ma
        WHERE UPPER(ma.roll_number) = UPPER(s.roll_number)
          AND UPPER(ma.faculty_id) = $1
-         AND (s.faculty_mentor_id IS NULL OR s.faculty_mentor_id = '')`,
+         AND s.faculty_mentor_id IS DISTINCT FROM $1`,
       [finalId]
     ).catch(() => {});
 
@@ -2682,13 +2797,26 @@ app.get('/faculty/by-email/:email', async (req: Request, res: Response) => {
     if (exact.rows.length > 0) return res.json(exact.rows[0]);
 
     // Tier 2: name-based fuzzy match from email prefix
+    // Safety: prefix must be >= 6 chars to be reliable; require ALL normalized words
+    // from the candidate faculty name to appear in the email prefix (word-containment, not substring).
+    // We also only auto-link to placeholder (pending_email) records to avoid mis-linking real faculty.
     const prefix = email.split('@')[0].replace(/[^a-z]/gi, '').toLowerCase();
-    if (prefix.length >= 3) {
+    if (prefix.length >= 6) {
       const all = await db.query('SELECT * FROM faculty', []);
-      const normalize = (s: string) => s.toLowerCase().replace(/^(dr|prof|mr|mrs|ms|er)\.?\s*/i, '').replace(/[^a-z]/g, '');
+      const normFac = (s: string) => s.toLowerCase()
+        .replace(/^(dr|prof|mr|mrs|ms|er)\.?\s*/i, '')
+        .replace(/\b[a-z]\.\s*/g, '')
+        .replace(/[^a-z]/g, '')
+        .trim();
       const match = all.rows.find((f: any) => {
-        const n = normalize(f.name);
-        return n.includes(prefix) || prefix.includes(n.slice(0, Math.min(n.length, 8)));
+        // Only auto-link placeholder records; real-email records need admin action
+        if (f.email && !String(f.email).startsWith('pending_')) return false;
+        const n = normFac(f.name);
+        if (n.length < 4) return false;
+        // The entire normalized name must be contained within the email prefix (or vice versa)
+        // AND the overlap must be at least 6 chars to avoid short-name false positives
+        const overlap = n.length >= 6 ? prefix.includes(n) : (n.includes(prefix) && prefix.length >= 6);
+        return overlap;
       });
       if (match) {
         // Auto-link email to the matched faculty record
@@ -2713,10 +2841,9 @@ app.get('/faculty/mentees/by-email/:email', async (req: Request, res: Response) 
     // Ensure mentor_assignments table exists
     await db.query(`
       CREATE TABLE IF NOT EXISTS mentor_assignments (
-        roll_number  TEXT        NOT NULL,
+        roll_number  TEXT        NOT NULL PRIMARY KEY,
         faculty_id   TEXT        NOT NULL,
-        assigned_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (roll_number, faculty_id)
+        assigned_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       )
     `).catch(() => {});
 
@@ -2735,19 +2862,40 @@ app.get('/faculty/mentees/by-email/:email', async (req: Request, res: Response) 
     // Extract significant words (length >= 4) from name for fuzzy matching
     const sigWords = primaryNorm.split(/\s+/).filter((w: string) => w.length >= 4);
 
-    // Step 2: Find ALL faculty records whose name is a genuine alias for this person
-    // Uses AND-match: ALL of my significant words must appear in their name OR vice versa
-    // This prevents false positives (e.g. "basha" shared by Suleman Basha and Karimulla Basha)
-    const allFac = await db.query('SELECT faculty_id, name FROM faculty');
+    // Step 2: Find ALL faculty records whose name is a genuine alias for this person.
+    // SAFETY RULES to prevent false merges:
+    //   a) Only consider placeholder (unlinked) records — never merge two real faculty.
+    //   b) Require >= 2 significant words to match bidirectionally, OR
+    //      both names reduce to a single word with Levenshtein distance ≤ 2 (typo fallback).
+    const MIN_MATCH_WORDS = 2;
+    const lev = (a: string, b: string): number => {
+      const m = a.length, n = b.length;
+      const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+        Array.from({ length: n + 1 }, (_, j) => i === 0 ? j : j === 0 ? i : 0));
+      for (let i = 1; i <= m; i++)
+        for (let j = 1; j <= n; j++)
+          dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1]
+            : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+      return dp[m][n];
+    };
+    const allFac = await db.query('SELECT faculty_id, name, email FROM faculty');
     const matchingIds: string[] = [primaryFac.faculty_id];
     for (const f of allFac.rows) {
       if (f.faculty_id === primaryFac.faculty_id) continue;
+      // Only merge placeholder (CSV-auto-created, no real email) records
+      if (!f.email || !String(f.email).startsWith('pending_')) continue;
       const norm = normalize(f.name);
       const theirWords = norm.split(/\s+/).filter((w: string) => w.length >= 4);
-      // Match if: ALL my sig words appear in their name, OR all their words appear in my name
-      const iMatch = sigWords.length > 0 && sigWords.every((w: string) => norm.includes(w));
-      const theyMatch = theirWords.length > 0 && theirWords.every((w: string) => primaryNorm.includes(w));
-      if (iMatch || theyMatch) matchingIds.push(f.faculty_id);
+      // Primary: >= 2 significant words match
+      const myMatchCount    = sigWords.filter((w: string) => norm.includes(w)).length;
+      const theirMatchCount = theirWords.filter((w: string) => primaryNorm.includes(w)).length;
+      const iMatch    = sigWords.length    >= MIN_MATCH_WORDS && myMatchCount    >= MIN_MATCH_WORDS;
+      const theyMatch = theirWords.length  >= MIN_MATCH_WORDS && theirMatchCount >= MIN_MATCH_WORDS;
+      if (iMatch || theyMatch) { matchingIds.push(f.faculty_id); continue; }
+      // Fallback: both reduce to single word → Levenshtein ≤ 2 (typo safe)
+      if (sigWords.length === 1 && theirWords.length === 1) {
+        if (lev(sigWords[0], theirWords[0]) <= 2) matchingIds.push(f.faculty_id);
+      }
     }
 
     // Step 3: Union mentees across all matching faculty_ids
@@ -2794,7 +2942,15 @@ app.get('/faculty/mentees/by-email/:email', async (req: Request, res: Response) 
       registered: r.registered === true || r.registered === 't',
     }));
 
-    res.json(rows);
+    // Year-wise breakdown summary
+    const yearBreakdown: Record<string, number> = {
+      '1st Year': 0, '2nd Year': 0, '3rd Year': 0, '4th Year': 0,
+    };
+    for (const r of rows) {
+      if (r.year && yearBreakdown[r.year] !== undefined) yearBreakdown[r.year]++;
+    }
+
+    res.json({ mentees: rows, yearBreakdown, total: rows.length });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -2810,9 +2966,14 @@ app.get('/faculty', requireRole('admin', 'hod'), async (_req: Request, res: Resp
     }
     const result = await db.query(`
       SELECT f.*,
-             COUNT(s.roll_number)::int AS mentee_count
+             COUNT(ma.roll_number)::int                                           AS mentee_count,
+             COUNT(CASE WHEN s.year = '1st Year' THEN 1 END)::int                AS year1_count,
+             COUNT(CASE WHEN s.year = '2nd Year' THEN 1 END)::int                AS year2_count,
+             COUNT(CASE WHEN s.year = '3rd Year' THEN 1 END)::int                AS year3_count,
+             COUNT(CASE WHEN s.year = '4th Year' THEN 1 END)::int                AS year4_count
       FROM faculty f
-      LEFT JOIN students s ON s.faculty_mentor_id = f.faculty_id
+      LEFT JOIN mentor_assignments ma ON UPPER(ma.faculty_id) = UPPER(f.faculty_id)
+      LEFT JOIN students s ON UPPER(s.roll_number) = UPPER(ma.roll_number)
       GROUP BY f.faculty_id
       ORDER BY f.name
     `);
@@ -2967,7 +3128,7 @@ app.get('/faculty/:id/mentees-detail', requireRole('admin'), async (req: Request
     const facId = req.params.id.toUpperCase();
     if (db.isMock) return res.json([]);
 
-    await db.query(`CREATE TABLE IF NOT EXISTS mentor_assignments (roll_number TEXT NOT NULL, faculty_id TEXT NOT NULL, assigned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (roll_number, faculty_id))`).catch(() => {});
+    await db.query(`CREATE TABLE IF NOT EXISTS mentor_assignments (roll_number TEXT NOT NULL PRIMARY KEY, faculty_id TEXT NOT NULL, assigned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP)`).catch(() => {});
 
     const result = await db.query(
       `SELECT
@@ -2995,6 +3156,48 @@ app.get('/faculty/:id/mentees-detail', requireRole('admin'), async (req: Request
   }
 });
 
+// POST /mentor-assignments/sync — Admin utility: reconcile students.faculty_mentor_id with mentor_assignments
+// Ensures both tables agree; safe to run any number of times (idempotent).
+app.post('/mentor-assignments/sync', requireRole('admin'), async (req: Request, res: Response) => {
+  try {
+    if (db.isMock) return res.json({ synced: 0, message: 'Mock mode — sync skipped' });
+
+    await db.query(`CREATE TABLE IF NOT EXISTS mentor_assignments (roll_number TEXT NOT NULL PRIMARY KEY, faculty_id TEXT NOT NULL, assigned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP)`).catch(() => {});
+
+    // Sync: for every entry in mentor_assignments, update students.faculty_mentor_id
+    const syncResult = await db.query(`
+      UPDATE students s
+      SET faculty_mentor_id = ma.faculty_id,
+          updated_at        = NOW()
+      FROM mentor_assignments ma
+      WHERE UPPER(s.roll_number) = UPPER(ma.roll_number)
+        AND s.faculty_mentor_id IS DISTINCT FROM ma.faculty_id
+      RETURNING s.roll_number
+    `);
+
+    // Also clear faculty_mentor_id for any student whose roll_number is no longer in mentor_assignments
+    const clearResult = await db.query(`
+      UPDATE students
+      SET faculty_mentor_id = NULL,
+          updated_at        = NOW()
+      WHERE faculty_mentor_id IS NOT NULL
+        AND UPPER(roll_number) NOT IN (
+          SELECT UPPER(roll_number) FROM mentor_assignments
+        )
+      RETURNING roll_number
+    `);
+
+    res.json({
+      success: true,
+      synced: syncResult.rowCount ?? 0,
+      cleared: clearResult.rowCount ?? 0,
+      message: `Synced ${syncResult.rowCount ?? 0} student(s); cleared ${clearResult.rowCount ?? 0} stale assignment(s).`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /mentor-assignments/:facultyId/:rollNumber — Unassign a student from a faculty
 app.delete('/mentor-assignments/:facultyId/:rollNumber', requireRole('admin'), async (req: Request, res: Response) => {
   try {
@@ -3004,6 +3207,159 @@ app.delete('/mentor-assignments/:facultyId/:rollNumber', requireRole('admin'), a
     await db.query('DELETE FROM mentor_assignments WHERE UPPER(faculty_id) = $1 AND UPPER(roll_number) = $2', [facId, roll]);
     await db.query(`UPDATE students SET faculty_mentor_id = NULL WHERE UPPER(roll_number) = $1 AND UPPER(faculty_mentor_id) = $2`, [roll, facId]).catch(() => {});
     res.json({ message: `${roll} unassigned from ${facId}` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /faculty/:facultyId/mentees — Admin manually assigns one or more students to a faculty mentor
+app.post('/faculty/:facultyId/mentees', requireRole('admin'), async (req: Request, res: Response) => {
+  try {
+    const facId = req.params.facultyId.toUpperCase();
+    const rawRolls: any[] = Array.isArray(req.body?.rolls)
+      ? req.body.rolls
+      : typeof req.body?.rollNumber === 'string'
+      ? [req.body.rollNumber]
+      : [];
+
+    const rolls = rawRolls
+      .map((r: any) => String(r || '').trim().toUpperCase())
+      .filter((r: string) => r.length > 0);
+
+    if (rolls.length === 0) {
+      return res.status(400).json({ error: 'At least one valid roll number is required' });
+    }
+
+    if (db.isMock) {
+      return res.json({
+        success: true,
+        count: rolls.length,
+        faculty_id: facId,
+        assigned: rolls.map(r => ({ roll: r, status: 'assigned', reassignedFrom: null })),
+      });
+    }
+
+    // Verify faculty exists
+    const facCheck = await db.query('SELECT faculty_id, name FROM faculty WHERE UPPER(faculty_id) = $1', [facId]);
+    if (facCheck.rows.length === 0) {
+      return res.status(404).json({ error: `Faculty record ${facId} not found` });
+    }
+    const facultyName = facCheck.rows[0].name;
+
+    // Ensure mentor_assignments table exists
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS mentor_assignments (
+        roll_number  TEXT        NOT NULL PRIMARY KEY,
+        faculty_id   TEXT        NOT NULL,
+        assigned_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      )
+    `).catch(() => {});
+
+    const assignedResults = [];
+
+    for (const roll of rolls) {
+      // Find current assignment & student details if any
+      const cur = await db.query(
+        `SELECT ma.faculty_id AS current_faculty_id, f.name AS current_faculty_name, s.name, s.year, s.section, s.department
+         FROM mentor_assignments ma
+         LEFT JOIN faculty f ON UPPER(f.faculty_id) = UPPER(ma.faculty_id)
+         LEFT JOIN students s ON UPPER(s.roll_number) = UPPER(ma.roll_number)
+         WHERE UPPER(ma.roll_number) = $1`,
+        [roll]
+      );
+
+      const prevFacId = cur.rows[0]?.current_faculty_id;
+      const prevFacName = cur.rows[0]?.current_faculty_name;
+      const isReassigned = Boolean(prevFacId && prevFacId.toUpperCase() !== facId);
+
+      // Upsert into mentor_assignments
+      await db.query(
+        `INSERT INTO mentor_assignments (roll_number, faculty_id, assigned_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (roll_number) DO UPDATE SET faculty_id = EXCLUDED.faculty_id, assigned_at = NOW()`,
+        [roll, facId]
+      );
+
+      // Sync into students table if student exists
+      const sUp = await db.query(
+        `UPDATE students SET faculty_mentor_id = $1, updated_at = NOW()
+         WHERE UPPER(roll_number) = $2 RETURNING name, year, section, department`,
+        [facId, roll]
+      );
+
+      const studentData = sUp.rows[0] || cur.rows[0] || {};
+
+      assignedResults.push({
+        roll,
+        name: studentData.name || null,
+        year: studentData.year || null,
+        section: studentData.section || null,
+        department: studentData.department || null,
+        registered: Boolean(sUp.rows.length > 0 || studentData.name),
+        status: isReassigned ? 'reassigned' : 'assigned',
+        reassignedFrom: isReassigned ? (prevFacName || prevFacId) : null,
+      });
+    }
+
+    res.json({
+      success: true,
+      count: assignedResults.length,
+      faculty_id: facId,
+      faculty_name: facultyName,
+      assigned: assignedResults,
+      message: `Successfully assigned ${assignedResults.length} mentee(s) to ${facultyName}.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /students/search-assignable — Admin autocomplete search for students to assign as mentees
+app.get('/students/search-assignable', requireRole('admin'), async (req: Request, res: Response) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (!q || q.length < 1) {
+      return res.json([]);
+    }
+
+    if (db.isMock) {
+      const mockStudents = Array.from(db.mockStore.students.values())
+        .filter(s => s.roll_number.toLowerCase().includes(q.toLowerCase()) || s.name.toLowerCase().includes(q.toLowerCase()))
+        .slice(0, 15);
+      return res.json(mockStudents.map(s => ({
+        roll_number: s.roll_number,
+        name: s.name,
+        year: s.year,
+        section: s.section,
+        department: s.department,
+        email: s.email,
+        current_faculty_id: s.faculty_mentor_id || null,
+        current_faculty_name: null,
+      })));
+    }
+
+    const pattern = `%${q.toLowerCase()}%`;
+    const result = await db.query(
+      `SELECT
+         s.roll_number,
+         s.name,
+         s.year,
+         s.section,
+         s.department,
+         s.email,
+         s.cgpa,
+         ma.faculty_id AS current_faculty_id,
+         f.name AS current_faculty_name
+       FROM students s
+       LEFT JOIN mentor_assignments ma ON UPPER(ma.roll_number) = UPPER(s.roll_number)
+       LEFT JOIN faculty f ON UPPER(f.faculty_id) = UPPER(ma.faculty_id)
+       WHERE LOWER(s.roll_number) LIKE $1 OR LOWER(s.name) LIKE $1
+       ORDER BY s.roll_number
+       LIMIT 15`,
+      [pattern]
+    );
+
+    res.json(result.rows);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -3081,19 +3437,43 @@ app.post('/mentor-assignments/upload', requireRole('admin'), async (req: Request
       autoCreatedFaculty.push(rawName);
     }
 
-    // Ensure mentor_assignments table exists
+    // Ensure mentor_assignments table exists with single-mentor-per-student PK
     if (!db.isMock) {
       await db.query(`
         CREATE TABLE IF NOT EXISTS mentor_assignments (
-          roll_number  TEXT        NOT NULL,
+          roll_number  TEXT        NOT NULL PRIMARY KEY,
           faculty_id   TEXT        NOT NULL,
-          assigned_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (roll_number, faculty_id)
+          assigned_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         )
       `).catch(() => {});
+      // Migration: if the table already exists with the old composite PK, migrate it.
+      // Safe to run every time — DO NOTHING if already correct.
+      await db.query(`
+        DO $$ BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.table_constraints
+            WHERE table_name = 'mentor_assignments'
+              AND constraint_type = 'PRIMARY KEY'
+              AND constraint_name != 'mentor_assignments_pkey'
+          ) THEN NULL;
+          ELSIF (
+            SELECT COUNT(*) FROM information_schema.key_column_usage
+            WHERE table_name = 'mentor_assignments' AND constraint_name = 'mentor_assignments_pkey'
+          ) > 1 THEN
+            -- Old composite PK detected: keep the most recent assignment per student, then re-key
+            DELETE FROM mentor_assignments a USING mentor_assignments b
+              WHERE a.roll_number = b.roll_number AND a.assigned_at < b.assigned_at;
+            ALTER TABLE mentor_assignments DROP CONSTRAINT mentor_assignments_pkey;
+            ALTER TABLE mentor_assignments ADD PRIMARY KEY (roll_number);
+          END IF;
+        END $$;
+      `).catch(() => {/* Ignore if already migrated */});
+      // Ensure index on faculty_id for fast mentee lookups
+      await db.query(`CREATE INDEX IF NOT EXISTS idx_mentor_assignments_faculty ON mentor_assignments(faculty_id)`).catch(() => {});
     }
 
     // Now assign students — upsert into mentor_assignments AND update students if they exist
+    // ON CONFLICT (roll_number) DO UPDATE: the latest upload always wins (one mentor per student)
     for (const row of rows) {
       const facId = facultyCache[normalize(row.facultyName.trim())];
       if (!facId) continue;
@@ -3108,11 +3488,11 @@ app.post('/mentor-assignments/upload', requireRole('admin'), async (req: Request
           continue;
         }
 
-        // Always persist the assignment (even if student hasn't registered yet)
+        // Upsert: one mentor per student — latest CSV upload wins
         await db.query(
           `INSERT INTO mentor_assignments (roll_number, faculty_id)
            VALUES ($1, $2)
-           ON CONFLICT (roll_number, faculty_id) DO NOTHING`,
+           ON CONFLICT (roll_number) DO UPDATE SET faculty_id = EXCLUDED.faculty_id, assigned_at = NOW()`,
           [cleanRoll, facId]
         );
 
@@ -3157,10 +3537,9 @@ app.get('/faculty/:id/mentees', async (req: Request, res: Response) => {
     // Ensure mentor_assignments table exists before querying
     await db.query(`
       CREATE TABLE IF NOT EXISTS mentor_assignments (
-        roll_number  TEXT        NOT NULL,
+        roll_number  TEXT        NOT NULL PRIMARY KEY,
         faculty_id   TEXT        NOT NULL,
-        assigned_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (roll_number, faculty_id)
+        assigned_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       )
     `).catch(() => {});
 

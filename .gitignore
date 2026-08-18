@@ -40,3 +40,7 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
+*.zip
+*.timestamp-*.mjs
+nat-id.txt
+

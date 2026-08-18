@@ -63,6 +63,51 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
     return true;
   };
 
+  const [openingCertId, setOpeningCertId] = useState<string | null>(null);
+
+  const handleViewCertificate = async (cert: Certification) => {
+    const rawUrl = cert.certificate_file_url;
+    if (!rawUrl) return;
+
+    // External certification URLs (e.g. Credly, Coursera, HackerRank, freeCodeCamp)
+    if (!rawUrl.includes('.s3.') && !rawUrl.includes('s3.amazonaws.com') && !rawUrl.startsWith('students/')) {
+      window.open(rawUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // Extract S3 key
+    let fileKey = '';
+    const withoutQuery = rawUrl.split('?')[0].trim();
+    const idx = withoutQuery.indexOf('students/');
+    if (idx !== -1) {
+      try {
+        fileKey = decodeURIComponent(withoutQuery.substring(idx));
+      } catch {
+        fileKey = withoutQuery.substring(idx);
+      }
+    } else {
+      fileKey = rawUrl;
+    }
+
+    const certKey = cert.id || cert.title;
+    setOpeningCertId(certKey);
+
+    try {
+      // Fetch fresh, never-expired pre-signed URL from backend
+      const res = await api.getViewUrl(activeRollNo || (cert as any).student_id || 'TEMP', fileKey);
+      if (res && res.viewUrl) {
+        window.open(res.viewUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        window.open(rawUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err) {
+      console.warn('Failed to fetch on-demand view URL, opening existing URL:', err);
+      window.open(rawUrl, '_blank', 'noopener,noreferrer');
+    } finally {
+      setOpeningCertId(null);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || readOnly) return;
@@ -79,8 +124,8 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
         });
       }
 
-      // Store the viewUrl (GET pre-signed URL) for later viewing
-      setFileUrl(presigned.viewUrl || presigned.uploadUrl);
+      // Store the clean fileKey or viewUrl
+      setFileUrl(presigned.fileKey || presigned.viewUrl || presigned.uploadUrl);
     } catch (e: any) {
       alert('Upload failed: ' + e.message);
     } finally {
@@ -196,15 +241,15 @@ export const CertificationsTab: React.FC<CertificationsTabProps> = ({ certificat
               <h4 className="text-sm font-bold text-textPrimary mt-1.5">{cert.title}</h4>
               {cert.certificate_file_url && (
                 isCertUrlValid(cert.certificate_file_url) ? (
-                  <a
-                    href={cert.certificate_file_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-2 text-xs font-semibold text-brand-primary hover:underline inline-flex items-center gap-1"
+                  <button
+                    type="button"
+                    onClick={() => handleViewCertificate(cert)}
+                    disabled={openingCertId === (cert.id || cert.title)}
+                    className="mt-2 text-xs font-semibold text-brand-primary hover:underline inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
                   >
-                    <span>View Certificate PDF</span>
+                    <span>{openingCertId === (cert.id || cert.title) ? 'Opening...' : 'View Certificate PDF'}</span>
                     <ExternalLink className="w-3 h-3" />
-                  </a>
+                  </button>
                 ) : (
                   <span className="mt-2 text-xs font-medium text-textSecondary inline-flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3 text-success" />

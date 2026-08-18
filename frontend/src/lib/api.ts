@@ -344,8 +344,25 @@ export const api = {
   },
 
   // Faculty Mentees — by email (resolves all records for same person across multiple faculty_ids)
+  // Returns a StudentProfile[] array with an extra `.yearBreakdown` property attached.
   getMenteesByEmail: async (email: string): Promise<any[]> => {
-    return fetchWithAuth(`/faculty/mentees/by-email/${encodeURIComponent(email)}`);
+    const resp = await fetchWithAuth(`/faculty/mentees/by-email/${encodeURIComponent(email)}`);
+    // Backend now returns { mentees: [], yearBreakdown: {...}, total: n }
+    // Stay backward-compatible: return the array but attach yearBreakdown for stat cards.
+    if (resp && !Array.isArray(resp) && Array.isArray(resp.mentees)) {
+      const arr: any[] = resp.mentees;
+      (arr as any).yearBreakdown = resp.yearBreakdown || { '1st Year': 0, '2nd Year': 0, '3rd Year': 0, '4th Year': 0 };
+      return arr;
+    }
+    // Old server or mock: plain array — compute breakdown locally
+    const arr: any[] = Array.isArray(resp) ? resp : [];
+    (arr as any).yearBreakdown = {
+      '1st Year': arr.filter((m: any) => m.year === '1st Year').length,
+      '2nd Year': arr.filter((m: any) => m.year === '2nd Year').length,
+      '3rd Year': arr.filter((m: any) => m.year === '3rd Year').length,
+      '4th Year': arr.filter((m: any) => m.year === '4th Year').length,
+    };
+    return arr;
   },
 
   // Get all faculty with mentee counts (admin)
@@ -394,12 +411,30 @@ export const api = {
     return fetchWithAuth(`/mentor-assignments/${encodeURIComponent(facultyId)}/${encodeURIComponent(rollNumber)}`, { method: 'DELETE' });
   },
 
+  // Manually assign roll numbers to a faculty mentor (admin)
+  addMenteesToFaculty: async (facultyId: string, rolls: string[]): Promise<any> => {
+    return fetchWithAuth(`/faculty/${encodeURIComponent(facultyId)}/mentees`, {
+      method: 'POST',
+      body: JSON.stringify({ rolls }),
+    });
+  },
+
+  // Search students with assignment status for autocomplete (admin)
+  searchAssignableStudents: async (query: string): Promise<any[]> => {
+    return fetchWithAuth(`/students/search-assignable?q=${encodeURIComponent(query)}`);
+  },
+
   // Upload mentor assignment CSV rows
   uploadMentorAssignments: async (rows: { rolls: string[]; facultyName: string }[]): Promise<any> => {
     return fetchWithAuth(`/mentor-assignments/upload`, {
       method: 'POST',
       body: JSON.stringify({ rows }),
     });
+  },
+
+  // Sync mentor_assignments → students.faculty_mentor_id (admin utility, idempotent)
+  syncMentorAssignments: async (): Promise<{ success: boolean; synced: number; cleared: number; message: string }> => {
+    return fetchWithAuth(`/mentor-assignments/sync`, { method: 'POST' });
   },
 
   // Reports & Analytics
