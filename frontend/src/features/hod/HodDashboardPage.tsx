@@ -1001,14 +1001,14 @@ export const HodDashboardPage: React.FC = () => {
                       <td className="py-3 px-4 font-black text-brand-primary">{s.cgpa > 0 ? `${s.cgpa} CGPA` : <span className="text-textSecondary italic text-xs font-normal">N/A</span>}</td>
                       <td className="py-3 px-4 text-xs font-bold text-[#FFA116]">
                         {s.isLcLinked ? (
-                          s.leetcode > 0 ? `${s.leetcode} Solved` : `Linked`
+                          `${s.leetcode} Solved`
                         ) : (
                           <span className="text-textSecondary font-semibold px-2 py-0.5 rounded-md bg-background border border-borderLine">Not Linked</span>
                         )}
                       </td>
                       <td className="py-3 px-4 text-xs text-textSecondary font-medium">
                         {s.isGhLinked ? (
-                          s.github > 0 ? `${s.github} Repos` : `Linked`
+                          `${s.github} Repos`
                         ) : (
                           <span className="text-textSecondary font-semibold px-2 py-0.5 rounded-md bg-background border border-borderLine">Not Linked</span>
                         )}
@@ -1107,7 +1107,7 @@ export const HodDashboardPage: React.FC = () => {
                         <p className="text-[11px] text-textSecondary">{s.regNo} • {s.section}</p>
                       </div>
                     </div>
-                    {s.isLcLinked && s.leetcode > 0 ? (
+                    {s.isLcLinked ? (
                       <span className="text-sm font-black text-[#FFA116]">{s.leetcode} Solved</span>
                     ) : (
                       <span className="text-xs font-semibold text-textSecondary bg-surface border border-borderLine px-2.5 py-1 rounded-lg">
