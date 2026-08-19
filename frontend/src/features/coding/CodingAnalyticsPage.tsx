@@ -108,7 +108,18 @@ export const CodingAnalyticsPage: React.FC = () => {
     };
   });
 
-  // Filter based on search query, year, and section
+  // ── Step 1: Compute GLOBAL ranks from FULL list (before any filter) ──
+  // This ensures ranks stay consistent regardless of search/filter.
+  const globalLcRanked = [...enrichedStudents].sort((a, b) => b.totalSolved - a.totalSolved);
+  const globalGhRanked = [...enrichedStudents].sort((a, b) => (b.repos + b.stars + b.followers) - (a.repos + a.stars + a.followers));
+  const globalCgpaRanked = [...enrichedStudents].sort((a, b) => b.cgpa - a.cgpa);
+
+  // Build rank maps keyed by regNo
+  const lcRankMap = new Map(globalLcRanked.map((s, i) => [s.regNo, i + 1]));
+  const ghRankMap = new Map(globalGhRanked.map((s, i) => [s.regNo, i + 1]));
+  const cgpaRankMap = new Map(globalCgpaRanked.map((s, i) => [s.regNo, i + 1]));
+
+  // ── Step 2: Filter based on search query, year, and section ──
   const filteredStudents = enrichedStudents.filter((s) => {
     const q = search.toLowerCase();
     const matchesSearch =
@@ -123,9 +134,9 @@ export const CodingAnalyticsPage: React.FC = () => {
     return matchesSearch && matchesYear && matchesSection;
   });
 
-  // Tab specific sorting
+  // ── Step 3: Sort filtered list for display order (same criteria) ──
   const leetcodeLeaderboard = [...filteredStudents].sort((a, b) => b.totalSolved - a.totalSolved);
-  const githubLeaderboard = [...filteredStudents].sort((a, b) => b.stars - a.stars);
+  const githubLeaderboard = [...filteredStudents].sort((a, b) => (b.repos + b.stars + b.followers) - (a.repos + a.stars + a.followers));
   const cgpaLeaderboard = [...filteredStudents].sort((a, b) => b.cgpa - a.cgpa);
 
   // Overall analytics stats computed dynamically from database records
@@ -313,8 +324,8 @@ export const CodingAnalyticsPage: React.FC = () => {
                     </td>
                   </tr>
                 )}
-                {leetcodeLeaderboard.map((s, idx) => {
-                  const rank = idx + 1;
+                {leetcodeLeaderboard.map((s) => {
+                  const rank = lcRankMap.get(s.regNo) ?? 0;
                   return (
                     <tr key={s.regNo} className="hover:bg-background/50 transition-colors">
                       <td className="py-3.5 px-4">
@@ -390,7 +401,7 @@ export const CodingAnalyticsPage: React.FC = () => {
             </div>
             <div>
               <h3 className="text-sm font-bold text-textPrimary">Verified Student GitHub Rankings</h3>
-              <p className="text-xs text-textSecondary">Ranked by verified GitHub stars earned across public repositories</p>
+              <p className="text-xs text-textSecondary">Ranked by composite GitHub score (repos + stars + followers)</p>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -416,8 +427,8 @@ export const CodingAnalyticsPage: React.FC = () => {
                     </td>
                   </tr>
                 )}
-                {githubLeaderboard.map((s, idx) => {
-                  const rank = idx + 1;
+                {githubLeaderboard.map((s) => {
+                  const rank = ghRankMap.get(s.regNo) ?? 0;
                   return (
                     <tr key={s.regNo} className="hover:bg-background/50 transition-colors">
                       <td className="py-3.5 px-4">
@@ -521,8 +532,8 @@ export const CodingAnalyticsPage: React.FC = () => {
                     </td>
                   </tr>
                 )}
-                {cgpaLeaderboard.map((s, idx) => {
-                  const rank = idx + 1;
+                {cgpaLeaderboard.map((s) => {
+                  const rank = cgpaRankMap.get(s.regNo) ?? 0;
                   return (
                     <tr key={s.regNo} className="hover:bg-background/50 transition-colors">
                       <td className="py-3.5 px-4">
