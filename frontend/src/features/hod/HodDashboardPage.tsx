@@ -41,7 +41,7 @@ import { PlacementPreferencesTab } from '../profile/tabs/PlacementPreferencesTab
 
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'] as const;
 const SECTIONS = ['Section A', 'Section B', 'Section C'] as const;
-const STANDINGS = ['Distinction', 'First Class', 'Second Class'] as const;
+const STANDINGS = ['Distinction', 'First Class', 'Second Class', 'Pass'] as const;
 const CODING_LEVELS = ['All Coders', 'Top Coders (>300 LC)', 'Active GitHub (>20 repos)'] as const;
 
 // HOD Department context
@@ -87,7 +87,13 @@ function mapStudentToHodEntry(student: any, index: number, liveSolved?: number):
   const isGhLinked = Boolean(rawGhHandle) && rawGhHandle !== 'Not Linked' && rawGhHandle !== '';
   const github = isGhLinked ? Number(student.github_repos || 0) : 0;
 
-  const standing = student.standing || (cgpa >= 9.0 ? 'Distinction' : (cgpa >= 6.5 ? 'First Class' : (cgpa > 0 ? 'Pass' : 'N/A')));
+  const standing = student.standing || (
+    cgpa >= 8.0 ? 'Distinction' :
+    (cgpa >= 6.5 && cgpa < 8.0) ? 'First Class' :
+    (cgpa >= 5.5 && cgpa < 6.5) ? 'Second Class' :
+    (cgpa > 4.5 && cgpa < 5.5) ? 'Pass' :
+    (cgpa > 0 ? 'Pass' : 'N/A')
+  );
 
   return {
     rank: index + 1,
@@ -291,7 +297,7 @@ export const HodDashboardPage: React.FC = () => {
       ? Math.round(lcStudents.reduce((s, p) => s + p.leetcode, 0) / lcStudents.length)
       : 0;
 
-    const distinctions = filteredDataset.filter((p) => p.standing.includes('Distinction')).length;
+    const distinctions = filteredDataset.filter((p) => p.cgpa >= 8.0 || p.standing.includes('Distinction')).length;
     const distinctionRatio = `${Math.round((distinctions / total) * 100)}%`;
 
     return { count: total, avgCgpa, avgLeetCode, distinctionRatio };
@@ -311,15 +317,19 @@ export const HodDashboardPage: React.FC = () => {
         : 0;
 
       const distinction = yearStudents.filter(
-        (s) => s.cgpa >= 9.0 || s.standing?.includes('Distinction')
+        (s) => s.cgpa >= 8.0 || s.standing?.includes('Distinction')
       ).length;
 
       const firstClass = yearStudents.filter(
-        (s) => (s.cgpa >= 8.0 && s.cgpa < 9.0) || s.standing?.includes('First')
+        (s) => (s.cgpa >= 6.5 && s.cgpa < 8.0) || s.standing?.includes('First')
       ).length;
 
       const secondClass = yearStudents.filter(
-        (s) => (s.cgpa >= 7.0 && s.cgpa < 8.0) || s.standing?.includes('Second') || (s.cgpa > 0 && s.cgpa < 8.0)
+        (s) => (s.cgpa >= 5.5 && s.cgpa < 6.5) || s.standing?.includes('Second')
+      ).length;
+
+      const passClass = yearStudents.filter(
+        (s) => (s.cgpa > 4.5 && s.cgpa < 5.5) || s.standing?.includes('Pass')
       ).length;
 
       return {
@@ -329,6 +339,7 @@ export const HodDashboardPage: React.FC = () => {
         distinction,
         firstClass,
         secondClass,
+        passClass,
       };
     });
   }, [mergedStudentDataset]);
@@ -347,11 +358,19 @@ export const HodDashboardPage: React.FC = () => {
         : 0;
 
       const distinction = secStudents.filter(
-        (s) => s.cgpa >= 9.0 || s.standing?.includes('Distinction')
+        (s) => s.cgpa >= 8.0 || s.standing?.includes('Distinction')
       ).length;
 
       const firstClass = secStudents.filter(
-        (s) => (s.cgpa >= 8.0 && s.cgpa < 9.0) || s.standing?.includes('First')
+        (s) => (s.cgpa >= 6.5 && s.cgpa < 8.0) || s.standing?.includes('First')
+      ).length;
+
+      const secondClass = secStudents.filter(
+        (s) => (s.cgpa >= 5.5 && s.cgpa < 6.5) || s.standing?.includes('Second')
+      ).length;
+
+      const passClass = secStudents.filter(
+        (s) => (s.cgpa > 4.5 && s.cgpa < 5.5) || s.standing?.includes('Pass')
       ).length;
 
       return {
@@ -360,6 +379,8 @@ export const HodDashboardPage: React.FC = () => {
         students: totalStudents,
         distinction,
         firstClass,
+        secondClass,
+        passClass,
       };
     });
   }, [mergedStudentDataset]);
@@ -701,7 +722,7 @@ export const HodDashboardPage: React.FC = () => {
               accentColor="amber"
               label="Distinction Rate"
               value={summaryMetrics.distinctionRatio}
-              subtext="Students with >9.0 CGPA"
+              subtext="Students with ≥ 8.0 CGPA (≥ 75%)"
             />
             <StatCard
               icon={<Code2 className="w-5 h-5" />}
@@ -726,28 +747,38 @@ export const HodDashboardPage: React.FC = () => {
                     <th className="py-3 px-4">Academic Year</th>
                     <th className="py-3 px-4">Enrolled Students</th>
                     <th className="py-3 px-4">Avg CGPA</th>
-                    <th className="py-3 px-4">Distinction (&gt; 9.0)</th>
-                    <th className="py-3 px-4">First Class (8.0–9.0)</th>
-                    <th className="py-3 px-4">Second Class (7.0–8.0)</th>
+                    <th className="py-3 px-4">Distinction (≥ 8.0)</th>
+                    <th className="py-3 px-4">First Class (6.5–7.99)</th>
+                    <th className="py-3 px-4">Second Class (5.5–6.49)</th>
+                    <th className="py-3 px-4">Pass Class (4.5–5.49)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-borderLine text-sm">
+                <tbody className="divide-y border-borderLine text-sm">
                   {yearCgpaSummary.map((y) => (
                     <tr key={y.year} className="hover:bg-background/50 transition-colors">
                       <td className="py-3.5 px-4 font-bold text-textPrimary">{y.year}</td>
                       <td className="py-3.5 px-4 text-textSecondary">{y.students} Students</td>
                       <td className="py-3.5 px-4 font-extrabold text-brand-primary">{y.avgCgpa}</td>
                       <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                           {y.distinction} Students
                         </span>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-brand-soft text-brand-primary">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-brand-soft text-brand-primary dark:bg-indigo-950/40 dark:text-indigo-400 border border-brand-primary/20">
                           {y.firstClass} Students
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-textSecondary">{y.secondClass} Students</td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                          {y.secondClass} Students
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border border-sky-200 dark:border-sky-800">
+                          {y.passClass} Students
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -768,8 +799,10 @@ export const HodDashboardPage: React.FC = () => {
                     <th className="py-3 px-4">Section</th>
                     <th className="py-3 px-4">Enrolled Students</th>
                     <th className="py-3 px-4">Avg CGPA</th>
-                    <th className="py-3 px-4">Distinction (&gt; 9.0)</th>
-                    <th className="py-3 px-4">First Class (8.0–9.0)</th>
+                    <th className="py-3 px-4">Distinction (≥ 8.0)</th>
+                    <th className="py-3 px-4">First Class (6.5–7.99)</th>
+                    <th className="py-3 px-4">Second Class (5.5–6.49)</th>
+                    <th className="py-3 px-4">Pass Class (4.5–5.49)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-borderLine text-sm">
@@ -779,13 +812,23 @@ export const HodDashboardPage: React.FC = () => {
                       <td className="py-3.5 px-4 text-textSecondary">{s.students} Students</td>
                       <td className="py-3.5 px-4 font-extrabold text-brand-primary">{s.avgCgpa > 0 ? s.avgCgpa : '—'}</td>
                       <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                           {s.distinction} Students
                         </span>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-brand-soft text-brand-primary">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-brand-soft text-brand-primary dark:bg-indigo-950/40 dark:text-indigo-400 border border-brand-primary/20">
                           {s.firstClass} Students
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                          {s.secondClass} Students
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border border-sky-200 dark:border-sky-800">
+                          {s.passClass} Students
                         </span>
                       </td>
                     </tr>
@@ -1015,7 +1058,11 @@ export const HodDashboardPage: React.FC = () => {
                       </td>
                       <td className="py-3 px-4">
                         <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                          s.standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700' : 'bg-brand-soft text-brand-primary'
+                          s.standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' :
+                          s.standing === 'First Class' ? 'bg-brand-soft text-brand-primary dark:bg-indigo-950/40 dark:text-indigo-400 border border-brand-primary/20' :
+                          s.standing === 'Second Class' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800' :
+                          s.standing === 'Pass' ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border border-sky-200 dark:border-sky-800' :
+                          'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
                         }`}>
                           {s.standing}
                         </span>
@@ -1259,7 +1306,7 @@ export const HodDashboardPage: React.FC = () => {
                                 const cgpa = Number(m.cgpa);
                                 const isAtRisk = cgpa > 0 && cgpa < 6.0;
                                 const initials = (m.name || '?').split(' ').map((n: string) => n[0]).join('');
-                                const standing = cgpa >= 9.0 ? 'Distinction' : cgpa >= 7.0 ? 'First Class' : cgpa >= 5.0 ? 'Second Class' : 'Pass';
+                                const standing = cgpa >= 8.0 ? 'Distinction' : (cgpa >= 6.5 && cgpa < 8.0) ? 'First Class' : (cgpa >= 5.5 && cgpa < 6.5) ? 'Second Class' : (cgpa > 4.5 && cgpa < 5.5) ? 'Pass' : (cgpa > 0 ? 'Pass' : 'N/A');
 
                                 return (
                                   <tr
@@ -1284,7 +1331,11 @@ export const HodDashboardPage: React.FC = () => {
                                     <td className="py-3.5 px-4 text-sm font-extrabold text-brand-primary">{cgpa > 0 ? cgpa.toFixed(2) : '—'}</td>
                                     <td className="py-3.5 px-4">
                                       <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                                        standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700' : 'bg-brand-soft text-brand-primary'
+                                        standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' :
+                                        standing === 'First Class' ? 'bg-brand-soft text-brand-primary dark:bg-indigo-950/40 dark:text-indigo-400 border border-brand-primary/20' :
+                                        standing === 'Second Class' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800' :
+                                        standing === 'Pass' ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border border-sky-200 dark:border-sky-800' :
+                                        'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
                                       }`}>
                                         {standing}
                                       </span>

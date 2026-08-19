@@ -97,7 +97,13 @@ export const PlacementEligibilitySection: React.FC<PlacementEligibilityProps> = 
       const phone = s.phone || 'N/A';
       const year = s.year || '3rd Year';
       const section = s.section ? (s.section.startsWith('Sec ') ? s.section : `Sec ${s.section}`) : 'Sec A';
-      const standing = s.standing || (cgpa >= 9.0 ? 'Distinction' : cgpa >= 6.5 ? 'First Class' : (cgpa > 0 ? 'Pass' : 'Enrolled'));
+      const standing = s.standing || (
+        cgpa >= 8.0 ? 'Distinction' :
+        (cgpa >= 6.5 && cgpa < 8.0) ? 'First Class' :
+        (cgpa >= 5.5 && cgpa < 6.5) ? 'Second Class' :
+        (cgpa > 4.5 && cgpa < 5.5) ? 'Pass' :
+        (cgpa > 0 ? 'Pass' : 'Enrolled')
+      );
 
       return {
         rank: idx + 1,
@@ -452,7 +458,13 @@ export const PlacementEligibilitySection: React.FC<PlacementEligibilityProps> = 
                   <td className="py-2.5 px-3 font-bold text-green-600">{s.leetcode > 0 ? `${s.leetcode} Solved` : '0'}</td>
                   <td className="py-2.5 px-3 font-medium text-textPrimary">{s.github > 0 ? `${s.github} Repos` : '0'}</td>
                   <td className="py-2.5 px-3">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      s.standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' :
+                      s.standing === 'First Class' ? 'bg-brand-soft text-brand-primary dark:bg-indigo-950/40 dark:text-indigo-400 border border-brand-primary/20' :
+                      s.standing === 'Second Class' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800' :
+                      s.standing === 'Pass' ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border border-sky-200 dark:border-sky-800' :
+                      'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                    }`}>
                       {s.standing}
                     </span>
                   </td>

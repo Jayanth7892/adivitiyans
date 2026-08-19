@@ -1028,7 +1028,7 @@ app.get('/students', async (req: Request, res: Response) => {
         const lcProfile = codingProfiles.find((p: any) => String(p.platform).toLowerCase() === 'leetcode');
         const ghProfile = codingProfiles.find((p: any) => String(p.platform).toLowerCase() === 'github');
 
-        const computedStanding = cgpa >= 9.0 ? 'First Class with Distinction' : 'First Class';
+        const computedStanding = cgpa >= 8.0 ? 'Distinction' : (cgpa >= 6.5 && cgpa < 8.0) ? 'First Class' : (cgpa >= 5.5 && cgpa < 6.5) ? 'Second Class' : (cgpa > 4.5 && cgpa < 5.5) ? 'Pass' : 'Pass';
 
         return {
           ...student,
@@ -3595,15 +3595,15 @@ app.get('/reports/hod-analytics', async (_req: Request, res: Response) => {
         department: 'Computer Science & Engineering (CSE)',
         totalStudents: 470,
         yearBreakdown: [
-          { year: '1st Year', avgCgpa: 8.85, students: 120, distinction: 42, firstClass: 55, secondClass: 18 },
-          { year: '2nd Year', avgCgpa: 8.95, students: 115, distinction: 45, firstClass: 50, secondClass: 15 },
-          { year: '3rd Year', avgCgpa: 9.12, students: 125, distinction: 54, firstClass: 55, secondClass: 13 },
-          { year: '4th Year', avgCgpa: 9.25, students: 110, distinction: 52, firstClass: 46, secondClass: 10 },
+          { year: '1st Year', avgCgpa: 8.85, students: 120, distinction: 42, firstClass: 55, secondClass: 15, passClass: 8 },
+          { year: '2nd Year', avgCgpa: 8.95, students: 115, distinction: 45, firstClass: 50, secondClass: 12, passClass: 8 },
+          { year: '3rd Year', avgCgpa: 9.12, students: 125, distinction: 54, firstClass: 55, secondClass: 10, passClass: 6 },
+          { year: '4th Year', avgCgpa: 9.25, students: 110, distinction: 52, firstClass: 46, secondClass: 8, passClass: 4 },
         ],
         sectionBreakdown: [
-          { section: 'Section A', avgCgpa: 9.15, students: 155, distinction: 68 },
-          { section: 'Section B', avgCgpa: 9.02, students: 160, distinction: 64 },
-          { section: 'Section C', avgCgpa: 8.95, students: 155, distinction: 61 },
+          { section: 'Section A', avgCgpa: 9.15, students: 155, distinction: 68, firstClass: 60, secondClass: 18, passClass: 9 },
+          { section: 'Section B', avgCgpa: 9.02, students: 160, distinction: 64, firstClass: 65, secondClass: 21, passClass: 10 },
+          { section: 'Section C', avgCgpa: 8.95, students: 155, distinction: 61, firstClass: 62, secondClass: 22, passClass: 10 },
         ],
         topRankers: Array.from(db.mockStore.students.values()).slice(0, 5),
       });
@@ -3618,9 +3618,10 @@ app.get('/reports/hod-analytics', async (_req: Request, res: Response) => {
       `SELECT s.year,
               COUNT(*) as students,
               ROUND(AVG(a.avg_gpa)::numeric, 2) as "avgCgpa",
-              COUNT(*) FILTER (WHERE a.avg_gpa >= 9.0) as distinction,
-              COUNT(*) FILTER (WHERE a.avg_gpa >= 7.0 AND a.avg_gpa < 9.0) as "firstClass",
-              COUNT(*) FILTER (WHERE a.avg_gpa >= 5.0 AND a.avg_gpa < 7.0) as "secondClass"
+              COUNT(*) FILTER (WHERE a.avg_gpa >= 8.0) as distinction,
+              COUNT(*) FILTER (WHERE a.avg_gpa >= 6.5 AND a.avg_gpa < 8.0) as "firstClass",
+              COUNT(*) FILTER (WHERE a.avg_gpa >= 5.5 AND a.avg_gpa < 6.5) as "secondClass",
+              COUNT(*) FILTER (WHERE a.avg_gpa > 4.5 AND a.avg_gpa < 5.5) as "passClass"
        FROM students s
        LEFT JOIN (SELECT student_id, AVG(semester_gpa) as avg_gpa FROM academics GROUP BY student_id) a
          ON s.roll_number = a.student_id
@@ -3633,7 +3634,10 @@ app.get('/reports/hod-analytics', async (_req: Request, res: Response) => {
       `SELECT 'Section ' || s.section as section,
               COUNT(*) as students,
               ROUND(AVG(a.avg_gpa)::numeric, 2) as "avgCgpa",
-              COUNT(*) FILTER (WHERE a.avg_gpa >= 9.0) as distinction
+              COUNT(*) FILTER (WHERE a.avg_gpa >= 8.0) as distinction,
+              COUNT(*) FILTER (WHERE a.avg_gpa >= 6.5 AND a.avg_gpa < 8.0) as "firstClass",
+              COUNT(*) FILTER (WHERE a.avg_gpa >= 5.5 AND a.avg_gpa < 6.5) as "secondClass",
+              COUNT(*) FILTER (WHERE a.avg_gpa > 4.5 AND a.avg_gpa < 5.5) as "passClass"
        FROM students s
        LEFT JOIN (SELECT student_id, AVG(semester_gpa) as avg_gpa FROM academics GROUP BY student_id) a
          ON s.roll_number = a.student_id
