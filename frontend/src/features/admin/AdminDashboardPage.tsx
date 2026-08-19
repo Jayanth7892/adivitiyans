@@ -211,9 +211,15 @@ export const AdminDashboardPage: React.FC = () => {
   // Top performers data dynamically mapped from real API students (using database stored stats)
   const performersData = [...students]
     .map((s, idx) => {
-      const cgpa = (s as any).cgpa !== undefined ? Number((s as any).cgpa) : 9.0;
+      const cgpa = (s as any).cgpa !== undefined ? Number((s as any).cgpa) : 0;
       const leetcodePts = (s as any).leetcode_solved !== undefined ? Number((s as any).leetcode_solved) : 0;
-      const status = (s as any).standing || (cgpa >= 9.0 ? 'Distinction' : 'First Class');
+      const status = (s as any).standing || (
+        cgpa >= 8.0 ? 'Distinction' :
+        (cgpa >= 6.5 && cgpa < 8.0) ? 'First Class' :
+        (cgpa >= 5.5 && cgpa < 6.5) ? 'Second Class' :
+        (cgpa > 4.5 && cgpa < 5.5) ? 'Pass' :
+        (cgpa > 0 ? 'Pass' : 'N/A')
+      );
       return {
         rank: idx + 1,
         name: s.name,
@@ -248,10 +254,10 @@ export const AdminDashboardPage: React.FC = () => {
 
   // CGPA band counts — computed from real student data for the performance tab stat cards
   const total = students.length || 1; // avoid division by zero
-  const cgpaAbove9  = students.filter(s => Number((s as any).cgpa ?? 0) > 9.0).length;
-  const cgpa8to9    = students.filter(s => { const c = Number((s as any).cgpa ?? 0); return c >= 8.0 && c <= 9.0; }).length;
-  const cgpa7to8    = students.filter(s => { const c = Number((s as any).cgpa ?? 0); return c >= 7.0 && c < 8.0; }).length;
-  const cgpaBelow7  = students.filter(s => Number((s as any).cgpa ?? 0) < 7.0 && (s as any).cgpa !== undefined && (s as any).cgpa !== null).length;
+  const cgpaAbove8  = students.filter(s => Number((s as any).cgpa ?? 0) >= 8.0).length;
+  const cgpa65to8   = students.filter(s => { const c = Number((s as any).cgpa ?? 0); return c >= 6.5 && c < 8.0; }).length;
+  const cgpa55to65  = students.filter(s => { const c = Number((s as any).cgpa ?? 0); return c >= 5.5 && c < 6.5; }).length;
+  const cgpaPass    = students.filter(s => { const c = Number((s as any).cgpa ?? 0); return c > 4.5 && c < 5.5; }).length;
 
   // Student CRUD handlers
   const openAddModal = () => {
@@ -538,7 +544,7 @@ export const AdminDashboardPage: React.FC = () => {
         <StatCard icon={<Users className="w-5 h-5" />} iconBgColor="bg-brand-soft text-brand-primary"
           accentColor="brand" label="Total Students" value={students.length} subtext="Active in platform" />
         <StatCard icon={<GraduationCap className="w-5 h-5" />} iconBgColor="bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-          accentColor="amber" label="CGPA > 9.0 (Distinction)" value="3 Students" subtext="Academic distinction" />
+          accentColor="amber" label="CGPA ≥ 8.0 (Distinction)" value={`${cgpaAbove8} Students`} subtext="Academic distinction (≥ 75%)" />
         <StatCard icon={<BookOpen className="w-5 h-5" />} iconBgColor="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
           accentColor="indigo" label="Avg Institution CGPA" value="9.09 / 10" subtext="High academic standing" />
         <StatCard icon={<Code2 className="w-5 h-5" />} iconBgColor="bg-[#FFA116]/10 text-[#FFA116]"
@@ -730,12 +736,12 @@ export const AdminDashboardPage: React.FC = () => {
       {activeTab === 'performance' && (
         <div className="space-y-6">
           {/* CGPA Band Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: 'CGPA > 9.0 (Distinction)',      count: cgpaAbove9,  color: 'text-brand-primary', pct: `${Math.round((cgpaAbove9  / total) * 100)}%` },
-              { label: 'CGPA 8.0–9.0 (First Class)',    count: cgpa8to9,    color: 'text-success',       pct: `${Math.round((cgpa8to9   / total) * 100)}%` },
-              { label: 'CGPA 7.0–8.0',                  count: cgpa7to8,    color: 'text-indigo-600',    pct: `${Math.round((cgpa7to8   / total) * 100)}%` },
-              { label: 'CGPA < 7.0 (Needs Support)',    count: cgpaBelow7,  color: 'text-alert',         pct: `${Math.round((cgpaBelow7 / total) * 100)}%` },
+              { label: 'CGPA ≥ 8.0 (Distinction)',      count: cgpaAbove8,  color: 'text-emerald-600',   pct: `${Math.round((cgpaAbove8  / total) * 100)}%` },
+              { label: 'CGPA 6.5–7.99 (First Class)',   count: cgpa65to8,   color: 'text-brand-primary', pct: `${Math.round((cgpa65to8   / total) * 100)}%` },
+              { label: 'CGPA 5.5–6.49 (Second Class)',  count: cgpa55to65,  color: 'text-amber-600',     pct: `${Math.round((cgpa55to65  / total) * 100)}%` },
+              { label: 'CGPA 4.51–5.49 (Pass Class)',   count: cgpaPass,    color: 'text-sky-600',       pct: `${Math.round((cgpaPass    / total) * 100)}%` },
             ].map((band) => (
               <div key={band.label} className="p-4 rounded-xl bg-surface border border-borderLine shadow-sm">
                 <p className="text-xs font-bold text-textSecondary uppercase leading-tight mb-2">{band.label}</p>
@@ -784,7 +790,7 @@ export const AdminDashboardPage: React.FC = () => {
                       <td className="py-3.5 px-4 font-bold text-textPrimary">{p.name}</td>
                       <td className="py-3.5 px-4 text-xs font-semibold text-textSecondary">{p.regNo}</td>
                       <td className="py-3.5 px-4 text-xs">{p.dept} • {p.year}</td>
-                      <td className="py-3.5 px-4 font-black text-green-600">{p.cgpa}</td>
+                      <td className="py-3.5 px-4 font-black text-green-600">{p.cgpa > 0 ? p.cgpa : '—'}</td>
                       <td className="py-3.5 px-4">
                         <a href={`https://leetcode.com/${p.leetcode}`} target="_blank" rel="noreferrer"
                           className="text-xs font-semibold text-[#FFA116] hover:underline flex items-center gap-0.5">
@@ -799,7 +805,15 @@ export const AdminDashboardPage: React.FC = () => {
                         </a>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-brand-soft text-brand-primary">{p.status}</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          p.status === 'Distinction' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' :
+                          p.status === 'First Class' ? 'bg-brand-soft text-brand-primary dark:bg-indigo-950/40 dark:text-indigo-400 border border-brand-primary/20' :
+                          p.status === 'Second Class' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800' :
+                          p.status === 'Pass' ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border border-sky-200 dark:border-sky-800' :
+                          'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                        }`}>
+                          {p.status}
+                        </span>
                       </td>
                     </tr>
                   ))}

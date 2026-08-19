@@ -91,7 +91,7 @@ export const CodingAnalyticsPage: React.FC = () => {
       year: s.year,
       section: s.section || '',
       cgpa: Number(cgpa.toFixed(2)),
-      standing: cgpa >= 9.0 ? 'First Class with Distinction' : (cgpa >= 6.5 ? 'First Class' : (cgpa > 0 ? 'Pass' : 'Unspecified')),
+      standing: cgpa >= 8.0 ? 'Distinction' : ((cgpa >= 6.5 && cgpa < 8.0) ? 'First Class' : ((cgpa >= 5.5 && cgpa < 6.5) ? 'Second Class' : ((cgpa > 4.5 && cgpa < 5.5) ? 'Pass' : (cgpa > 0 ? 'Pass' : 'Unspecified')))),
       isLcLinked,
       lcHandle: isLcLinked ? rawLcHandle : null,
       totalSolved,
@@ -156,7 +156,7 @@ export const CodingAnalyticsPage: React.FC = () => {
     : 0;
 
   const topRating = linkedLcStudents.length > 0 ? Math.max(...linkedLcStudents.map((s) => s.contestRating)) : 0;
-  const distinctionCount = enrichedStudents.filter((s) => s.cgpa >= 9.0).length;
+  const distinctionCount = enrichedStudents.filter((s) => s.cgpa >= 8.0).length;
 
   return (
     <div className="space-y-6">
@@ -211,9 +211,9 @@ export const CodingAnalyticsPage: React.FC = () => {
           icon={<Users className="w-5 h-5" />}
           iconBgColor="bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
           accentColor="indigo"
-          label="Distinction Class (> 9.0)"
+          label="Distinction Class (≥ 8.0)"
           value={`${distinctionCount} Students`}
-          subtext="Academic Excellence"
+          subtext="Academic Excellence (≥ 75%)"
         />
       </div>
 
@@ -558,7 +558,13 @@ export const CodingAnalyticsPage: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 font-black text-brand-primary text-sm">{s.cgpa} / 10.0</td>
                       <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-brand-soft text-brand-primary">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          s.standing === 'Distinction' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' :
+                          s.standing === 'First Class' ? 'bg-brand-soft text-brand-primary dark:bg-indigo-950/40 dark:text-indigo-400 border border-brand-primary/20' :
+                          s.standing === 'Second Class' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800' :
+                          s.standing === 'Pass' ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border border-sky-200 dark:border-sky-800' :
+                          'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+                        }`}>
                           {s.standing}
                         </span>
                       </td>

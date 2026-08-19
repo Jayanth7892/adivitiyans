@@ -39,11 +39,12 @@ import { PlacementEligibilitySection } from '../hod/components/PlacementEligibil
 // Helper: compute academic standing from CGPA
 const getStanding = (cgpa: number | string | undefined | null) => {
   const val = Number(cgpa) || 0;
-  if (val >= 9.0) return { label: `Distinction (${val.toFixed(2)})`, color: 'bg-success-soft text-success border-green-200' };
-  if (val >= 7.5) return { label: `First Class (${val.toFixed(2)})`, color: 'bg-blue-50 text-blue-700 border-blue-200' };
-  if (val >= 6.0) return { label: `Second Class (${val.toFixed(2)})`, color: 'bg-amber-50 text-amber-700 border-amber-200' };
-  if (val > 0)   return { label: `Pass (${val.toFixed(2)})`, color: 'bg-orange-50 text-orange-700 border-orange-200' };
-  return { label: 'No Data', color: 'bg-background text-textSecondary border-borderLine' };
+  if (val >= 8.0) return { label: `Distinction (${val.toFixed(2)})`, color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' };
+  if (val >= 6.5) return { label: `First Class (${val.toFixed(2)})`, color: 'bg-brand-soft text-brand-primary dark:bg-indigo-950/40 dark:text-indigo-400 border border-brand-primary/20' };
+  if (val >= 5.5) return { label: `Second Class (${val.toFixed(2)})`, color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800' };
+  if (val > 4.5 && val < 5.5) return { label: `Pass (${val.toFixed(2)})`, color: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border border-sky-200 dark:border-sky-800' };
+  if (val > 0)   return { label: `At Risk (${val.toFixed(2)})`, color: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-800' };
+  return { label: 'No Data', color: 'bg-background text-textSecondary border border-borderLine' };
 };
 
 export const FacultyDashboardPage: React.FC = () => {
@@ -80,7 +81,7 @@ export const FacultyDashboardPage: React.FC = () => {
 
   // Compute real stat card values
   const topStandingCount = useMemo(
-    () => mentees.filter((m: any) => Number(m.cgpa) >= 9.0).length,
+    () => mentees.filter((m: any) => Number(m.cgpa) >= 8.0).length,
     [mentees]
   );
   const realAvgGpa = useMemo(() => {
@@ -334,7 +335,7 @@ export const FacultyDashboardPage: React.FC = () => {
           icon={<Award className="w-5 h-5" />}
           iconBgColor="bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
           accentColor="amber"
-          label="Top GPA (9.0+)"
+          label="Distinction (8.0+)"
           value={topStandingCount}
           subtext={`Avg GPA: ${realAvgGpa || '—'}`}
         />
