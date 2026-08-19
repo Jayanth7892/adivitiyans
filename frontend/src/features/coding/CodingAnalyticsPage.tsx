@@ -108,33 +108,38 @@ export const CodingAnalyticsPage: React.FC = () => {
     };
   });
 
-  // ── Step 1: Compute GLOBAL ranks from FULL list (before any filter) ──
-  // This ensures ranks stay consistent regardless of search/filter.
-  const globalLcRanked = [...enrichedStudents].sort((a, b) => b.totalSolved - a.totalSolved);
-  const globalGhRanked = [...enrichedStudents].sort((a, b) => (b.repos + b.stars + b.followers) - (a.repos + a.stars + a.followers));
-  const globalCgpaRanked = [...enrichedStudents].sort((a, b) => b.cgpa - a.cgpa);
+  // ── Step 1: Apply year/section filters to define the RANKING POOL ──
+  // Ranks are computed within this pool (e.g., "rank 1 in 3rd Year").
+  // When no year/section is selected, the pool is ALL students (global ranks).
+  const rankingPool = enrichedStudents.filter((s) => {
+    const matchesYear = !yearFilter || s.year === yearFilter;
+    const matchesSection =
+      !sectionFilter || s.section === sectionFilter || s.section === `Section ${sectionFilter}`;
+    return matchesYear && matchesSection;
+  });
 
-  // Build rank maps keyed by regNo
-  const lcRankMap = new Map(globalLcRanked.map((s, i) => [s.regNo, i + 1]));
-  const ghRankMap = new Map(globalGhRanked.map((s, i) => [s.regNo, i + 1]));
-  const cgpaRankMap = new Map(globalCgpaRanked.map((s, i) => [s.regNo, i + 1]));
+  // ── Step 2: Compute ranks within the ranking pool ──
+  const poolLcRanked = [...rankingPool].sort((a, b) => b.totalSolved - a.totalSolved);
+  const poolGhRanked = [...rankingPool].sort((a, b) => (b.repos + b.stars + b.followers) - (a.repos + a.stars + a.followers));
+  const poolCgpaRanked = [...rankingPool].sort((a, b) => b.cgpa - a.cgpa);
 
-  // ── Step 2: Filter based on search query, year, and section ──
-  const filteredStudents = enrichedStudents.filter((s) => {
+  const lcRankMap = new Map(poolLcRanked.map((s, i) => [s.regNo, i + 1]));
+  const ghRankMap = new Map(poolGhRanked.map((s, i) => [s.regNo, i + 1]));
+  const cgpaRankMap = new Map(poolCgpaRanked.map((s, i) => [s.regNo, i + 1]));
+
+  // ── Step 3: Apply search filter for display (ranks from Step 2 are preserved) ──
+  const filteredStudents = rankingPool.filter((s) => {
     const q = search.toLowerCase();
-    const matchesSearch =
+    return (
       !q ||
       s.name.toLowerCase().includes(q) ||
       s.regNo.toLowerCase().includes(q) ||
       (s.lcHandle && s.lcHandle.toLowerCase().includes(q)) ||
-      (s.ghHandle && s.ghHandle.toLowerCase().includes(q));
-    const matchesYear = !yearFilter || s.year === yearFilter;
-    const matchesSection =
-      !sectionFilter || s.section === sectionFilter || s.section === `Section ${sectionFilter}`;
-    return matchesSearch && matchesYear && matchesSection;
+      (s.ghHandle && s.ghHandle.toLowerCase().includes(q))
+    );
   });
 
-  // ── Step 3: Sort filtered list for display order (same criteria) ──
+  // ── Step 4: Sort filtered list for display order (same criteria) ──
   const leetcodeLeaderboard = [...filteredStudents].sort((a, b) => b.totalSolved - a.totalSolved);
   const githubLeaderboard = [...filteredStudents].sort((a, b) => (b.repos + b.stars + b.followers) - (a.repos + a.stars + a.followers));
   const cgpaLeaderboard = [...filteredStudents].sort((a, b) => b.cgpa - a.cgpa);
