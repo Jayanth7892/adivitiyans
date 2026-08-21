@@ -990,8 +990,84 @@ app.get('/auth/validate-session', async (req: Request, res: Response) => {
 
 // ============================================================================
 
+// ── Throttled Background Auto-Sync ──────────────────────────────────────────
+// Automatically refreshes stale coding profiles (LeetCode/GitHub) in the
+// background whenever GET /students is called. Fire-and-forget: doesn't block
+// the response. Throttled to run at most once every 10 minutes.
+// ─────────────────────────────────────────────────────────────────────────────
+let lastAutoSyncTimestamp = 0;
+const AUTO_SYNC_THROTTLE_MS = 10 * 60 * 1000; // 10 minutes
+const AUTO_SYNC_STALE_HOURS = 2;              // sync profiles older than 2 hours
+const AUTO_SYNC_BATCH_LIMIT = 20;             // max profiles per auto-sync run
+
+function triggerBackgroundAutoSync() {
+  const now = Date.now();
+  if (now - lastAutoSyncTimestamp < AUTO_SYNC_THROTTLE_MS) return; // throttled
+  if (db.isMock) return;
+  lastAutoSyncTimestamp = now;
+
+  // Fire-and-forget — do NOT await this
+  (async () => {
+    try {
+      const staleRes = await db.query(
+        `SELECT student_id, platform, handle FROM coding_profiles
+         WHERE handle IS NOT NULL AND handle != '' AND handle != 'Not Linked'
+           AND (updated_at IS NULL OR updated_at < NOW() - INTERVAL '${AUTO_SYNC_STALE_HOURS} hours')
+         ORDER BY updated_at ASC NULLS FIRST
+         LIMIT $1`,
+        [AUTO_SYNC_BATCH_LIMIT]
+      );
+
+      const rows = staleRes.rows;
+      if (rows.length === 0) return;
+      console.log(`[AutoSync] Refreshing ${rows.length} stale coding profiles in background...`);
+
+      const CHUNK = 5;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const chunk = rows.slice(i, i + CHUNK);
+        await Promise.all(
+          chunk.map(async (row: any) => {
+            const { student_id, platform, handle } = row;
+            const platLower = String(platform).toLowerCase();
+            try {
+              if (platLower === 'leetcode') {
+                const lcData = await fetchLeetCodeStatsDirect(handle);
+                if (lcData) {
+                  await db.query(
+                    `UPDATE coding_profiles
+                     SET score_rating = $1, easy_count = $2, medium_count = $3, hard_count = $4,
+                         streak = COALESCE($5, streak), updated_at = CURRENT_TIMESTAMP
+                     WHERE student_id = $6 AND LOWER(platform) = 'leetcode'`,
+                    [lcData.solved, lcData.easy, lcData.medium, lcData.hard, lcData.streak || 0, student_id]
+                  ).catch(() => {});
+                }
+              } else if (platLower === 'github') {
+                const ghData = await fetchGitHubStatsDirect(handle);
+                if (ghData) {
+                  await db.query(
+                    `UPDATE coding_profiles
+                     SET repositories_count = $1, followers_count = $2, stars_count = $3,
+                         top_language = $4, updated_at = CURRENT_TIMESTAMP
+                     WHERE student_id = $5 AND LOWER(platform) = 'github'`,
+                    [ghData.repos, ghData.followers, ghData.stars, ghData.topLanguage, student_id]
+                  ).catch(() => {});
+                }
+              }
+            } catch (_) { /* individual profile failure — skip */ }
+          })
+        );
+      }
+      console.log(`[AutoSync] Background sync complete — ${rows.length} profiles refreshed.`);
+    } catch (err: any) {
+      console.warn('[AutoSync] Background sync error:', err.message || err);
+    }
+  })();
+}
+
 // GET /students — List/Search/Filter (Guarantees DISTINCT ON roll_number)
 app.get('/students', async (req: Request, res: Response) => {
+  // Kick off background auto-sync of stale coding profiles (fire-and-forget)
+  triggerBackgroundAutoSync();
   try {
     const { department, batch, section, year, standing, mentor_id, search } = req.query;
 

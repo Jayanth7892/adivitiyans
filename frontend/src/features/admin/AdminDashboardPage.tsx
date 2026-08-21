@@ -173,6 +173,8 @@ export const AdminDashboardPage: React.FC = () => {
   const { data: students = [], refetch } = useQuery({
     queryKey: ['adminStudents'],
     queryFn: () => api.getAllStudents(),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // Per-student sub-resources for inspection modal

@@ -54,6 +54,8 @@ export const CodingAnalyticsPage: React.FC = () => {
   const { data: students = [], isLoading, refetch } = useQuery({
     queryKey: ['leaderboardStudents'],
     queryFn: () => api.getAllStudents(),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // Deduplicate students by roll_number so no duplicate profiles exist

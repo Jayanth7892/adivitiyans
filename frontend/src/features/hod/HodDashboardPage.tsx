@@ -232,6 +232,8 @@ export const HodDashboardPage: React.FC = () => {
   const { data: students = [], refetch } = useQuery({
     queryKey: ['hodStudents'],
     queryFn: () => api.getAllStudents(),
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const handleForceCronSync = async () => {
