@@ -471,23 +471,24 @@ export const api = {
 
   // HOD Credential Management
   // Fetch current HOD email & password (admin-facing — shows DB override or env default)
-  getHodCredentials: async (): Promise<{ email: string; password: string; source: string; updated_at: string | null }> => {
-    return fetchWithAuth('/auth/hod-credentials');
+  getHodCredentials: async (department?: string): Promise<{ email: string; password: string; department: string; source: string; updated_at: string | null }> => {
+    const q = department ? `?department=${encodeURIComponent(department)}` : '';
+    return fetchWithAuth(`/auth/hod-credentials${q}`);
   },
 
   // HOD updates their own email/password — no current password required
-  updateHodCredentials: async (newEmail?: string, newPassword?: string): Promise<{ success: boolean; message: string; email: string }> => {
+  updateHodCredentials: async (newEmail?: string, newPassword?: string, department?: string): Promise<{ success: boolean; message: string; email: string }> => {
     return fetchWithAuth('/auth/hod-credentials', {
       method: 'PUT',
-      body: JSON.stringify({ new_email: newEmail || undefined, new_password: newPassword || undefined }),
+      body: JSON.stringify({ new_email: newEmail || undefined, new_password: newPassword || undefined, department }),
     });
   },
 
   // Admin resets HOD credentials without needing the current password
-  adminResetHodCredentials: async (newEmail?: string, newPassword?: string): Promise<{ success: boolean; message: string; email: string }> => {
+  adminResetHodCredentials: async (newEmail?: string, newPassword?: string, department?: string): Promise<{ success: boolean; message: string; email: string }> => {
     return fetchWithAuth('/auth/hod-credentials/admin-reset', {
       method: 'POST',
-      body: JSON.stringify({ new_email: newEmail || undefined, new_password: newPassword || undefined }),
+      body: JSON.stringify({ new_email: newEmail || undefined, new_password: newPassword || undefined, department }),
     });
   },
 
@@ -522,10 +523,10 @@ export const api = {
     return fetchWithAuth(`/super-admin/admins?caller_email=${encodeURIComponent(callerEmail)}`);
   },
 
-  createAdmin: async (callerEmail: string, name: string, email: string, password: string): Promise<{ success: boolean }> => {
+  createAdmin: async (callerEmail: string, name: string, email: string, password: string, department?: string): Promise<{ success: boolean }> => {
     return fetchWithAuth('/super-admin/admins', {
       method: 'POST',
-      body: JSON.stringify({ caller_email: callerEmail, name, email, password }),
+      body: JSON.stringify({ caller_email: callerEmail, name, email, password, department }),
     });
   },
 

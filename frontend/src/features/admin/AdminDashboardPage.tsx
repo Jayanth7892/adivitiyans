@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { VALID_DEPARTMENT_NAMES } from '../../lib/validation/auth';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
@@ -48,8 +49,6 @@ import { BulkImportModal } from './components/BulkImportModal';
 import { FacultyRecordsTable } from './components/FacultyRecordsTable';
 import { PlacementEligibilitySection } from '../hod/components/PlacementEligibilitySection';
 
-import { VALID_DEPARTMENT_NAMES } from '../../lib/validation/auth';
-
 const DEPARTMENTS = VALID_DEPARTMENT_NAMES;
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'] as const;
 
@@ -76,6 +75,7 @@ export const AdminDashboardPage: React.FC = () => {
   const isSuperAdmin = user?.role === 'admin' && SUPER_ADMIN_EMAILS.includes(user?.email ?? '');
 
   // HOD Credentials panel state
+  const [hodDept, setHodDept] = useState(user?.isSuperAdmin ? 'CSE (Data Science)' : (user?.department || 'CSE (Data Science)'));
   const [hodCreds, setHodCreds] = useState<{ email: string; source: string; updated_at: string | null } | null>(null);
   const [hodCredsLoading, setHodCredsLoading] = useState(false);
   const [adminResetEmail, setAdminResetEmail] = useState('');
@@ -121,8 +121,9 @@ export const AdminDashboardPage: React.FC = () => {
   const [showPwdMap, setShowPwdMap] = useState<Record<string, boolean>>({});
 
   // Admin Management panel state (super admin only)
-  type AdminRow = { email: string; name: string; password: string; created_by: string; created_at: string };
+  type AdminRow = { email: string; name: string; password: string; department?: string; created_by: string; created_at: string };
   const [adminList, setAdminList] = useState<AdminRow[]>([]);
+  const [newAdminDept, setNewAdminDept] = useState('CSE (Data Science)');
   const [adminListLoading, setAdminListLoading] = useState(false);
   const [showAdminPwdMap, setShowAdminPwdMap] = useState<Record<string, boolean>>({});
   const [adminPwdEditId, setAdminPwdEditId] = useState<string | null>(null);
@@ -513,7 +514,7 @@ export const AdminDashboardPage: React.FC = () => {
                   setSearchParams({ tab: t.key });
                   if (t.key === 'hod-credentials' && !hodCreds) {
                     setHodCredsLoading(true);
-                    api.getHodCredentials().then((data) => {
+                    api.getHodCredentials(hodDept).then((data) => {
                       setHodCreds(data);
                       setHodCredsLoading(false);
                     }).catch(() => setHodCredsLoading(false));
@@ -1217,7 +1218,7 @@ export const AdminDashboardPage: React.FC = () => {
               <button
                 onClick={() => {
                   setHodCredsLoading(true);
-                  api.getHodCredentials().then((data) => {
+                  api.getHodCredentials(hodDept).then((data) => {
                     setHodCreds(data);
                     setHodCredsLoading(false);
                   }).catch(() => setHodCredsLoading(false));
@@ -1228,6 +1229,29 @@ export const AdminDashboardPage: React.FC = () => {
                 <RefreshCw className={`w-4 h-4 ${hodCredsLoading ? 'animate-spin' : ''}`} />
               </button>
             </div>
+
+            {isSuperAdmin && (
+              <div className="mb-4 flex items-center gap-2">
+                <label className="text-xs font-semibold text-textSecondary uppercase tracking-wider">Viewing HOD for:</label>
+                <select
+                  value={hodDept}
+                  onChange={(e) => {
+                    const selected = e.target.value;
+                    setHodDept(selected);
+                    setHodCredsLoading(true);
+                    api.getHodCredentials(selected).then((data) => {
+                      setHodCreds(data);
+                      setHodCredsLoading(false);
+                    }).catch(() => setHodCredsLoading(false));
+                  }}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background font-bold text-brand-primary"
+                >
+                  {VALID_DEPARTMENT_NAMES.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {hodCredsLoading ? (
               <div className="flex items-center gap-2 text-xs text-textSecondary py-4">
@@ -1368,13 +1392,14 @@ export const AdminDashboardPage: React.FC = () => {
                     const result = await api.adminResetHodCredentials(
                       adminResetEmail || undefined,
                       adminResetPassword || undefined,
+                      hodDept
                     );
                     setAdminResetMessage({ type: 'success', text: `HOD credentials reset! New email: ${result.email}` });
                     setAdminResetEmail('');
                     setAdminResetPassword('');
                     setAdminResetConfirm('');
                     // Refresh credentials display
-                    const updated = await api.getHodCredentials().catch(() => null);
+                    const updated = await api.getHodCredentials(hodDept).catch(() => null);
                     if (updated) setHodCreds(updated);
                   } catch (err: any) {
                     setAdminResetMessage({ type: 'error', text: err.message || 'Reset failed.' });
@@ -1624,6 +1649,20 @@ export const AdminDashboardPage: React.FC = () => {
                   <input type="text" placeholder="Password (min 4 chars)" value={newAdminPassword} onChange={(e) => setNewAdminPassword(e.target.value)}
                     className="px-3 py-2 text-xs rounded-lg border border-borderLine bg-background focus:outline-none focus:border-brand-primary font-mono" />
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="flex flex-col">
+                    <label className="text-[10px] font-semibold text-textSecondary mb-1">Scope Department *</label>
+                    <select
+                      value={newAdminDept}
+                      onChange={(e) => setNewAdminDept(e.target.value)}
+                      className="px-3 py-2 text-xs rounded-lg border border-borderLine bg-background focus:outline-none focus:border-brand-primary font-medium"
+                    >
+                      {VALID_DEPARTMENT_NAMES.map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
                 {adminMsg?.key === 'add' && (
                   <p className={`text-[10px] font-semibold ${adminMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>{adminMsg.text}</p>
                 )}
@@ -1634,7 +1673,7 @@ export const AdminDashboardPage: React.FC = () => {
                       if (newAdminPassword.length < 4) { setAdminMsg({ key: 'add', type: 'error', text: 'Password min 4 chars.' }); return; }
                       setNewAdminSaving(true);
                       try {
-                        await api.createAdmin(user!.email, newAdminName, newAdminEmail, newAdminPassword);
+                        await api.createAdmin(user!.email, newAdminName, newAdminEmail, newAdminPassword, newAdminDept);
                         const rows = await api.getSuperAdminAdmins(user!.email);
                         setAdminList(rows);
                         setNewAdminName(''); setNewAdminEmail(''); setNewAdminPassword('');
@@ -1672,6 +1711,7 @@ export const AdminDashboardPage: React.FC = () => {
                     <tr className="border-b border-borderLine text-[11px] font-semibold text-textSecondary uppercase tracking-wider">
                       <th className="py-3 px-4">Email</th>
                       <th className="py-3 px-4">Name</th>
+                      <th className="py-3 px-4">Department Scope</th>
                       <th className="py-3 px-4">Password</th>
                       <th className="py-3 px-4">Created By</th>
                       <th className="py-3 px-4 text-right">Actions</th>
@@ -1686,6 +1726,7 @@ export const AdminDashboardPage: React.FC = () => {
                         <tr key={row.email} className="hover:bg-background/50 transition-colors">
                           <td className="py-3.5 px-4 text-xs font-bold text-brand-primary">{row.email}</td>
                           <td className="py-3.5 px-4 text-sm font-medium text-textPrimary">{row.name}</td>
+                          <td className="py-3.5 px-4 text-xs font-semibold text-textSecondary">{row.department || 'All'}</td>
                           <td className="py-3.5 px-4">
                             {isEditing ? (
                               <input type="text" value={adminPwdEditValue} onChange={(e) => setAdminPwdEditValue(e.target.value)} autoFocus
