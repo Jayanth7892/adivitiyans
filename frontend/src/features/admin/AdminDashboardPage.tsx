@@ -60,6 +60,7 @@ const INITIAL_FACULTY = [
 
 // The 3 fixed super admin emails — used to derive isSuperAdmin flag from user.email
 const SUPER_ADMIN_EMAILS = [
+  'admin@rgmcet.edu.in',
   'jayakrushna1622@gmail.com',
   'dineshkumarpathipati@gmail.com',
   'jayanthkumarnaidu777@gmail.com',

@@ -443,6 +443,7 @@ async function isSuperAdminCaller(callerEmail: string): Promise<boolean> {
 }
 
 const SUPER_ADMIN_EMAILS_LOWER = [
+  'admin@rgmcet.edu.in',
   'jayakrushna1622@gmail.com',
   'dineshkumarpathipati@gmail.com',
   'jayanthkumarnaidu777@gmail.com',

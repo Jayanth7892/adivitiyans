@@ -316,6 +316,11 @@ async function ensureSchema(p: Pool) {
      VALUES (1, 'hodcseds@rgmcet.edu.in', 'cseds@2026', 'CSE (Data Science)')
      ON CONFLICT (id) DO UPDATE SET department = COALESCE(hod_credentials.department, 'CSE (Data Science)');`,
 
+    // Seed ECE HOD credentials
+    `INSERT INTO hod_credentials (email, password, department)
+     VALUES ('hodece@rgmcet.edu.in', 'hod@2026', 'ECE')
+     ON CONFLICT (LOWER(department)) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password;`,
+
     // Semester unlock settings — HOD/Admin controls which semesters students can fill
     `CREATE TABLE IF NOT EXISTS semester_unlock_settings (
       year_label VARCHAR(20) PRIMARY KEY,
@@ -353,8 +358,9 @@ async function ensureSchema(p: Pool) {
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`,
 
-    // Seed the 3 super admins — DO NOTHING on conflict so changed passwords survive redeploys
+    // Seed the super admins — DO NOTHING on conflict so changed passwords survive redeploys
     `INSERT INTO super_admin_credentials (email, password) VALUES
+      ('admin@rgmcet.edu.in', 'admin@2026'),
       ('jayakrushna1622@gmail.com', 'jdj275152'),
       ('dineshkumarpathipati@gmail.com', 'jdj275152'),
       ('jayanthkumarnaidu777@gmail.com', 'jdj275152')
@@ -374,9 +380,11 @@ async function ensureSchema(p: Pool) {
     // Migration: add department column to existing admin_accounts
     `ALTER TABLE admin_accounts ADD COLUMN IF NOT EXISTS department VARCHAR(100);`,
 
+    `DELETE FROM admin_accounts WHERE LOWER(email) = 'admin@rgmcet.edu.in';`,
+
     `INSERT INTO admin_accounts (email, name, password, department, created_by) VALUES
-      ('admin@rgmcet.edu.in', 'College Administrator', 'admin@2026', 'CSE (Data Science)', 'System')
-     ON CONFLICT (email) DO UPDATE SET department = COALESCE(admin_accounts.department, 'CSE (Data Science)');`,
+      ('admincse@rgmcet.edu.in', 'CSE Department Admin', 'admin@2026', 'CSE', 'System')
+     ON CONFLICT (email) DO UPDATE SET department = 'CSE', password = 'admin@2026';`,
 
     // Index for department-based lookups
     `CREATE INDEX IF NOT EXISTS idx_students_department ON students(department);`,
