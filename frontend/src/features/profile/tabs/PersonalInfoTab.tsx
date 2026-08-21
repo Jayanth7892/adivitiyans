@@ -13,21 +13,9 @@ interface PersonalInfoTabProps {
   onRefresh: () => void;
 }
 
-const DEPARTMENTS = [
-  'CSE (Data Science)',
-  'CSE',
-  'Data Science',
-  'IT',
-  'ECE',
-  'EEE',
-  'Mechanical',
-  'Civil',
-  'Chemical',
-  'AI & ML',
-  'Cyber Security',
-  'MBA',
-  'MCA',
-];
+import { VALID_DEPARTMENT_NAMES } from '../../../lib/validation/auth';
+
+const DEPARTMENTS = VALID_DEPARTMENT_NAMES;
 
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
 
@@ -59,7 +47,7 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, acade
       phone: student?.phone || '',
       address: student?.address || '',
       native_place: student?.native_place || '',
-      department: student?.department || 'CSE (Data Science)',
+      department: student?.department || user?.department || '',
       batch: student?.batch || '2023-2027',
       section: student?.section || '',
       hostel_day_scholar: (student?.hostel_day_scholar as any) || 'Day Scholar',
@@ -70,7 +58,7 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, acade
       financial_background: student?.financial_background || '',
       linkedin_url: student?.linkedin_url || '',
     });
-  }, [student, activeName, activeRoll, activeEmail, reset]);
+  }, [student, activeName, activeRoll, activeEmail, reset, user]);
 
   const onSubmit = async (data: any) => {
     if (!activeRoll) return; // auth not ready yet — prevent malformed API call
@@ -83,7 +71,7 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, acade
         roll_number: data.roll_number || student?.roll_number || activeRoll,
         email: data.email || student?.email || activeEmail,
         year: data.year && data.year !== '' ? data.year : (student?.year || '3rd Year'),
-        department: data.department && data.department !== '' ? data.department : (student?.department || 'CSE (Data Science)'),
+        department: data.department && data.department !== '' ? data.department : (student?.department || user?.department || ''),
         batch: data.batch && data.batch !== '' ? data.batch : (student?.batch || '2023-2027'),
         section: data.section && data.section !== '' ? data.section : (student?.section || ''),
         hostel_day_scholar: data.hostel_day_scholar && data.hostel_day_scholar !== '' ? data.hostel_day_scholar : (student?.hostel_day_scholar || 'Day Scholar'),
@@ -193,9 +181,7 @@ export const PersonalInfoTab: React.FC<PersonalInfoTabProps> = ({ student, acade
               </select>
             ) : (
               <p className="text-sm font-medium text-textPrimary">
-                {(!s?.department || s.department === 'CSE' || s.department === 'Data Science' || s.department === 'CSE (Data Science)')
-                  ? 'CSE(Data Science)'
-                  : s.department}
+                {s?.department || 'Not specified'}
               </p>
             )}
           </div>

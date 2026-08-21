@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../db';
+import { getDeptFromRollNumber, DEPARTMENT_CODE_MAP } from './validation';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Auth Middleware for Advitiyans API
@@ -15,6 +16,8 @@ export interface AuthPayload {
   email: string;
   role: string;   // 'student' | 'faculty' | 'hod' | 'admin'
   regNo: string;  // roll_number or faculty_id
+  department?: string;  // department name for scoped access
+  isSuperAdmin?: boolean;  // true for the 3 super admin emails
 }
 
 // Extend Express Request to carry auth info
@@ -72,10 +75,17 @@ export async function extractAuth(req: Request, _res: Response, next: NextFuncti
     if (payload && payload.email) {
       const email = (payload.email || '').toLowerCase();
       const derivedRegNo = (payload['custom:reg_no'] || (email.includes('@') ? email.split('@')[0] : '')).toUpperCase();
+      const role = (payload['custom:role'] || 'student').toLowerCase();
+      // Derive department from roll number for students, or from DB for faculty
+      let department: string | undefined;
+      if (role === 'student' && derivedRegNo.length === 10) {
+        department = getDeptFromRollNumber(derivedRegNo);
+      }
       req.auth = {
         email,
-        role: (payload['custom:role'] || 'student').toLowerCase(),
+        role,
         regNo: derivedRegNo,
+        department,
       };
       return next();
     }
@@ -100,37 +110,88 @@ export async function extractAuth(req: Request, _res: Response, next: NextFuncti
       }
 
       if (demoRole === 'admin') {
+        // Look up admin's department from DB
+        let adminDept: string | undefined;
+        let superAdmin = false;
+        if (email && !db.isMock) {
+          try {
+            const saCheck = await db.query(
+              'SELECT 1 FROM super_admin_credentials WHERE LOWER(email) = LOWER($1)', [email]
+            );
+            if (saCheck.rows.length > 0) {
+              superAdmin = true;
+              adminDept = '*'; // super admin sees all
+            } else {
+              const adminCheck = await db.query(
+                'SELECT department FROM admin_accounts WHERE LOWER(email) = LOWER($1)', [email]
+              );
+              if (adminCheck.rows.length > 0) {
+                adminDept = adminCheck.rows[0].department || undefined;
+              }
+            }
+          } catch { /* ignore */ }
+        }
         req.auth = {
           email: email || 'admin@rgmcet.edu.in',
           role: 'admin',
-          regNo: 'ADMIN_MASTER',
+          regNo: 'ADMIN',
+          department: adminDept,
+          isSuperAdmin: superAdmin,
         };
         return next();
       }
 
       if (demoRole === 'hod') {
+        // Look up HOD's department from DB
+        let hodDept: string | undefined;
+        if (email && !db.isMock) {
+          try {
+            const hodCheck = await db.query(
+              'SELECT department FROM hod_credentials WHERE LOWER(email) = LOWER($1)', [email]
+            );
+            if (hodCheck.rows.length > 0) {
+              hodDept = hodCheck.rows[0].department || undefined;
+            }
+          } catch { /* ignore */ }
+        }
         req.auth = {
-          email: email || 'hodcseds@rgmcet.edu.in',
+          email: email || 'hod@rgmcet.edu.in',
           role: 'hod',
-          regNo: 'HOD_CSEDS',
+          regNo: hodDept ? `HOD_${hodDept.replace(/[^A-Za-z]/g, '').toUpperCase()}` : 'HOD',
+          department: hodDept,
         };
         return next();
       }
 
       if (demoRole === 'faculty') {
+        // Look up faculty department from DB
+        let facDept: string | undefined;
+        if (email && !db.isMock) {
+          try {
+            const facCheck = await db.query(
+              'SELECT department FROM faculty WHERE LOWER(email) = LOWER($1)', [email]
+            );
+            if (facCheck.rows.length > 0) {
+              facDept = facCheck.rows[0].department || undefined;
+            }
+          } catch { /* ignore */ }
+        }
         req.auth = {
           email: email || 'faculty@rgmcet.edu.in',
           role: 'faculty',
           regNo: email ? `FAC_${email.split('@')[0].toUpperCase()}` : 'FAC_FACULTY',
+          department: facDept,
         };
         return next();
       }
 
       if (demoRole === 'student') {
+        const studentRegNo = email ? email.split('@')[0].toUpperCase() : '';
         req.auth = {
           email: email || '',
           role: 'student',
-          regNo: email ? email.split('@')[0].toUpperCase() : '',
+          regNo: studentRegNo,
+          department: studentRegNo.length === 10 ? getDeptFromRollNumber(studentRegNo) : undefined,
         };
         return next();
       }

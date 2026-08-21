@@ -48,7 +48,9 @@ import { BulkImportModal } from './components/BulkImportModal';
 import { FacultyRecordsTable } from './components/FacultyRecordsTable';
 import { PlacementEligibilitySection } from '../hod/components/PlacementEligibilitySection';
 
-const DEPARTMENTS = ['CSE (Data Science)', 'CSE', 'Data Science', 'IT', 'ECE', 'EEE', 'Mechanical', 'Civil', 'AI & ML', 'Cyber Security', 'MBA', 'MCA'];
+import { VALID_DEPARTMENT_NAMES } from '../../lib/validation/auth';
+
+const DEPARTMENTS = VALID_DEPARTMENT_NAMES;
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'] as const;
 
 // Initial Faculty data store (admin-managed)
@@ -87,6 +89,9 @@ export const AdminDashboardPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState<string>(
+    user?.isSuperAdmin ? 'All' : (user?.department || 'CSE (Data Science)')
+  );
   const [showAddModal, setShowAddModal] = useState(false);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState<StudentProfile | null>(null);
@@ -171,8 +176,8 @@ export const AdminDashboardPage: React.FC = () => {
 
   // Queries
   const { data: students = [], refetch } = useQuery({
-    queryKey: ['adminStudents'],
-    queryFn: () => api.getAllStudents(),
+    queryKey: ['adminStudents', departmentFilter],
+    queryFn: () => api.getAllStudents({ department: departmentFilter === 'All' ? undefined : departmentFilter }),
     staleTime: 0,
     refetchOnMount: 'always',
   });
@@ -571,6 +576,17 @@ export const AdminDashboardPage: React.FC = () => {
                   className="w-full bg-transparent focus:outline-none text-textPrimary"
                 />
               </div>
+              {isSuperAdmin ? (
+                <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-medium">
+                  <option value="All">All Departments</option>
+                  {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              ) : (
+                <span className="px-3 py-1.5 text-xs rounded-lg border border-brand-primary/30 bg-brand-soft text-brand-primary font-bold">
+                  {departmentFilter}
+                </span>
+              )}
               <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}
                 className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-background text-textPrimary font-medium">
                 <option value="">All Academic Years</option>

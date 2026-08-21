@@ -20,7 +20,7 @@ export const Footer: React.FC = () => {
           <Heart className="w-3 h-3 text-red-500 fill-red-500 inline-block" />
           <span>from</span>
           <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-brand-soft text-brand-primary text-[10px] font-bold">
-            Data Science
+            RGMCET
           </span>
           <span>by</span>
           <span className="text-textPrimary font-bold">Jaya Krushna</span>,

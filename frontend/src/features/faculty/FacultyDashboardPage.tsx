@@ -3,7 +3,9 @@ import { useAuth } from '../../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-const DEPARTMENTS = ['CSE (Data Science)', 'CSE', 'Data Science', 'IT', 'ECE', 'EEE', 'Mechanical', 'Civil', 'AI & ML', 'Cyber Security', 'MBA', 'MCA'];
+import { VALID_DEPARTMENT_NAMES } from '../../lib/validation/auth';
+
+const DEPARTMENTS = VALID_DEPARTMENT_NAMES;
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
 import {
   Users,
@@ -75,8 +77,8 @@ export const FacultyDashboardPage: React.FC = () => {
   });
 
   const { data: deptReport } = useQuery({
-    queryKey: ['deptReport'],
-    queryFn: () => api.getDepartmentReport('CSE(Data Science)'),
+    queryKey: ['deptReport', user?.department],
+    queryFn: () => api.getDepartmentReport(user?.department),
   });
 
   // Compute real stat card values
@@ -532,7 +534,7 @@ export const FacultyDashboardPage: React.FC = () => {
       {/* Tab 2: Department Skill Analytics */}
       {activeTab === 'analytics' && (
         <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm space-y-4">
-          <h3 className="text-base font-bold text-textPrimary">Department Tech Skill Analytics (CSE - Data Science)</h3>
+          <h3 className="text-base font-bold text-textPrimary">Department Tech Skill Analytics ({user?.department || 'Department'})</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div className="p-4 bg-background border border-borderLine rounded-xl">
               <h4 className="font-bold text-textPrimary mb-2">Top Verified Tools</h4>

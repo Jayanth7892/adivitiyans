@@ -121,6 +121,27 @@ async function ensureSchema(p: Pool) {
   schemaInitialized = true;
 
   const ddlStatements = [
+    // Departments lookup table — must be created first (before students references it)
+    `CREATE TABLE IF NOT EXISTS departments (
+      code VARCHAR(4) PRIMARY KEY,
+      name VARCHAR(100) NOT NULL UNIQUE,
+      short_name VARCHAR(20) NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );`,
+
+    // Seed the 9 departments — safe to re-run
+    `INSERT INTO departments (code, name, short_name) VALUES
+      ('01', 'Civil', 'CIVIL'),
+      ('02', 'EEE', 'EEE'),
+      ('03', 'Mechanical', 'MECH'),
+      ('04', 'ECE', 'ECE'),
+      ('05', 'CSE', 'CSE'),
+      ('32', 'CSE (Data Science)', 'DS'),
+      ('33', 'CSE (AI & ML)', 'AIML'),
+      ('34', 'CSE (BS)', 'BS'),
+      ('37', 'CSE (Cyber Security)', 'CYS')
+     ON CONFLICT (code) DO NOTHING;`,
+
     `CREATE TABLE IF NOT EXISTS faculty (
       faculty_id VARCHAR(50) PRIMARY KEY,
       name VARCHAR(100) NOT NULL,
@@ -139,7 +160,7 @@ async function ensureSchema(p: Pool) {
       phone VARCHAR(20),
       address TEXT,
       native_place VARCHAR(100),
-      department VARCHAR(50) NOT NULL DEFAULT 'CSE(Data Science)',
+      department VARCHAR(50) NOT NULL,
       batch VARCHAR(20) NOT NULL DEFAULT '2023-2027',
       section VARCHAR(10) DEFAULT 'A',
       hostel_day_scholar VARCHAR(20) DEFAULT 'Day Scholar',
@@ -153,11 +174,16 @@ async function ensureSchema(p: Pool) {
       resume_url TEXT,
       linkedin_url TEXT,
       linkedin_updated TIMESTAMP WITH TIME ZONE,
+      is_lateral_entry BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`,
 
-    `UPDATE students SET department = 'CSE(Data Science)' WHERE department IS NULL OR department = '' OR department = 'CSE' OR department = 'Data Science' OR department = 'CSE (Data Science)';`,
+    // Migration: add is_lateral_entry column for existing DBs
+    `ALTER TABLE students ADD COLUMN IF NOT EXISTS is_lateral_entry BOOLEAN DEFAULT FALSE;`,
+
+    // Migration: normalize legacy DS department names to 'CSE (Data Science)'
+    `UPDATE students SET department = 'CSE (Data Science)' WHERE department IN ('CSE(Data Science)', 'Data Science', 'CSE (Data Science) ');`,
 
     `CREATE TABLE IF NOT EXISTS academics (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -267,18 +293,28 @@ async function ensureSchema(p: Pool) {
      VALUES ('HOD_CSEDS', 'Dr. HOD (CSE & Data Science)', 'hodcseds@rgmcet.edu.in', 'Data Science', 'hod')
      ON CONFLICT (email) DO UPDATE SET role = 'hod', department = 'Data Science';`,
 
-    // HOD credentials table — plain-text email+password managed by HOD and visible to admin
+    // HOD credentials table — per-department HOD login credentials
     `CREATE TABLE IF NOT EXISTS hod_credentials (
       id SERIAL PRIMARY KEY,
       email VARCHAR(100) NOT NULL,
       password TEXT NOT NULL,
+      department VARCHAR(100),
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`,
 
+    // Migration: add department column to existing hod_credentials
+    `ALTER TABLE hod_credentials ADD COLUMN IF NOT EXISTS department VARCHAR(100);`,
+
+    // Set existing DS HOD row's department if not set
+    `UPDATE hod_credentials SET department = 'CSE (Data Science)' WHERE department IS NULL OR department = '';`,
+
+    // Create unique index on department for hod_credentials
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_hod_dept ON hod_credentials(LOWER(department)) WHERE department IS NOT NULL;`,
+
     // Seed HOD credentials with env defaults if no row exists yet
-    `INSERT INTO hod_credentials (id, email, password)
-     VALUES (1, 'hodcseds@rgmcet.edu.in', 'cseds@2026')
-     ON CONFLICT (id) DO NOTHING;`,
+    `INSERT INTO hod_credentials (id, email, password, department)
+     VALUES (1, 'hodcseds@rgmcet.edu.in', 'cseds@2026', 'CSE (Data Science)')
+     ON CONFLICT (id) DO UPDATE SET department = COALESCE(hod_credentials.department, 'CSE (Data Science)');`,
 
     // Semester unlock settings — HOD/Admin controls which semesters students can fill
     `CREATE TABLE IF NOT EXISTS semester_unlock_settings (
@@ -324,19 +360,27 @@ async function ensureSchema(p: Pool) {
       ('jayanthkumarnaidu777@gmail.com', 'jdj275152')
      ON CONFLICT (email) DO NOTHING;`,
 
-    // Regular admin accounts — created/managed by super admins
+    // Regular admin accounts — created/managed by super admins, scoped to a department
     `CREATE TABLE IF NOT EXISTS admin_accounts (
       email VARCHAR(100) PRIMARY KEY,
       name  VARCHAR(100) NOT NULL DEFAULT 'Admin',
       password TEXT NOT NULL,
+      department VARCHAR(100),
       created_by VARCHAR(100),
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );`,
 
-    `INSERT INTO admin_accounts (email, name, password, created_by) VALUES
-      ('admin@rgmcet.edu.in', 'College Administrator', 'admin@2026', 'System')
-     ON CONFLICT (email) DO NOTHING;`,
+    // Migration: add department column to existing admin_accounts
+    `ALTER TABLE admin_accounts ADD COLUMN IF NOT EXISTS department VARCHAR(100);`,
+
+    `INSERT INTO admin_accounts (email, name, password, department, created_by) VALUES
+      ('admin@rgmcet.edu.in', 'College Administrator', 'admin@2026', 'CSE (Data Science)', 'System')
+     ON CONFLICT (email) DO UPDATE SET department = COALESCE(admin_accounts.department, 'CSE (Data Science)');`,
+
+    // Index for department-based lookups
+    `CREATE INDEX IF NOT EXISTS idx_students_department ON students(department);`,
+    `CREATE INDEX IF NOT EXISTS idx_faculty_department ON faculty(department);`,
 
     // Single-session enforcement table — one active session per email
     // Must exist before any delete route tries to clean up user_sessions

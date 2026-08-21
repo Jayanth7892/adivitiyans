@@ -172,7 +172,7 @@ export const ProfilePage: React.FC = () => {
                 {/* Meta row */}
                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
                   {[
-                    ((!student?.department || student.department === 'CSE' || student.department === 'Data Science' || student.department === 'CSE (Data Science)') ? 'CSE (Data Science)' : student?.department),
+                    (student?.department || 'Department'),
                     student?.batch ? `Batch ${student.batch}` : null,
                     student?.year ?? null,
                     student?.section ? `Sec ${student.section}` : null,

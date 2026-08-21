@@ -22,6 +22,8 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
   const [unlockLoading, setUnlockLoading] = useState(true);
   const { user } = useAuth();
   const activeRollNo = user?.rollNumber || '';
+  const isLateral = user?.isLateralEntry || (activeRollNo.length === 10 && activeRollNo.charAt(4) === '5');
+  const semestersToDisplay = isLateral ? [3, 4, 5, 6, 7, 8] : [1, 2, 3, 4, 5, 6, 7, 8];
 
   // Fetch semester unlock settings for this student's year
   useEffect(() => {
@@ -141,8 +143,11 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
                   size="md"
                   onClick={() => {
                     setEditingSemester(null);
+                    const nextSemNumber = isLateral
+                      ? (sortedAcademics.find((a) => a.semester >= 3) ? (sortedAcademics[sortedAcademics.length - 1]?.semester || 2) + 1 : 3)
+                      : (sortedAcademics.length || 0) + 1;
                     reset({
-                      semester: (sortedAcademics.length || 0) + 1,
+                      semester: nextSemNumber,
                       semester_gpa: 9.0,
                       programming_grade: 'O',
                       attendance_pct: 95.0,
@@ -153,7 +158,7 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
                   }}
                   icon={<Plus className="w-4 h-4" />}
                 >
-                  + Enter Semester {sortedAcademics.length + 1} GPA
+                  + Enter Semester GPA
                 </PillButton>
               </div>
             ) : (
@@ -262,14 +267,21 @@ export const AcademicsTab: React.FC<AcademicsTabProps> = ({ academics, readOnly 
         )}
       </div>
 
-      {/* 3. Semester Cards Grid (Sem 1 to Sem 8) */}
+      {/* 3. Semester Cards Grid (Sem 1 to Sem 8, or Sem 3 to Sem 8 for Lateral Entry) */}
       <div className="space-y-4">
-        <h3 className="text-base font-bold text-textPrimary">
-          Semester Performance Breakdown{!readOnly && ' (Click any semester to enter/edit)'}
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold text-textPrimary">
+            Semester Performance Breakdown{!readOnly && ' (Click any semester to enter/edit)'}
+          </h3>
+          {isLateral && (
+            <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-300">
+              Lateral Entry (Sem 1 &amp; 2 Excluded)
+            </span>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((semNum) => {
+          {semestersToDisplay.map((semNum) => {
             const record = sortedAcademics.find((a) => Number(a.semester) === semNum);
             const prevRecord = sortedAcademics.find((a) => Number(a.semester) === semNum - 1);
 

@@ -224,7 +224,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onMenuToggle }) => {
                             <div>
                               <p className="font-bold text-textPrimary">{s.name}</p>
                               <p className="text-[10px] text-textMuted mt-0.5">
-                                {s.roll_number} • {(!s.department || s.department === 'CSE' || s.department === 'Data Science' || s.department === 'CSE (Data Science)') ? 'CSE(Data Science)' : s.department}
+                                {s.roll_number} • {s.department || 'N/A'}
                               </p>
                             </div>
                             <span className="text-[10px] font-semibold text-success bg-success-soft px-2 py-0.5 rounded-lg">

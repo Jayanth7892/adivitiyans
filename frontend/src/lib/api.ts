@@ -125,15 +125,14 @@ export const api = {
     }
   },
   // Admin & HOD Login — credentials validated server-side (never stored in frontend)
-  // Backend reads from Lambda env vars: ADMIN_MASTER_EMAIL, ADMIN_MASTER_PASS, HOD_MASTER_EMAIL, HOD_MASTER_PASS
-  adminLogin: async (email: string, password: string): Promise<{ valid: boolean; role?: 'admin' | 'hod'; error?: string }> => {
+  adminLogin: async (email: string, password: string, department?: string): Promise<{ valid: boolean; role?: 'admin' | 'hod'; isSuperAdmin?: boolean; department?: string; error?: string }> => {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s max
       const res = await fetch(`${API_BASE_URL}/auth/admin-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, department }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -437,17 +436,24 @@ export const api = {
     return fetchWithAuth(`/mentor-assignments/sync`, { method: 'POST' });
   },
 
+  // Departments
+  getDepartments: async (): Promise<{ code: string; name: string; short_name: string }[]> => {
+    return fetchWithAuth(`/departments`);
+  },
+
   // Reports & Analytics
-  getDepartmentReport: async (dept: string = 'CSE(Data Science)') => {
-    return fetchWithAuth(`/reports/department/${dept}`);
+  getDepartmentReport: async (dept?: string) => {
+    return fetchWithAuth(`/reports/department/${dept ? encodeURIComponent(dept) : ''}`);
   },
 
-  getHodAnalytics: async () => {
-    return fetchWithAuth(`/reports/hod-analytics`);
+  getHodAnalytics: async (dept?: string) => {
+    const q = dept ? `?department=${encodeURIComponent(dept)}` : '';
+    return fetchWithAuth(`/reports/hod-analytics${q}`);
   },
 
-  getPlacementSummary: async () => {
-    return fetchWithAuth(`/reports/placement-summary`);
+  getPlacementSummary: async (dept?: string) => {
+    const q = dept ? `?department=${encodeURIComponent(dept)}` : '';
+    return fetchWithAuth(`/reports/placement-summary${q}`);
   },
 
   bulkImportStudents: async (students: any[]) => {

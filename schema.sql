@@ -3,6 +3,26 @@
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- 0. Departments Lookup Table
+CREATE TABLE IF NOT EXISTS departments (
+    code VARCHAR(4) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    short_name VARCHAR(20) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO departments (code, name, short_name) VALUES
+  ('01', 'Civil', 'CIVIL'),
+  ('02', 'EEE', 'EEE'),
+  ('03', 'Mechanical', 'MECH'),
+  ('04', 'ECE', 'ECE'),
+  ('05', 'CSE', 'CSE'),
+  ('32', 'CSE (Data Science)', 'DS'),
+  ('33', 'CSE (AI & ML)', 'AIML'),
+  ('34', 'CSE (BS)', 'BS'),
+  ('37', 'CSE (Cyber Security)', 'CYS')
+ON CONFLICT (code) DO NOTHING;
+
 -- 1. Faculty Table
 CREATE TABLE IF NOT EXISTS faculty (
     faculty_id VARCHAR(50) PRIMARY KEY,
@@ -25,7 +45,7 @@ CREATE TABLE IF NOT EXISTS students (
     phone VARCHAR(20),
     address TEXT,
     native_place VARCHAR(100),
-    department VARCHAR(50) NOT NULL DEFAULT 'CSE(Data Science)',
+    department VARCHAR(50) NOT NULL,
     batch VARCHAR(20) NOT NULL DEFAULT '',
     section VARCHAR(10) DEFAULT '',
     hostel_day_scholar VARCHAR(20) DEFAULT '',
@@ -39,10 +59,11 @@ CREATE TABLE IF NOT EXISTS students (
     resume_url TEXT,
     linkedin_url TEXT,
     linkedin_updated TIMESTAMP WITH TIME ZONE,
+    is_lateral_entry BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT check_roll_number_format CHECK (roll_number ~ '^\d{5}[A-Za-z]32\d{2}$'),
+    CONSTRAINT check_roll_number_format CHECK (roll_number ~ '^\d{4}[15][Aa](01|02|03|04|05|32|33|34|37)[0-9A-Za-z]{2}$'),
     CONSTRAINT check_rgmcet_email CHECK (email ~* '^[a-zA-Z0-9._%+-]+@rgmcet\.edu\.in$')
 );
 

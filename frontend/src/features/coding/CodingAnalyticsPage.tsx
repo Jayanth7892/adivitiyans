@@ -7,6 +7,7 @@ import {
 import { api } from '../../lib/api';
 import { StudentProfile } from '../../types';
 import { StatCard } from '../../components/common/StatCard';
+import { useAuth } from '../../context/AuthContext';
 
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'] as const;
 
@@ -45,6 +46,7 @@ interface EnrichedStudent {
 }
 
 export const CodingAnalyticsPage: React.FC = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'leetcode' | 'github' | 'cgpa'>('leetcode');
   const [yearFilter, setYearFilter] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
@@ -191,7 +193,7 @@ export const CodingAnalyticsPage: React.FC = () => {
           accentColor="brand"
           label="Average CGPA"
           value={`${avgCgpa} / 10`}
-          subtext="Data Science Program Average"
+          subtext={`${user?.department || 'Department'} Program Average`}
         />
         <StatCard
           icon={<Trophy className="w-5 h-5" />}

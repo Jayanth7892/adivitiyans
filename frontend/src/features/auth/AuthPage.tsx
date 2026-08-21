@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, UserCheck, Lock, CheckCircle2, XCircle, Loader2, Sparkles, Eye, EyeOff } from 'lucide-react';
-import { studentSignUpSchema, facultySignUpSchema, loginSchema, StudentSignUpInput, FacultySignUpInput, LoginInput } from '../../lib/validation/auth';
+import { studentSignUpSchema, facultySignUpSchema, loginSchema, StudentSignUpInput, FacultySignUpInput, LoginInput, DEPARTMENT_CODE_MAP, VALID_DEPARTMENT_NAMES, getDeptCodeFromRollNumber, getDeptFromRollNumber } from '../../lib/validation/auth';
 import { api } from '../../lib/api';
 import { cognitoSignUp, cognitoSignIn, cognitoSignOut, isCognitoConfigError } from '../../lib/cognitoAuth';
 import { useAuth } from '../../context/AuthContext';
@@ -17,6 +17,7 @@ import { UserRole } from '../../types';
 export const AuthPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<UserRole>('student');
   const [isSignUp, setIsSignUp] = useState(false);
+  const [loginDept, setLoginDept] = useState<string>('CSE (Data Science)');
   const [regNoStatus, setRegNoStatus] = useState<{ loading: boolean; available?: boolean; message?: string }>({ loading: false });
   const [emailStatus, setEmailStatus] = useState<{ loading: boolean; available?: boolean; message?: string }>({ loading: false });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -74,6 +75,13 @@ export const AuthPage: React.FC = () => {
     // Auto-sync college email with student registration number (e.g. 23091a3205@rgmcet.edu.in)
     const expectedEmail = `${watchedRegNo.toLowerCase()}@rgmcet.edu.in`;
     setValueSignUp('email', expectedEmail, { shouldValidate: true });
+
+    // Auto-detect department from registration number code
+    const deptCode = getDeptCodeFromRollNumber(watchedRegNo.toUpperCase());
+    const matchedDept = DEPARTMENT_CODE_MAP[deptCode];
+    if (matchedDept) {
+      setValueSignUp('department', matchedDept, { shouldValidate: true });
+    }
 
     const timer = setTimeout(async () => {
       setRegNoStatus({ loading: true });
@@ -165,7 +173,7 @@ export const AuthPage: React.FC = () => {
         name: data.fullName,
         email: data.email,
         year: data.year,
-        department: 'CSE(Data Science)',
+        department: data.department,
         batch: '2023-2027',
         section: 'A',
       }).catch((dbErr: any) => {
@@ -173,7 +181,7 @@ export const AuthPage: React.FC = () => {
       });
 
       // 3. Log in to app context and navigate immediately (session registration is non-blocking)
-      login(data.email, 'student', regNo, data.fullName, jwtToken);
+      login(data.email, 'student', regNo, data.fullName, jwtToken, data.department);
       registerSession(data.email, 'student');
       navigate('/dashboard');
     } catch (err: any) {
@@ -212,7 +220,7 @@ export const AuthPage: React.FC = () => {
         console.warn('[DB Faculty Create Notice]:', dbErr.message);
       });
 
-      login(data.email, 'faculty', generatedFacId, data.fullName, jwtToken);
+      login(data.email, 'faculty', generatedFacId, data.fullName, jwtToken, data.department);
       registerSession(data.email, 'faculty');
       navigate('/faculty/dashboard');
     } catch (err: any) {
@@ -251,7 +259,7 @@ export const AuthPage: React.FC = () => {
         console.warn('[DB HOD Create Notice]:', dbErr.message);
       });
 
-      login(data.email, 'hod', generatedHodId, data.fullName, jwtToken);
+      login(data.email, 'hod', generatedHodId, data.fullName, jwtToken, data.department);
       registerSession(data.email, 'hod');
       navigate('/hod/dashboard');
     } catch (err: any) {
@@ -287,14 +295,15 @@ export const AuthPage: React.FC = () => {
       // ── MASTER ADMIN LOGIN HANDLER ──
       // Route all 'admin' tab logins to the backend for server-side credential validation
       if (activeTab === 'admin') {
-        const authResult = await api.adminLogin(data.email, data.password);
+        const authResult = await api.adminLogin(data.email, data.password, loginDept);
         if (!authResult.valid) {
           throw new Error(authResult.error || 'Incorrect password. Please enter valid admin credentials.');
         }
 
         // Sign out any lingering student Cognito session so it doesn't pollute the admin token
         cognitoSignOut();
-        login(data.email, 'admin', 'ADMIN_MASTER', 'System Administrator', undefined);
+        const effectiveDept = authResult.department || loginDept || 'CSE (Data Science)';
+        login(data.email, 'admin', 'ADMIN_MASTER', 'System Administrator', undefined, effectiveDept, authResult.isSuperAdmin);
         registerSession(data.email, 'admin');
         navigate('/admin/dashboard');
         return;
@@ -303,7 +312,7 @@ export const AuthPage: React.FC = () => {
       // ── MASTER HOD LOGIN HANDLER ──
       // Route all 'hod' tab logins to the backend for server-side credential validation
       if (activeTab === 'hod') {
-        const hodAuthResult = await api.adminLogin(data.email, data.password);
+        const hodAuthResult = await api.adminLogin(data.email, data.password, loginDept);
         if (!hodAuthResult.valid || hodAuthResult.role !== 'hod') {
           throw new Error(hodAuthResult.error || 'Incorrect password. Please enter the valid HOD password.');
         }
@@ -311,36 +320,30 @@ export const AuthPage: React.FC = () => {
         // Clear any lingering student Cognito session before attempting HOD Cognito sign-in
         cognitoSignOut();
 
-        // Attempt Cognito sign in for JWT (best-effort; HOD works without JWT if Cognito fails)
         try {
           const cognitoResult = await cognitoSignIn(data.email, data.password);
           jwtToken = cognitoResult.idToken;
         } catch (cognitoErr: any) {
-          // Cognito sign-in failed — HOD account may not exist in Cognito yet
           console.warn('[HOD Cognito Notice]:', cognitoErr.message);
         }
 
-        // Auto-provision HOD record in Postgres DB using the email they logged in with
         const hodLoginEmail = data.email;
         let hod = await api.getFacultyByEmail(hodLoginEmail).catch(() => null);
-        if (!hod) {
-          // Also try legacy email in case of first login after credential update
-          hod = await api.getFacultyByEmail(hodLoginEmail).catch(() => null);
-        }
+        const effectiveDept = hodAuthResult.department || loginDept || 'CSE (Data Science)';
         if (!hod) {
           await api.createFaculty({
-            faculty_id: 'HOD_CSEDS',
+            faculty_id: `HOD_${effectiveDept.replace(/[^A-Za-z]/g, '').toUpperCase()}`,
             name: 'Dr. HOD',
             email: hodLoginEmail,
-            department: 'Data Science',
+            department: effectiveDept,
             role: 'hod',
           }).catch((dbErr: any) => console.warn('[DB HOD Create Notice]:', dbErr.message));
           hod = await api.getFacultyByEmail(hodLoginEmail).catch(() => null);
         }
 
-        rollNo = 'HOD_CSEDS';
+        rollNo = `HOD_${effectiveDept.replace(/[^A-Za-z]/g, '').toUpperCase()}`;
         displayName = hod ? hod.name : 'Dr. HOD';
-        login(hodLoginEmail, 'hod', rollNo, displayName, jwtToken);
+        login(hodLoginEmail, 'hod', rollNo, displayName, jwtToken, effectiveDept);
         registerSession(hodLoginEmail, 'hod'); // non-blocking
         navigate('/hod/dashboard');
         return;
@@ -477,6 +480,15 @@ export const AuthPage: React.FC = () => {
 
         rollNo = student.roll_number;
         displayName = student.name;
+        const studentDept = student.department || (rollNo ? getDeptFromRollNumber(rollNo) : 'CSE (Data Science)');
+        
+        // Enforce department matching on student login
+        if (loginDept && studentDept && studentDept !== loginDept) {
+          cognitoSignOut();
+          throw new Error(`Department mismatch: Your account belongs to ${studentDept}, but you selected ${loginDept}. Please select ${studentDept} to log in.`);
+        }
+
+        login(data.email, 'student', rollNo, displayName, jwtToken, studentDept);
       } else if (activeTab === 'faculty') {
         let faculty = await api.getFacultyByEmail(data.email).catch(() => null);
         if (!faculty) {
@@ -486,16 +498,17 @@ export const AuthPage: React.FC = () => {
             faculty_id: facId,
             name: facName,
             email: data.email,
-            department: 'CSE(Data Science)',
+            department: loginDept || 'CSE (Data Science)',
             role: 'mentor',
           }).catch(() => {});
           faculty = await api.getFacultyByEmail(data.email).catch(() => null);
         }
         rollNo = faculty?.faculty_id || `FAC_${data.email.split('@')[0].toUpperCase()}`;
         displayName = faculty?.name || 'Faculty Member';
+        const facDept = faculty?.department || loginDept || 'CSE (Data Science)';
+        login(data.email, activeTab, rollNo, displayName, jwtToken, facDept);
       }
 
-      login(data.email, activeTab, rollNo, displayName, jwtToken);
       registerSession(data.email, activeTab); // non-blocking — navigate immediately
       if ((activeTab as string) === 'admin') {
         navigate('/admin/dashboard');
@@ -628,14 +641,14 @@ export const AuthPage: React.FC = () => {
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <label className="block text-xs font-semibold text-textPrimary">Registration Number *</label>
-                    <span className="text-[10px] text-textSecondary">Format: 23091A3251</span>
+                    <span className="text-[10px] text-textSecondary">Format: 23091A0428 (or 23095A0428)</span>
                   </div>
                   <div className="relative">
                     <input
                       {...registerSignUp('registrationNumber')}
                       type="text"
                       maxLength={10}
-                      placeholder="e.g. 23091A3251"
+                      placeholder="e.g. 23091A0428"
                       className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background uppercase focus:outline-none focus:ring-2 focus:ring-brand-primary pr-10"
                     />
                     <div className="absolute right-3 top-2.5">
@@ -655,6 +668,22 @@ export const AuthPage: React.FC = () => {
                   )}
                   {signUpErrors.registrationNumber && (
                     <p className="text-xs text-alert mt-1">{signUpErrors.registrationNumber.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-textPrimary mb-1">Department *</label>
+                  <select
+                    {...registerSignUp('department')}
+                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  >
+                    <option value="">Select Department</option>
+                    {VALID_DEPARTMENT_NAMES.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                  {signUpErrors.department && (
+                    <p className="text-xs text-alert mt-1">{signUpErrors.department.message}</p>
                   )}
                 </div>
 
@@ -687,7 +716,7 @@ export const AuthPage: React.FC = () => {
                       {...registerSignUp('email')}
                       type="email"
                       readOnly={Boolean(watchedRegNo && watchedRegNo.length === 10)}
-                      placeholder="e.g. 23091a3205@rgmcet.edu.in"
+                      placeholder="e.g. 23091a0428@rgmcet.edu.in"
                       className={`w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine focus:outline-none focus:ring-2 focus:ring-brand-primary pr-10 ${
                         watchedRegNo && watchedRegNo.length === 10
                           ? 'bg-brand-soft/30 cursor-not-allowed font-bold text-brand-primary border-brand-primary/40'
@@ -787,6 +816,19 @@ export const AuthPage: React.FC = () => {
               /* STUDENT LOGIN FORM */
               <form onSubmit={handleLoginSubmit(onLogin)} className="space-y-4">
                 <div>
+                  <label className="block text-xs font-semibold text-textPrimary mb-1">Department *</label>
+                  <select
+                    value={loginDept}
+                    onChange={(e) => setLoginDept(e.target.value)}
+                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary font-medium"
+                  >
+                    {VALID_DEPARTMENT_NAMES.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
                   <label className="block text-xs font-semibold text-textPrimary mb-1">Student Email *</label>
                   <input
                     {...registerLogin('email')}
@@ -869,12 +911,9 @@ export const AuthPage: React.FC = () => {
                   {...registerFacultySignUp('department')}
                   className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary"
                 >
-                  <option value="CSE (Data Science)">CSE (Data Science)</option>
-                  <option value="CSE">Computer Science & Engineering (CSE)</option>
-                  <option value="ECE">Electronics & Communication (ECE)</option>
-                  <option value="EEE">Electrical & Electronics (EEE)</option>
-                  <option value="ME">Mechanical Engineering (ME)</option>
-                  <option value="CE">Civil Engineering (CE)</option>
+                  {VALID_DEPARTMENT_NAMES.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
                 </select>
                 {facultySignUpErrors.department && (
                   <p className="text-xs text-alert mt-1">{facultySignUpErrors.department.message}</p>
@@ -1004,6 +1043,19 @@ export const AuthPage: React.FC = () => {
 
 
               <form onSubmit={handleLoginSubmit(onLogin)} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-textPrimary mb-1">Department *</label>
+                  <select
+                    value={loginDept}
+                    onChange={(e) => setLoginDept(e.target.value)}
+                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary font-medium"
+                  >
+                    {VALID_DEPARTMENT_NAMES.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-textPrimary mb-1">
                     {activeTab === 'faculty' ? 'Faculty Email' : activeTab === 'hod' ? 'HOD Official Email' : 'Admin Email'}

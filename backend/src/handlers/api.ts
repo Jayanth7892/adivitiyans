@@ -17,6 +17,9 @@ import {
   placementProfileSchema,
   REGISTRATION_NUMBER_REGEX,
   RGMCET_EMAIL_REGEX,
+  DEPARTMENT_CODE_MAP,
+  getDeptFromRollNumber,
+  isLateralEntry,
 } from '../lib/validation';
 import { extractAuth, requireAuth, requireRole, requireOwnerOrRole } from '../lib/authMiddleware';
 import bcrypt from 'bcryptjs';
@@ -304,7 +307,7 @@ app.get('/', (_req: Request, res: Response) => {
 // ============================================================================
 app.post('/auth/admin-login', async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, department } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'email and password are required' });
     }
@@ -320,27 +323,27 @@ app.post('/auth/admin-login', async (req: Request, res: Response) => {
         );
         if (saResult.rows.length > 0) {
           if (saResult.rows[0].password === password) {
-            return res.json({ valid: true, role: 'admin', isSuperAdmin: true, email: saResult.rows[0].email });
+            return res.json({ valid: true, role: 'admin', isSuperAdmin: true, department: '*', email: saResult.rows[0].email });
           }
-          // Email matches a super admin but password is wrong → reject immediately
           await new Promise(resolve => setTimeout(resolve, 600));
           return res.status(401).json({ valid: false, error: 'Invalid email or password.' });
         }
       } catch {
-        // Table may not exist on first cold-start; fall through to next check
+        // Table may not exist on first cold-start; fall through
       }
 
       // ── Priority 2: Regular admin accounts (DB) ───────────────────────────
       try {
         const adminResult = await db.query(
-          'SELECT email, name, password FROM admin_accounts WHERE LOWER(email) = $1',
+          'SELECT email, name, password, department FROM admin_accounts WHERE LOWER(email) = $1',
           [emailLower]
         );
         if (adminResult.rows.length > 0) {
-          if (adminResult.rows[0].password === password) {
-            return res.json({ valid: true, role: 'admin', isSuperAdmin: false, email: adminResult.rows[0].email });
+          const adminRow = adminResult.rows[0];
+          if (adminRow.password === password) {
+            const assignedDept = adminRow.department || department || 'CSE (Data Science)';
+            return res.json({ valid: true, role: 'admin', isSuperAdmin: false, department: assignedDept, email: adminRow.email });
           }
-          // Email matches a regular admin but password is wrong → reject immediately
           await new Promise(resolve => setTimeout(resolve, 600));
           return res.status(401).json({ valid: false, error: 'Invalid email or password.' });
         }
@@ -349,13 +352,34 @@ app.post('/auth/admin-login', async (req: Request, res: Response) => {
       }
     }
 
-    // ── Priority 3: Legacy env-var admin/HOD (fails closed if env vars not set) ──
+    // ── Priority 3: HOD credentials (DB) ───────────────────────────────────
+    if (!db.isMock) {
+      try {
+        let hodDbResult = await db.query('SELECT email, password, department FROM hod_credentials WHERE LOWER(email) = $1', [emailLower]);
+        if (hodDbResult.rows.length === 0 && department) {
+          hodDbResult = await db.query('SELECT email, password, department FROM hod_credentials WHERE LOWER(department) = LOWER($1)', [department]);
+        }
+        if (hodDbResult.rows.length === 0) {
+          hodDbResult = await db.query('SELECT email, password, department FROM hod_credentials LIMIT 1');
+        }
+        if (hodDbResult.rows.length > 0) {
+          const hodRow = hodDbResult.rows[0];
+          if ((emailLower === hodRow.email.toLowerCase() || (department && hodRow.department && department.toLowerCase() === hodRow.department.toLowerCase())) && password === hodRow.password) {
+            const assignedDept = hodRow.department || department || 'CSE (Data Science)';
+            return res.json({ valid: true, role: 'hod', department: assignedDept, email: hodRow.email });
+          }
+        }
+      } catch {
+        // Fall through
+      }
+    }
+
+    // ── Priority 4: Legacy env-var admin/HOD ─────────────────────────────────
     const adminEmail = process.env.ADMIN_MASTER_EMAIL?.toLowerCase();
     const adminPass  = process.env.ADMIN_MASTER_PASS;
     const hodEmail   = process.env.HOD_MASTER_EMAIL?.toLowerCase();
     const hodPass    = process.env.HOD_MASTER_PASS;
 
-    // Brute-force protection: every failed branch now has a minimum 500ms delay
     const failWithDelay = async (msg: string) => {
       await new Promise(resolve => setTimeout(resolve, 500));
       return res.status(401).json({ valid: false, error: msg });
@@ -363,40 +387,39 @@ app.post('/auth/admin-login', async (req: Request, res: Response) => {
 
     if (adminEmail && emailLower === adminEmail) {
       if (adminPass && password === adminPass) {
-        return res.json({ valid: true, role: 'admin', isSuperAdmin: false, email: adminEmail });
+        return res.json({ valid: true, role: 'admin', isSuperAdmin: true, department: '*', email: adminEmail });
       }
       return failWithDelay('Invalid email or password.');
     }
 
-    // Check DB-persisted HOD credentials first (takes precedence over env vars when set)
-    if (!db.isMock) {
-      try {
-        const hodDbResult = await db.query('SELECT email, password FROM hod_credentials LIMIT 1');
-        if (hodDbResult.rows.length > 0) {
-          const hodRow = hodDbResult.rows[0];
-          if (emailLower === hodRow.email.toLowerCase() && password === hodRow.password) {
-            return res.json({ valid: true, role: 'hod', email: hodRow.email });
-          }
-          // Email matched a DB HOD row but password wrong
-          return failWithDelay('Invalid email or password.');
-        }
-      } catch {
-        // hod_credentials table may not exist yet — fall back to env vars
-      }
-    }
-
-    // Fall back to env var HOD credentials
     if (hodEmail && emailLower === hodEmail) {
       if (hodPass && password === hodPass) {
-        return res.json({ valid: true, role: 'hod', email: hodEmail });
+        return res.json({ valid: true, role: 'hod', department: department || 'CSE (Data Science)', email: hodEmail });
       }
       return failWithDelay('Invalid email or password.');
     }
 
-    // Unknown email — delay then reject
     return failWithDelay('Invalid email or password.');
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /departments — Returns list of all departments
+app.get('/departments', async (_req: Request, res: Response) => {
+  try {
+    if (db.isMock) {
+      const depts = Object.entries(DEPARTMENT_CODE_MAP).map(([code, name]: [string, string]) => ({
+        code,
+        name,
+        short_name: name.split(' ')[0],
+      }));
+      return res.json(depts);
+    }
+    const result = await db.query('SELECT code, name, short_name FROM departments ORDER BY code ASC');
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -425,7 +448,7 @@ const SUPER_ADMIN_EMAILS_LOWER = [
   'jayanthkumarnaidu777@gmail.com',
 ];
 
-// GET /super-admin/admins — list all regular admins (email, name, password, created_at)
+// GET /super-admin/admins — list all regular admins (email, name, password, department, created_at)
 app.get('/super-admin/admins', requireRole('admin'), async (req: Request, res: Response) => {
   try {
     const callerEmail = String(req.query.caller_email || '');
@@ -433,7 +456,7 @@ app.get('/super-admin/admins', requireRole('admin'), async (req: Request, res: R
       return res.status(403).json({ error: 'Super admin access required' });
     }
     const result = await db.query(
-      'SELECT email, name, password, created_by, created_at FROM admin_accounts ORDER BY created_at DESC'
+      'SELECT email, name, password, department, created_by, created_at FROM admin_accounts ORDER BY created_at DESC'
     );
     res.json(result.rows);
   } catch (err: any) {
@@ -444,7 +467,7 @@ app.get('/super-admin/admins', requireRole('admin'), async (req: Request, res: R
 // POST /super-admin/admins — create a regular admin
 app.post('/super-admin/admins', requireRole('admin'), async (req: Request, res: Response) => {
   try {
-    const { caller_email, name, email, password } = req.body;
+    const { caller_email, name, email, password, department } = req.body;
     if (!await isSuperAdminCaller(caller_email)) {
       return res.status(403).json({ error: 'Super admin access required' });
     }
@@ -454,15 +477,15 @@ app.post('/super-admin/admins', requireRole('admin'), async (req: Request, res: 
     if (String(password).length < 4) {
       return res.status(400).json({ error: 'Password must be at least 4 characters' });
     }
-    // Prevent adding a super admin email as a regular admin
     if (SUPER_ADMIN_EMAILS_LOWER.includes(email.toLowerCase())) {
       return res.status(400).json({ error: 'Cannot create a regular admin account for a super admin email' });
     }
+    const dept = department || 'CSE (Data Science)';
     await db.query(
-      `INSERT INTO admin_accounts (email, name, password, created_by, created_at, updated_at)
-       VALUES (LOWER($1), $2, $3, LOWER($4), NOW(), NOW())
-       ON CONFLICT (email) DO UPDATE SET name = $2, password = $3, updated_at = NOW()`,
-      [email, name, password, caller_email]
+      `INSERT INTO admin_accounts (email, name, password, department, created_by, created_at, updated_at)
+       VALUES (LOWER($1), $2, $3, $4, LOWER($5), NOW(), NOW())
+       ON CONFLICT (email) DO UPDATE SET name = $2, password = $3, department = $4, updated_at = NOW()`,
+      [email, name, password, dept, caller_email]
     );
     res.json({ success: true });
   } catch (err: any) {
@@ -541,57 +564,71 @@ app.put('/super-admin/my-password', requireRole('admin'), async (req: Request, r
 // POST /auth/hod-credentials/admin-reset — Admin resets HOD credentials (no current password needed)
 // ============================================================================
 
-// GET /auth/hod-credentials — returns current HOD email only (password REDACTED for security)
-app.get('/auth/hod-credentials', requireRole('hod', 'admin'), async (_req: Request, res: Response) => {
+// GET /auth/hod-credentials — returns HOD credentials (department scoped)
+app.get('/auth/hod-credentials', requireRole('hod', 'admin'), async (req: Request, res: Response) => {
   try {
+    const targetDept = (req.query.department as string) || req.auth?.department || 'CSE (Data Science)';
     const hodEmailEnv = process.env.HOD_MASTER_EMAIL || null;
 
     if (db.isMock) {
-      return res.json({ email: hodEmailEnv || 'hodcseds@rgmcet.edu.in', password: '••••••', source: 'env', updated_at: null });
+      return res.json({ email: hodEmailEnv || 'hodcseds@rgmcet.edu.in', password: '••••••', department: targetDept, source: 'env', updated_at: null });
     }
 
-    const result = await db.query('SELECT email, updated_at FROM hod_credentials LIMIT 1').catch(() => ({ rows: [] }));
+    const result = await db.query(
+      'SELECT email, department, updated_at FROM hod_credentials WHERE LOWER(department) = LOWER($1) LIMIT 1',
+      [targetDept]
+    ).catch(() => ({ rows: [] }));
+
     if (result.rows.length > 0) {
-      // Return email + redacted password — never return actual password over API
-      return res.json({ email: result.rows[0].email, password: '••••••', source: 'database', updated_at: result.rows[0].updated_at });
+      return res.json({ email: result.rows[0].email, password: '••••••', department: result.rows[0].department, source: 'database', updated_at: result.rows[0].updated_at });
     }
-    return res.json({ email: hodEmailEnv, password: hodEmailEnv ? '••••••' : null, source: 'env', updated_at: null });
+
+    // Fallback: search any HOD row
+    const fallback = await db.query('SELECT email, department, updated_at FROM hod_credentials LIMIT 1').catch(() => ({ rows: [] }));
+    if (fallback.rows.length > 0) {
+      return res.json({ email: fallback.rows[0].email, password: '••••••', department: fallback.rows[0].department || targetDept, source: 'database', updated_at: fallback.rows[0].updated_at });
+    }
+
+    return res.json({ email: hodEmailEnv, password: hodEmailEnv ? '••••••' : null, department: targetDept, source: 'env', updated_at: null });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 });
 
-// PUT /auth/hod-credentials — HOD updates own email/password (no current password required)
+// PUT /auth/hod-credentials — HOD/Admin updates HOD email/password for department
 app.put('/auth/hod-credentials', requireRole('hod', 'admin'), async (req: Request, res: Response) => {
   try {
-    const { new_email, new_password } = req.body;
+    const { new_email, new_password, department } = req.body;
     if (!new_email && !new_password) {
       return res.status(400).json({ error: 'Provide at least new_email or new_password to update' });
     }
 
+    const targetDept = department || req.auth?.department || 'CSE (Data Science)';
     const hodEmailEnv = process.env.HOD_MASTER_EMAIL?.toLowerCase() || null;
     const hodPassEnv  = process.env.HOD_MASTER_PASS || null;
 
     if (db.isMock) {
-      return res.json({ success: true, message: 'HOD credentials updated.', email: new_email || hodEmailEnv || '' });
+      return res.json({ success: true, message: 'HOD credentials updated.', email: new_email || hodEmailEnv || '', department: targetDept });
     }
 
-    // Get existing row so we preserve whichever field isn't being changed
-    const existing = await db.query('SELECT email, password FROM hod_credentials WHERE id = 1').catch(() => ({ rows: [] }));
-    const currentEmail    = existing.rows[0]?.email    || hodEmailEnv || '';
-    const currentPassword = existing.rows[0]?.password || hodPassEnv || '';
+    const existing = await db.query(
+      'SELECT email, password FROM hod_credentials WHERE LOWER(department) = LOWER($1) LIMIT 1',
+      [targetDept]
+    ).catch(() => ({ rows: [] }));
+
+    const currentEmail    = existing.rows[0]?.email    || hodEmailEnv || `hod.${targetDept.toLowerCase().replace(/[^a-z]/g, '')}@rgmcet.edu.in`;
+    const currentPassword = existing.rows[0]?.password || hodPassEnv || 'hod@2026';
 
     const updatedEmail    = new_email    || currentEmail;
     const updatedPassword = new_password || currentPassword;
 
-    // Use explicit id=1 so ON CONFLICT always hits the single HOD row
     await db.query(`
-      INSERT INTO hod_credentials (id, email, password, updated_at)
-      VALUES (1, $1, $2, NOW())
-      ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, updated_at = NOW()
-    `, [updatedEmail, updatedPassword]);
+      INSERT INTO hod_credentials (email, password, department, updated_at)
+      VALUES (LOWER($1), $2, $3, NOW())
+      ON CONFLICT (LOWER(department)) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, updated_at = NOW()
+    `, [updatedEmail, updatedPassword, targetDept]);
 
-    return res.json({ success: true, message: 'HOD credentials updated successfully.', email: updatedEmail });
+    return res.json({ success: true, message: `HOD credentials updated successfully for ${targetDept}.`, email: updatedEmail, department: targetDept });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
@@ -881,7 +918,7 @@ app.get('/auth/check-availability', async (req: Request, res: Response) => {
     if (type === 'regNo') {
       const regStr = String(value).trim().toUpperCase();
       if (!REGISTRATION_NUMBER_REGEX.test(regStr)) {
-        return res.json({ available: false, message: "Must match 10-char format (e.g. 23091A3251 or 23091A32A0). Positions 7-8 must be '32'" });
+        return res.json({ available: false, message: "10-char format required (e.g. 23091A0428 or 23095A0428). Positions 7-8 must be a valid department code." });
       }
 
       if (db.isMock) {
@@ -1130,10 +1167,17 @@ app.get('/students', async (req: Request, res: Response) => {
     const params: any[] = [];
     let paramIndex = 1;
 
-    if (department && String(department) !== 'All') {
+    // Auto-apply department scoping if caller is non-super admin or HOD
+    const callerDept = req.auth?.department;
+    const isSuper = req.auth?.isSuperAdmin || callerDept === '*';
+    if (!isSuper && callerDept && (req.auth?.role === 'admin' || req.auth?.role === 'hod')) {
+      conditions.push(`department = $${paramIndex++}`);
+      params.push(callerDept);
+    } else if (department && String(department) !== 'All') {
       conditions.push(`department = $${paramIndex++}`);
       params.push(String(department));
     }
+
     if (batch && String(batch) !== 'All') {
       conditions.push(`batch = $${paramIndex++}`);
       params.push(String(batch));
@@ -1179,14 +1223,10 @@ app.get('/students', async (req: Request, res: Response) => {
       LEFT JOIN academics a ON a.student_id = s.roll_number
       LEFT JOIN coding_profiles c ON c.student_id = s.roll_number
       ${whereClause}
-      GROUP BY s.roll_number, s.name, s.email, s.year, s.phone, s.address, s.native_place, s.department, s.batch, s.section, s.hostel_day_scholar, s.driving_license, s.passport, s.relocation_willingness, s.family_business, s.financial_background, s.faculty_mentor_id, s.photo_url, s.resume_url, s.linkedin_url, s.linkedin_updated, s.created_at, s.updated_at
+      GROUP BY s.roll_number, s.name, s.email, s.year, s.phone, s.address, s.native_place, s.department, s.batch, s.section, s.hostel_day_scholar, s.driving_license, s.passport, s.relocation_willingness, s.family_business, s.financial_background, s.faculty_mentor_id, s.photo_url, s.resume_url, s.linkedin_url, s.linkedin_updated, s.is_lateral_entry, s.created_at, s.updated_at
       ORDER BY s.roll_number, s.created_at DESC
     `, params);
-    const formattedRows = result.rows.map((r: any) => ({
-      ...r,
-      department: (!r.department || r.department === 'CSE' || r.department === 'Data Science' || r.department === 'CSE (Data Science)') ? 'CSE(Data Science)' : r.department,
-    }));
-    res.json(formattedRows);
+    res.json(result.rows);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1294,24 +1334,26 @@ app.post('/students/bulk-import', requireRole('admin'), async (req: Request, res
       const name = s.name || s.fullName || `Student ${rawRoll}`;
       const email = (s.email || `${rawRoll.toLowerCase()}@rgmcet.edu.in`).toString().trim().toLowerCase();
       const year = s.year || '3rd Year';
-      const department = (!s.department || s.department === 'CSE' || s.department === 'Data Science' || s.department === 'CSE (Data Science)') ? 'CSE(Data Science)' : s.department;
+      const department = s.department || getDeptFromRollNumber(rawRoll);
       const section = (s.section || 'A').toString().replace(/^Sec\s*/i, '');
       const batch = s.batch || '2023-2027';
       const phone = s.phone || null;
       const cgpa = s.cgpa !== undefined && s.cgpa !== null && s.cgpa !== '' ? Number(s.cgpa) : 0;
+      const isLat = isLateralEntry(rawRoll);
 
       if (db.isMock) {
-        const studentObj = { roll_number: rawRoll, name, email, year, department, section, batch, phone, cgpa, updated_at: new Date().toISOString() };
+        const studentObj = { roll_number: rawRoll, name, email, year, department, section, batch, phone, cgpa, is_lateral_entry: isLat, updated_at: new Date().toISOString() };
         db.mockStore.students.set(rawRoll, studentObj);
         importedCount++;
         continue;
       }
 
       await db.query('ALTER TABLE students ADD COLUMN IF NOT EXISTS cgpa NUMERIC(4,2) DEFAULT 0.00;').catch(() => {});
+      await db.query('ALTER TABLE students ADD COLUMN IF NOT EXISTS is_lateral_entry BOOLEAN DEFAULT FALSE;').catch(() => {});
 
       await db.query(
-        `INSERT INTO students (roll_number, name, email, year, phone, department, batch, section, cgpa)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO students (roll_number, name, email, year, phone, department, batch, section, cgpa, is_lateral_entry)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (roll_number) DO UPDATE SET
            name = EXCLUDED.name,
            email = EXCLUDED.email,
@@ -1492,7 +1534,7 @@ app.get('/students/:id', async (req: Request, res: Response) => {
     }
     const student = result.rows[0];
     if (student) {
-      student.department = (!student.department || student.department === 'CSE' || student.department === 'Data Science' || student.department === 'CSE (Data Science)') ? 'CSE(Data Science)' : student.department;
+      student.department = student.department || getDeptFromRollNumber(student.roll_number);
     }
     res.json(student);
   } catch (err: any) {
@@ -1508,12 +1550,11 @@ app.put('/students/:id', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), as
 
     if (db.isMock) {
       const existing = db.mockStore.students.get(studentId) || { roll_number: studentId };
-      const rawDept = body.department && body.department !== '' ? body.department : (existing.department || 'CSE(Data Science)');
-      const normDept = (!rawDept || rawDept === 'CSE' || rawDept === 'Data Science' || rawDept === 'CSE (Data Science)') ? 'CSE(Data Science)' : rawDept;
+      const rawDept = body.department && body.department !== '' ? body.department : (existing.department || getDeptFromRollNumber(studentId));
       const updated = {
         ...existing,
         ...body,
-        department: normDept,
+        department: rawDept,
         year: body.year && body.year !== '' ? body.year : (existing.year || '3rd Year'),
         hostel_day_scholar: body.hostel_day_scholar && body.hostel_day_scholar !== '' ? body.hostel_day_scholar : (existing.hostel_day_scholar || 'Day Scholar'),
         cgpa: body.cgpa !== undefined && body.cgpa !== null && body.cgpa !== '' ? Number(body.cgpa) : (existing.cgpa || 0),
@@ -1535,8 +1576,7 @@ app.put('/students/:id', requireOwnerOrRole('id', 'faculty', 'hod', 'admin'), as
     const phone = body.phone !== undefined ? body.phone : (existing.phone || null);
     const address = body.address !== undefined ? body.address : (existing.address || null);
     const native_place = body.native_place !== undefined ? body.native_place : (existing.native_place || null);
-    const rawDept = body.department && body.department !== '' ? body.department : (existing.department || 'CSE(Data Science)');
-    const department = (!rawDept || rawDept === 'CSE' || rawDept === 'Data Science' || rawDept === 'CSE (Data Science)') ? 'CSE(Data Science)' : rawDept;
+    const department = body.department && body.department !== '' ? body.department : (existing.department || getDeptFromRollNumber(studentId));
     const batch = body.batch && body.batch !== '' ? body.batch : (existing.batch || '2023-2027');
     const section = body.section && body.section !== '' ? body.section : (existing.section || 'A');
     const hostel_day_scholar = body.hostel_day_scholar && body.hostel_day_scholar !== '' ? body.hostel_day_scholar : (existing.hostel_day_scholar || 'Day Scholar');
@@ -3001,9 +3041,7 @@ app.get('/faculty/mentees/by-email/:email', async (req: Request, res: Response) 
     const rows = result.rows.map((r: any) => ({
       ...r,
       name: r.name || null,
-      department: r.department
-        ? (r.department === 'CSE' || r.department === 'Data Science' || r.department === 'CSE (Data Science)' ? 'CSE(Data Science)' : r.department)
-        : null,
+      department: r.department || null,
       registered: r.registered === true || r.registered === 't',
     }));
 
@@ -3649,9 +3687,7 @@ app.get('/faculty/:id/mentees', async (req: Request, res: Response) => {
     const formattedRows = result.rows.map((r: any) => ({
       ...r,
       name: r.name || null,
-      department: r.department
-        ? ((!r.department || r.department === 'CSE' || r.department === 'Data Science' || r.department === 'CSE (Data Science)') ? 'CSE(Data Science)' : r.department)
-        : null,
+      department: r.department || null,
       registered: r.registered === true || r.registered === 't',
     }));
     res.json(formattedRows);
@@ -3664,11 +3700,13 @@ app.get('/faculty/:id/mentees', async (req: Request, res: Response) => {
 // ============================================================================
 // Reports: HOD Analytics
 // ============================================================================
-app.get('/reports/hod-analytics', async (_req: Request, res: Response) => {
+app.get('/reports/hod-analytics', async (req: Request, res: Response) => {
   try {
+    const targetDept = (req.query.department as string) || req.auth?.department || 'CSE (Data Science)';
+
     if (db.isMock) {
       return res.json({
-        department: 'Computer Science & Engineering (CSE)',
+        department: targetDept,
         totalStudents: 470,
         yearBreakdown: [
           { year: '1st Year', avgCgpa: 8.85, students: 120, distinction: 42, firstClass: 55, secondClass: 15, passClass: 8 },
@@ -3681,14 +3719,20 @@ app.get('/reports/hod-analytics', async (_req: Request, res: Response) => {
           { section: 'Section B', avgCgpa: 9.02, students: 160, distinction: 64, firstClass: 65, secondClass: 21, passClass: 10 },
           { section: 'Section C', avgCgpa: 8.95, students: 155, distinction: 61, firstClass: 62, secondClass: 22, passClass: 10 },
         ],
-        topRankers: Array.from(db.mockStore.students.values()).slice(0, 5),
+        topRankers: Array.from(db.mockStore.students.values()).filter(s => s.department === targetDept).slice(0, 5),
       });
     }
 
-    // Real aggregation queries
+    // Real aggregation queries scoped to targetDept (unless targetDept === '*')
+    const deptWhere = targetDept === '*' ? '' : 'WHERE department = $1';
+    const deptParams = targetDept === '*' ? [] : [targetDept];
+
     const totalRes = await db.query(
-      "SELECT COUNT(*) as count FROM students WHERE department = 'CSE'"
+      `SELECT COUNT(*) as count FROM students ${deptWhere}`,
+      deptParams
     );
+
+    const sWhere = targetDept === '*' ? '' : 'WHERE s.department = $1';
 
     const yearRes = await db.query(
       `SELECT s.year,
@@ -3701,9 +3745,10 @@ app.get('/reports/hod-analytics', async (_req: Request, res: Response) => {
        FROM students s
        LEFT JOIN (SELECT student_id, AVG(semester_gpa) as avg_gpa FROM academics GROUP BY student_id) a
          ON s.roll_number = a.student_id
-       WHERE s.department = 'CSE'
+       ${sWhere}
        GROUP BY s.year
-       ORDER BY s.year`
+       ORDER BY s.year`,
+      deptParams
     );
 
     const sectionRes = await db.query(
@@ -3717,23 +3762,25 @@ app.get('/reports/hod-analytics', async (_req: Request, res: Response) => {
        FROM students s
        LEFT JOIN (SELECT student_id, AVG(semester_gpa) as avg_gpa FROM academics GROUP BY student_id) a
          ON s.roll_number = a.student_id
-       WHERE s.department = 'CSE'
+       ${sWhere}
        GROUP BY s.section
-       ORDER BY s.section`
+       ORDER BY s.section`,
+      deptParams
     );
 
     const topRes = await db.query(
       `SELECT s.*, ROUND(AVG(a.semester_gpa)::numeric, 2) as avg_gpa
        FROM students s
        JOIN academics a ON s.roll_number = a.student_id
-       WHERE s.department = 'CSE'
-       GROUP BY s.roll_number
+       ${sWhere}
+       GROUP BY s.roll_number, s.name, s.email, s.year, s.department, s.batch, s.section, s.phone, s.photo_url, s.resume_url, s.linkedin_url, s.created_at, s.updated_at
        ORDER BY avg_gpa DESC
-       LIMIT 5`
+       LIMIT 5`,
+      deptParams
     );
 
     res.json({
-      department: 'Computer Science & Engineering (CSE)',
+      department: targetDept,
       totalStudents: parseInt(totalRes.rows[0]?.count || '0'),
       yearBreakdown: yearRes.rows,
       sectionBreakdown: sectionRes.rows,

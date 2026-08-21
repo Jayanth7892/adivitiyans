@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, FileText, CheckCircle2, AlertCircle, Download, X, Loader2, FileSpreadsheet } from 'lucide-react';
 import { api } from '../../../lib/api';
+import { getDeptFromRollNumber } from '../../../lib/validation/auth';
 import { PillButton } from '../../../components/common/PillButton';
 
 interface BulkImportModalProps {
@@ -62,7 +63,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClos
       if (!obj.name && values[1]) obj.name = values[1];
       if (!obj.email && obj.roll_number) obj.email = `${obj.roll_number.toLowerCase()}@rgmcet.edu.in`;
       if (!obj.year) obj.year = '3rd Year';
-      if (!obj.department) obj.department = 'CSE(Data Science)';
+      if (!obj.department && obj.roll_number) obj.department = getDeptFromRollNumber(obj.roll_number);
       if (!obj.section) obj.section = 'A';
       if (!obj.batch) obj.batch = '2023-2027';
 

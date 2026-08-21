@@ -6,7 +6,9 @@ export interface User {
   name: string;
   role: UserRole;
   rollNumber?: string;
-  department?: string;
+  department: string;
+  isSuperAdmin?: boolean;
+  isLateralEntry?: boolean;
 }
 
 export interface StudentProfile {

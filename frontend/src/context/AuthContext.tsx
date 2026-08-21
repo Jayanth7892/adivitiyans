@@ -29,7 +29,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   sessionKickedOut: boolean;
-  login: (email: string, role: UserRole, rollNumber?: string, name?: string, jwtToken?: string) => void;
+  login: (email: string, role: UserRole, rollNumber?: string, name?: string, jwtToken?: string, department?: string, isSuperAdmin?: boolean) => void;
   logout: () => void;
   registerSession: (email: string, role: UserRole) => Promise<void>;
 }
@@ -186,7 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   // ── Login ─────────────────────────────────────────────────────────────────
-  const login = (email: string, userRole: UserRole, rollNumber?: string, name?: string, jwtToken?: string) => {
+  const login = (email: string, userRole: UserRole, rollNumber?: string, name?: string, jwtToken?: string, department?: string, isSuperAdmin?: boolean) => {
     setSessionKickedOut(false);
 
     const formattedReg = rollNumber ? rollNumber.toUpperCase() : '';
@@ -209,7 +209,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name: formattedName,
       role: userRole,
       rollNumber: formattedReg,
-      department: 'CSE(Data Science)',
+      department: department || '',
+      isSuperAdmin: isSuperAdmin || false,
+      isLateralEntry: formattedReg.length === 10 && formattedReg.charAt(4) === '5',
     };
     setUser(newUser);
 

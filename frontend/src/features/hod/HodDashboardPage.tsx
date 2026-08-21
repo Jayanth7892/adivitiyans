@@ -42,10 +42,9 @@ import { PlacementPreferencesTab } from '../profile/tabs/PlacementPreferencesTab
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'] as const;
 const SECTIONS = ['Section A', 'Section B', 'Section C'] as const;
 const STANDINGS = ['Distinction', 'First Class', 'Second Class', 'Pass'] as const;
-const CODING_LEVELS = ['All Coders', 'Top Coders (>300 LC)', 'Active GitHub (>20 repos)'] as const;
+import { VALID_DEPARTMENT_NAMES } from '../../lib/validation/auth';
 
-// HOD Department context
-const DEPARTMENT_NAME = 'CSE(Data Science)';
+const CODING_LEVELS = ['All Coders', 'Top Coders (>300 LC)', 'Active GitHub (>20 repos)'] as const;
 
 
 
@@ -542,7 +541,7 @@ export const HodDashboardPage: React.FC = () => {
       p.rank,
       `"${p.name}"`,
       p.regNo,
-      'CSE(Data Science)',
+      user?.department || 'CSE (Data Science)',
       p.year,
       p.section,
       p.cgpa,
@@ -604,9 +603,9 @@ export const HodDashboardPage: React.FC = () => {
               <div>
                 <div className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-primary mb-1">
                   <GraduationCap className="w-3.5 h-3.5" />
-                  <span>{DEPARTMENT_NAME}</span>
+                  <span>{user?.department || 'CSE (Data Science)'}</span>
                 </div>
-                <h1 className="text-xl font-bold text-textPrimary tracking-tight">HOD CSE(Data Science) Executive Dashboard</h1>
+                <h1 className="text-xl font-bold text-textPrimary tracking-tight">HOD {user?.department || 'CSE (Data Science)'} Executive Dashboard</h1>
                 <p className="text-xs text-textSecondary">Real-time academic performance, student growth analytics, and directory</p>
               </div>
             </div>
@@ -708,7 +707,7 @@ export const HodDashboardPage: React.FC = () => {
               accentColor="indigo"
               label="Total Department Students"
               value={`${summaryMetrics.count} Students`}
-              subtext={isFiltered ? 'Filtered dataset' : 'Enrolled in Data Science'}
+              subtext={isFiltered ? 'Filtered dataset' : `Enrolled in ${user?.department || 'Department'}`}
             />
             <StatCard
               icon={<GraduationCap className="w-5 h-5" />}
@@ -732,14 +731,14 @@ export const HodDashboardPage: React.FC = () => {
               accentColor="brand"
               label="Avg LeetCode Solved"
               value={`${summaryMetrics.avgLeetCode} Solved`}
-              subtext="Coding activity index"
+              subtext={isFiltered ? 'Filtered dataset' : `Enrolled in ${user?.department || 'Department'}`}
             />
           </div>
 
           {/* Year-Wise CGPA Breakdown Table */}
           <div className="bg-surface border border-borderLine rounded-xl p-6 shadow-sm">
             <div className="mb-4">
-              <h3 className="text-base font-bold text-textPrimary">Data Science Department Year-Wise CGPA Breakdown</h3>
+              <h3 className="text-base font-bold text-textPrimary">{user?.department || 'Department'} Year-Wise CGPA Breakdown</h3>
               <p className="text-xs text-textSecondary">Academic standing distribution across 1st to 4th year batches</p>
             </div>
             <div className="overflow-x-auto">
@@ -1512,7 +1511,7 @@ export const HodDashboardPage: React.FC = () => {
                       name: inspectStudent.name,
                       email: inspectStudent.email,
                       year: inspectStudent.year as any,
-                      department: 'CSE(Data Science)',
+                      department: user?.department || 'CSE (Data Science)',
                       batch: '',
                       section: inspectStudent.section,
                       hostel_day_scholar: 'Day Scholar' as any,
