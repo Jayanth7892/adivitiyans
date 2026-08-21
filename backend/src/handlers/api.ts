@@ -1224,26 +1224,26 @@ app.get('/students', async (req: Request, res: Response) => {
     if (!isSuper && callerDept && (req.auth?.role === 'admin' || req.auth?.role === 'hod' || req.auth?.role === 'student')) {
       conditions.push(`department = $${paramIndex++}`);
       params.push(callerDept);
-    } else if (department && String(department) !== 'All') {
+    } else if (department && String(department) !== 'All' && String(department) !== 'undefined' && String(department) !== 'null') {
       conditions.push(`department = $${paramIndex++}`);
       params.push(String(department));
     }
 
-    if (batch && String(batch) !== 'All') {
+    if (batch && String(batch) !== 'All' && String(batch) !== 'undefined' && String(batch) !== 'null') {
       conditions.push(`batch = $${paramIndex++}`);
       params.push(String(batch));
     }
-    if (year && String(year) !== 'All') {
+    if (year && String(year) !== 'All' && String(year) !== 'undefined' && String(year) !== 'null') {
       conditions.push(`year = $${paramIndex++}`);
       params.push(String(year));
     }
-    if (section && String(section) !== 'All') {
+    if (section && String(section) !== 'All' && String(section) !== 'undefined' && String(section) !== 'null') {
       const secFormatted = String(section).replace('Section ', '').replace('Sec ', '');
       conditions.push(`(section = $${paramIndex} OR section = $${paramIndex + 1})`);
       params.push(secFormatted, `Sec ${secFormatted}`);
       paramIndex += 2;
     }
-    if (mentor_id) {
+    if (mentor_id && String(mentor_id) !== 'undefined' && String(mentor_id) !== 'null') {
       conditions.push(`faculty_mentor_id = $${paramIndex++}`);
       params.push(String(mentor_id));
     }

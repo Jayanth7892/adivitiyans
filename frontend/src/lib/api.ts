@@ -161,7 +161,15 @@ export const api = {
   },
 
   getAllStudents: async (params?: { department?: string; batch?: string; section?: string; search?: string }): Promise<StudentProfile[]> => {
-    const query = new URLSearchParams(params as any).toString();
+    const cleanParams: Record<string, string> = {};
+    if (params) {
+      Object.entries(params).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          cleanParams[key] = val;
+        }
+      });
+    }
+    const query = new URLSearchParams(cleanParams).toString();
     return fetchWithAuth(`/students${query ? `?${query}` : ''}`);
   },
 
