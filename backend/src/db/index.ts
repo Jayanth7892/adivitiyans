@@ -317,17 +317,17 @@ async function ensureSchema(p: Pool) {
      ON CONFLICT (id) DO UPDATE SET department = COALESCE(hod_credentials.department, 'CSE (Data Science)');`,
 
     // Seed HOD credentials for all 9 departments
-    `INSERT INTO hod_credentials (email, password, department) VALUES
-      ('hodcivil@rgmcet.edu.in', 'hod@2026', 'Civil'),
-      ('hodeee@rgmcet.edu.in', 'hod@2026', 'EEE'),
-      ('hodmech@rgmcet.edu.in', 'hod@2026', 'Mechanical'),
-      ('hodece@rgmcet.edu.in', 'hod@2026', 'ECE'),
-      ('hodcse@rgmcet.edu.in', 'hod@2026', 'CSE'),
-      ('hodds@rgmcet.edu.in', 'hod@2026', 'CSE (Data Science)'),
-      ('hodaiml@rgmcet.edu.in', 'hod@2026', 'CSE (AI & ML)'),
-      ('hodbs@rgmcet.edu.in', 'hod@2026', 'CSE (BS)'),
-      ('hodcys@rgmcet.edu.in', 'hod@2026', 'CSE (Cyber Security)')
-     ON CONFLICT (LOWER(department)) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password;`,
+    `INSERT INTO hod_credentials (id, email, password, department) VALUES
+      (101, 'hodcivil@rgmcet.edu.in', 'hod@2026', 'Civil'),
+      (102, 'hodeee@rgmcet.edu.in', 'hod@2026', 'EEE'),
+      (103, 'hodmech@rgmcet.edu.in', 'hod@2026', 'Mechanical'),
+      (104, 'hodece@rgmcet.edu.in', 'hod@2026', 'ECE'),
+      (105, 'hodcse@rgmcet.edu.in', 'hod@2026', 'CSE'),
+      (106, 'hodds@rgmcet.edu.in', 'hod@2026', 'CSE (Data Science)'),
+      (107, 'hodaiml@rgmcet.edu.in', 'hod@2026', 'CSE (AI & ML)'),
+      (108, 'hodbs@rgmcet.edu.in', 'hod@2026', 'CSE (BS)'),
+      (109, 'hodcys@rgmcet.edu.in', 'hod@2026', 'CSE (Cyber Security)')
+     ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, department = EXCLUDED.department, updated_at = NOW();`,
 
     // Semester unlock settings — HOD/Admin controls which semesters students can fill
     `CREATE TABLE IF NOT EXISTS semester_unlock_settings (
