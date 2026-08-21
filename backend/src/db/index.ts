@@ -316,9 +316,17 @@ async function ensureSchema(p: Pool) {
      VALUES (1, 'hodcseds@rgmcet.edu.in', 'cseds@2026', 'CSE (Data Science)')
      ON CONFLICT (id) DO UPDATE SET department = COALESCE(hod_credentials.department, 'CSE (Data Science)');`,
 
-    // Seed ECE HOD credentials
-    `INSERT INTO hod_credentials (email, password, department)
-     VALUES ('hodece@rgmcet.edu.in', 'hod@2026', 'ECE')
+    // Seed HOD credentials for all 9 departments
+    `INSERT INTO hod_credentials (email, password, department) VALUES
+      ('hodcivil@rgmcet.edu.in', 'hod@2026', 'Civil'),
+      ('hodeee@rgmcet.edu.in', 'hod@2026', 'EEE'),
+      ('hodmech@rgmcet.edu.in', 'hod@2026', 'Mechanical'),
+      ('hodece@rgmcet.edu.in', 'hod@2026', 'ECE'),
+      ('hodcse@rgmcet.edu.in', 'hod@2026', 'CSE'),
+      ('hodds@rgmcet.edu.in', 'hod@2026', 'CSE (Data Science)'),
+      ('hodaiml@rgmcet.edu.in', 'hod@2026', 'CSE (AI & ML)'),
+      ('hodbs@rgmcet.edu.in', 'hod@2026', 'CSE (BS)'),
+      ('hodcys@rgmcet.edu.in', 'hod@2026', 'CSE (Cyber Security)')
      ON CONFLICT (LOWER(department)) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password;`,
 
     // Semester unlock settings — HOD/Admin controls which semesters students can fill
@@ -383,8 +391,16 @@ async function ensureSchema(p: Pool) {
     `DELETE FROM admin_accounts WHERE LOWER(email) = 'admin@rgmcet.edu.in';`,
 
     `INSERT INTO admin_accounts (email, name, password, department, created_by) VALUES
-      ('admincse@rgmcet.edu.in', 'CSE Department Admin', 'admin@2026', 'CSE', 'System')
-     ON CONFLICT (email) DO UPDATE SET department = 'CSE', password = 'admin@2026';`,
+      ('admincivil@rgmcet.edu.in', 'Civil Admin', 'admin@2026', 'Civil', 'System'),
+      ('admineee@rgmcet.edu.in', 'EEE Admin', 'admin@2026', 'EEE', 'System'),
+      ('adminmech@rgmcet.edu.in', 'Mechanical Admin', 'admin@2026', 'Mechanical', 'System'),
+      ('adminece@rgmcet.edu.in', 'ECE Admin', 'admin@2026', 'ECE', 'System'),
+      ('admincse@rgmcet.edu.in', 'CSE Admin', 'admin@2026', 'CSE', 'System'),
+      ('adminds@rgmcet.edu.in', 'Data Science Admin', 'admin@2026', 'CSE (Data Science)', 'System'),
+      ('adminaiml@rgmcet.edu.in', 'AI & ML Admin', 'admin@2026', 'CSE (AI & ML)', 'System'),
+      ('adminbs@rgmcet.edu.in', 'BS Admin', 'admin@2026', 'CSE (BS)', 'System'),
+      ('admincys@rgmcet.edu.in', 'Cyber Security Admin', 'admin@2026', 'CSE (Cyber Security)', 'System')
+     ON CONFLICT (email) DO UPDATE SET department = EXCLUDED.department, password = EXCLUDED.password;`,
 
     // Index for department-based lookups
     `CREATE INDEX IF NOT EXISTS idx_students_department ON students(department);`,

@@ -399,6 +399,50 @@ app.post('/auth/admin-login', async (req: Request, res: Response) => {
       return failWithDelay('Invalid email or password.');
     }
 
+    if (db.isMock) {
+      const matchAdmin = emailLower.match(/^admin([a-z]+)@rgmcet\.edu\.in$/);
+      if (matchAdmin) {
+        const deptPrefix = matchAdmin[1];
+        const deptMap: Record<string, string> = {
+          civil: 'Civil',
+          eee: 'EEE',
+          mech: 'Mechanical',
+          ece: 'ECE',
+          cse: 'CSE',
+          ds: 'CSE (Data Science)',
+          aiml: 'CSE (AI & ML)',
+          bs: 'CSE (BS)',
+          cys: 'CSE (Cyber Security)',
+        };
+        const resolvedDept = deptMap[deptPrefix];
+        if (resolvedDept && password === 'admin@2026') {
+          return res.json({ valid: true, role: 'admin', isSuperAdmin: false, department: resolvedDept, email: emailLower });
+        }
+      }
+
+      const matchHod = emailLower.match(/^hod([a-z]+)@rgmcet\.edu\.in$/);
+      if (matchHod) {
+        const deptPrefix = matchHod[1];
+        const deptMap: Record<string, string> = {
+          civil: 'Civil',
+          eee: 'EEE',
+          mech: 'Mechanical',
+          ece: 'ECE',
+          cse: 'CSE',
+          ds: 'CSE (Data Science)',
+          cseds: 'CSE (Data Science)',
+          aiml: 'CSE (AI & ML)',
+          bs: 'CSE (BS)',
+          cys: 'CSE (Cyber Security)',
+        };
+        const resolvedDept = deptMap[deptPrefix];
+        const expectedPass = deptPrefix === 'cseds' ? 'cseds@2026' : 'hod@2026';
+        if (resolvedDept && password === expectedPass) {
+          return res.json({ valid: true, role: 'hod', department: resolvedDept, email: emailLower });
+        }
+      }
+    }
+
     return failWithDelay('Invalid email or password.');
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
