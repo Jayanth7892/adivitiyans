@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { VALID_DEPARTMENT_NAMES } from '../../lib/validation/auth';
 import { useQuery } from '@tanstack/react-query';
 import {
   Trophy, Code2, Github, Search, TrendingUp, Users,
@@ -47,15 +48,30 @@ interface EnrichedStudent {
 
 export const CodingAnalyticsPage: React.FC = () => {
   const { user } = useAuth();
+  
+  // Detect super admin
+  const isSuperAdmin = user?.role === 'admin' && (
+    (user as any).isSuperAdmin || 
+    user?.email === 'admin@rgmcet.edu.in' || 
+    user?.email === 'jayanthkumarnaidu777@gmail.com' || 
+    user?.email === 'dineshkumarpathipati@gmail.com' || 
+    user?.email === 'jayakrushna1622@gmail.com'
+  );
+
   const [activeTab, setActiveTab] = useState<'leetcode' | 'github' | 'cgpa'>('leetcode');
+  const [deptFilter, setDeptFilter] = useState<string>(
+    isSuperAdmin ? 'All' : (user?.department || 'All')
+  );
   const [yearFilter, setYearFilter] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
   const [search, setSearch] = useState('');
 
   // Fetch real students dynamically from Database Backend API
   const { data: students = [], isLoading, refetch } = useQuery({
-    queryKey: ['leaderboardStudents'],
-    queryFn: () => api.getAllStudents(),
+    queryKey: ['leaderboardStudents', deptFilter],
+    queryFn: () => api.getAllStudents({
+      department: deptFilter !== 'All' ? deptFilter : undefined
+    }),
     staleTime: 0,
     refetchOnMount: 'always',
   });
@@ -169,9 +185,9 @@ export const CodingAnalyticsPage: React.FC = () => {
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-soft text-brand-primary text-xs font-semibold mb-2">
             <BarChart2 className="w-3.5 h-3.5" />
-            <span>Program-Wide Real Student Analytics</span>
+            <span>{deptFilter === 'All' ? 'Program' : deptFilter}-Wide Student Analytics</span>
           </div>
-          <h1 className="text-2xl font-extrabold text-textPrimary">Program Leaderboard</h1>
+          <h1 className="text-2xl font-extrabold text-textPrimary">{deptFilter === 'All' ? 'Program' : deptFilter} Leaderboard</h1>
           <p className="text-xs text-textSecondary mt-1">
             Real-time verified student rankings by CGPA, LeetCode competitive metrics, and GitHub open-source activity
           </p>
@@ -193,7 +209,7 @@ export const CodingAnalyticsPage: React.FC = () => {
           accentColor="brand"
           label="Average CGPA"
           value={`${avgCgpa} / 10`}
-          subtext={`${user?.department || 'Department'} Program Average`}
+          subtext={`${deptFilter === 'All' ? 'Program' : deptFilter} Average`}
         />
         <StatCard
           icon={<Trophy className="w-5 h-5" />}
@@ -261,6 +277,18 @@ export const CodingAnalyticsPage: React.FC = () => {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
+        {isSuperAdmin && (
+          <select
+            value={deptFilter}
+            onChange={(e) => setDeptFilter(e.target.value)}
+            className="px-3 py-1.5 text-xs rounded-lg border border-borderLine bg-surface text-textPrimary font-semibold text-brand-primary"
+          >
+            <option value="All">All Departments</option>
+            {VALID_DEPARTMENT_NAMES.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        )}
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-borderLine bg-surface text-xs w-64">
           <Search className="w-4 h-4 text-textSecondary shrink-0" />
           <input

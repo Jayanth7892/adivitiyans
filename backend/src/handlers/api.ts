@@ -1158,7 +1158,13 @@ app.get('/students', async (req: Request, res: Response) => {
       // Deduplicate mock store entries by roll_number
       students = Array.from(new Map(students.map((s) => [s.roll_number.toUpperCase(), s])).values());
 
-      if (department && String(department) !== 'All') students = students.filter((s) => s.department === department);
+      const callerDept = req.auth?.department;
+      const isSuper = req.auth?.isSuperAdmin || callerDept === '*';
+      if (!isSuper && callerDept && (req.auth?.role === 'admin' || req.auth?.role === 'hod' || req.auth?.role === 'student')) {
+        students = students.filter((s) => s.department === callerDept);
+      } else if (department && String(department) !== 'All') {
+        students = students.filter((s) => s.department === department);
+      }
       if (batch && String(batch) !== 'All') students = students.filter((s) => s.batch === batch);
       if (year && String(year) !== 'All') students = students.filter((s) => s.year === year);
       if (section && String(section) !== 'All') {
@@ -1212,10 +1218,10 @@ app.get('/students', async (req: Request, res: Response) => {
     const params: any[] = [];
     let paramIndex = 1;
 
-    // Auto-apply department scoping if caller is non-super admin or HOD
+    // Auto-apply department scoping if caller is non-super admin, HOD, or Student
     const callerDept = req.auth?.department;
     const isSuper = req.auth?.isSuperAdmin || callerDept === '*';
-    if (!isSuper && callerDept && (req.auth?.role === 'admin' || req.auth?.role === 'hod')) {
+    if (!isSuper && callerDept && (req.auth?.role === 'admin' || req.auth?.role === 'hod' || req.auth?.role === 'student')) {
       conditions.push(`department = $${paramIndex++}`);
       params.push(callerDept);
     } else if (department && String(department) !== 'All') {
