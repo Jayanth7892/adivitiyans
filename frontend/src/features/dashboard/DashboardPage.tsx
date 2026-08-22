@@ -61,16 +61,24 @@ export const DashboardPage: React.FC = () => {
     placement
   );
 
-  // Cumulative CGPA and Semester GPA analytics
-  const validAcademics = academics.filter(
-    (a) => a && typeof a.semester_gpa === 'number' && Number(a.semester_gpa) > 0
-  );
+  // Cumulative CGPA and Semester GPA analytics (robust parsing for strings/numbers from DB)
+  const validAcademics = (academics || [])
+    .filter((a) => a && a.semester_gpa != null && !isNaN(Number(a.semester_gpa)) && Number(a.semester_gpa) > 0)
+    .sort((a, b) => Number(a.semester) - Number(b.semester));
+
   const cumulativeCgpa = validAcademics.length > 0
     ? (validAcademics.reduce((sum, a) => sum + Number(a.semester_gpa), 0) / validAcademics.length).toFixed(2)
     : null;
+
   const avgAttendance = validAcademics.length > 0
-    ? Math.round(validAcademics.reduce((sum, a) => sum + (Number(a.attendance_pct) || 0), 0) / validAcademics.length)
+    ? Math.round(
+        validAcademics.reduce(
+          (sum, a) => sum + (a.attendance_pct != null && !isNaN(Number(a.attendance_pct)) ? Number(a.attendance_pct) : 0),
+          0
+        ) / validAcademics.length
+      )
     : null;
+
   const latestSemGpa = validAcademics.length > 0
     ? Number(validAcademics[validAcademics.length - 1].semester_gpa).toFixed(2)
     : null;
@@ -130,8 +138,8 @@ export const DashboardPage: React.FC = () => {
               iconBgColor="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
               accentColor="emerald"
               label="Cumulative CGPA"
-              value={cumulativeCgpa ? `${cumulativeCgpa} / 10.0` : '—'}
-              subtext={validAcademics.length > 0 ? `Across ${validAcademics.length} semester${validAcademics.length > 1 ? 's' : ''}` : 'View academic records'}
+              value={cumulativeCgpa ? `${cumulativeCgpa} / 10.0` : '0.00 / 10.0'}
+              subtext={validAcademics.length > 0 ? `Across ${validAcademics.length} semester${validAcademics.length > 1 ? 's' : ''}` : 'Click to add semester marks'}
               onClick={() => navigate('/profile?tab=academics')}
             />
             <StatCard
@@ -148,7 +156,7 @@ export const DashboardPage: React.FC = () => {
               iconBgColor="bg-sky-50 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400"
               accentColor="sky"
               label="Latest Sem GPA"
-              value={latestSemGpa ? `${latestSemGpa} GPA` : '—'}
+              value={latestSemGpa ? `${latestSemGpa} GPA` : '0.00 GPA'}
               subtext={avgAttendance != null ? `Avg Attendance: ${avgAttendance}%` : 'Semester performance'}
               onClick={() => navigate('/profile?tab=academics')}
             />
