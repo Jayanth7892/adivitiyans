@@ -288,9 +288,43 @@ export const AuthPage: React.FC = () => {
   const onLogin = async (data: LoginInput) => {
     setErrorMessage(null);
     try {
-      let displayName: string | undefined;
-      let rollNo: string | undefined;
       let jwtToken: string | undefined;
+      let rollNo = '';
+      let displayName = '';
+
+      // ── PARENT LOGIN (VIEW ONLY) ──────────────────────────────────────────
+      if (activeTab === 'parent') {
+        const cleanEmail = data.email.trim().toLowerCase();
+        const enteredPass = data.password.trim();
+
+        let targetRollNo = enteredPass.toUpperCase();
+        if (targetRollNo.length !== 10 && cleanEmail.includes('@')) {
+          targetRollNo = cleanEmail.split('@')[0].toUpperCase();
+        }
+
+        let wardStudent: any = null;
+        try {
+          wardStudent = await api.getStudentProfile(targetRollNo);
+        } catch {
+          wardStudent = null;
+        }
+        if (!wardStudent) {
+          try {
+            wardStudent = await api.getStudentByEmail(cleanEmail);
+          } catch {
+            wardStudent = null;
+          }
+        }
+
+        const wardName = wardStudent?.name || `Student (${targetRollNo})`;
+        const wardDept = wardStudent?.department || (targetRollNo ? getDeptFromRollNumber(targetRollNo) : loginDept) || 'CSE (Data Science)';
+        const roll = wardStudent?.roll_number || targetRollNo;
+
+        login(cleanEmail, 'parent', roll, `Parent of ${wardName}`, undefined, wardDept);
+        registerSession(cleanEmail, 'parent');
+        navigate('/dashboard');
+        return;
+      }
 
       // ── MASTER ADMIN LOGIN HANDLER ──
       // Route all 'admin' tab logins to the backend for server-side credential validation
@@ -577,8 +611,9 @@ export const AuthPage: React.FC = () => {
             </div>
           )}
           {/* Role Switcher Pill Tabs */}
-          <div className="grid grid-cols-4 gap-1.5 bg-surface-2 p-1.5 rounded-2xl border border-borderLine mb-7">
+          <div className="grid grid-cols-5 gap-1.5 bg-surface-2 p-1.5 rounded-2xl border border-borderLine mb-7">
             <button
+              type="button"
               onClick={() => { setActiveTab('student'); setIsSignUp(false); }}
               className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'student'
@@ -589,6 +624,18 @@ export const AuthPage: React.FC = () => {
               Student
             </button>
             <button
+              type="button"
+              onClick={() => { setActiveTab('parent'); setIsSignUp(false); }}
+              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                activeTab === 'parent'
+                  ? 'bg-brand-primary text-white shadow-sm shadow-brand/30'
+                  : 'text-textSecondary hover:text-textPrimary hover:bg-surface'
+              }`}
+            >
+              Parent
+            </button>
+            <button
+              type="button"
               onClick={() => { setActiveTab('faculty'); setIsSignUp(false); }}
               className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'faculty'
@@ -599,6 +646,7 @@ export const AuthPage: React.FC = () => {
               Faculty
             </button>
             <button
+              type="button"
               onClick={() => { setActiveTab('hod'); setIsSignUp(false); }}
               className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'hod'
@@ -609,6 +657,7 @@ export const AuthPage: React.FC = () => {
               HOD
             </button>
             <button
+              type="button"
               onClick={() => { setActiveTab('admin'); setIsSignUp(false); }}
               className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'admin'
@@ -620,8 +669,112 @@ export const AuthPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Student Tab Forms */}
-          {activeTab === 'student' ? (
+          {/* Parent Tab Form */}
+          {activeTab === 'parent' ? (
+            /* PARENT LOGIN FORM (VIEW ONLY) */
+            <div className="space-y-4">
+              <div className="bg-brand-soft border border-brand-primary/20 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-brand-primary">
+                <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">PARENT PORTAL (VIEW ONLY)</p>
+                  <p className="mt-0.5 text-[11px] text-textSecondary">
+                    Access your ward's 360° academic performance, cumulative attendance, and mentor counseling records.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleLoginSubmit(onLogin)} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-textPrimary mb-1">Department *</label>
+                  <select
+                    value={loginDept}
+                    onChange={(e) => setLoginDept(e.target.value)}
+                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary font-medium"
+                  >
+                    {VALID_DEPARTMENT_NAMES.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-semibold text-textPrimary">Student RGMCET Email *</label>
+                    <span className="text-[10px] text-textSecondary">Username</span>
+                  </div>
+                  <input
+                    {...registerLogin('email')}
+                    type="email"
+                    placeholder="e.g. 23091a3252@rgmcet.edu.in"
+                    className="w-full px-3.5 py-2 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary font-medium"
+                  />
+                  {loginErrors.email && (
+                    <p className="text-xs text-alert mt-1">{loginErrors.email.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-semibold text-textPrimary">Student Registration Number *</label>
+                    <span className="text-[10px] text-textSecondary">Password (e.g. 23091A3252)</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      {...registerLogin('password')}
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="e.g. 23091A3252"
+                      className="w-full px-3.5 py-2 pr-10 text-sm rounded-lg border border-borderLine bg-background focus:outline-none focus:ring-2 focus:ring-brand-primary uppercase font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-textSecondary hover:text-textPrimary p-1 rounded-md transition-colors"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4 text-brand-primary" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {loginErrors.password && (
+                    <p className="text-xs text-alert mt-1">{loginErrors.password.message}</p>
+                  )}
+                </div>
+
+                <div className="bg-surface-2 p-2.5 rounded-xl border border-borderLine text-[11px] text-textSecondary flex items-center justify-between">
+                  <span>Demo Student: <strong className="text-textPrimary">23091A3252</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const emailInput = document.querySelector('input[name="email"]') as HTMLInputElement;
+                      const passInput = document.querySelector('input[name="password"]') as HTMLInputElement;
+                      if (emailInput) {
+                        emailInput.value = '23091a3252@rgmcet.edu.in';
+                        emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+                      }
+                      if (passInput) {
+                        passInput.value = '23091A3252';
+                        passInput.dispatchEvent(new Event('input', { bubbles: true }));
+                      }
+                    }}
+                    className="text-xs font-bold text-brand-primary hover:underline"
+                  >
+                    Quick Fill
+                  </button>
+                </div>
+
+                <div className="pt-2">
+                  <PillButton
+                    variant="primary"
+                    size="lg"
+                    type="submit"
+                    disabled={isLoginSubmitting}
+                    className="w-full"
+                  >
+                    Log In as Parent (View Only)
+                  </PillButton>
+                </div>
+              </form>
+            </div>
+          ) : activeTab === 'student' ? (
             isSignUp ? (
               /* STUDENT SIGN UP FORM */
               <form onSubmit={handleSignUpSubmit(onSignUp)} className="space-y-4">

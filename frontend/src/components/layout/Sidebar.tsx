@@ -114,10 +114,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
     },
   ];
 
+  const parentNavGroups: NavGroup[] = [
+    {
+      title: 'WARD OVERVIEW',
+      items: [
+        { label: 'Ward Dashboard', path: '/dashboard', icon: LayoutDashboard },
+        { label: 'Academics & CGPA', path: '/profile?tab=academics', icon: PieChart },
+        { label: 'Coding & Platforms', path: '/profile?tab=coding-profiles', icon: BarChart2 },
+        { label: 'Assigned Mentor', path: '/mentor', icon: UserCheck },
+        { label: 'Certifications', path: '/profile?tab=certifications', icon: CheckCircle2 },
+      ],
+    },
+  ];
+
   const activeNavGroups =
     role === 'admin' ? adminNavGroups
     : role === 'faculty' ? facultyNavGroups
     : role === 'hod' ? hodNavGroups
+    : role === 'parent' ? parentNavGroups
     : studentNavGroups;
 
   const rawFooterName = user?.name || (user?.email ? user.email.split('@')[0] : 'User');
@@ -250,7 +264,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, collapsed, onClose }) 
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-textPrimary truncate leading-snug">{footerDisplayName}</p>
-                <p className="text-[10px] text-brand-primary font-bold uppercase tracking-wider truncate">{role}</p>
+                <p className="text-[10px] text-brand-primary font-bold uppercase tracking-wider truncate">
+                  {role === 'parent' ? 'Parent (View Only)' : role}
+                </p>
               </div>
             </div>
           </div>

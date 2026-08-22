@@ -33,7 +33,7 @@ import { ProgressRing } from '../../components/common/ProgressRing';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const activeRollNo = user?.rollNumber || '';
 
   // Queries for real data — disabled when activeRollNo is empty to prevent malformed API calls (GAP-09)
@@ -74,6 +74,28 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* ── Parent View Indicator Banner ── */}
+      {role === 'parent' && (
+        <div className="bg-brand-soft border border-brand-primary/20 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-brand-primary text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+              👁️
+            </div>
+            <div>
+              <p className="text-xs font-bold text-brand-primary uppercase tracking-wider">
+                Parent View Mode (Strictly Read-Only)
+              </p>
+              <p className="text-xs text-textSecondary mt-0.5">
+                Monitoring 360° academic performance, cumulative attendance, and placement preparation for <strong className="text-textPrimary">{student?.name || user?.name || activeRollNo}</strong> ({activeRollNo}).
+              </p>
+            </div>
+          </div>
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-brand-primary/10 text-brand-primary border border-brand-primary/20 self-start sm:self-auto shrink-0">
+            Read-Only Mode
+          </span>
+        </div>
+      )}
+
       {/* 1. Greeting Hero */}
       <GreetingHero
         name={displayName}

@@ -33,6 +33,7 @@ export const ProfilePage: React.FC = () => {
   const viewId = searchParams.get('id') || '';
   const activeRollNo = viewId || user?.rollNumber || '';
   const isViewingOther = Boolean(viewId && viewId !== user?.rollNumber);
+  const isReadOnly = isViewingOther || user?.role === 'parent';
 
   const currentTab = searchParams.get('tab') || 'personal-info';
 
@@ -97,40 +98,32 @@ export const ProfilePage: React.FC = () => {
     .join('')
     .toUpperCase() || 'S';
 
-  // Coding-profiles tab: render standalone full-page layout.
-  // IMPORTANT: always pass the target studentRollNumber so the section fetches
-  // the viewed student's handles — not the logged-in user's (HOD/admin has no handles).
   if (currentTab === 'coding-profiles') {
     return (
       <CodingProfilesTab
         onRefresh={handleRefreshAll}
         studentRollNumber={activeRollNo}
         studentName={student?.name || displayName}
-        readOnly={isViewingOther}
+        readOnly={isReadOnly}
       />
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Read-only banner */}
-      {isViewingOther && (
+      {isReadOnly && (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-warning-soft border border-warning/30 text-warning text-xs font-semibold">
           <span>👁️ Viewing read-only profile of <span className="font-extrabold">{displayName}</span> ({displayRollNo}). Changes are disabled.</span>
         </div>
       )}
 
-      {/* Profile Header Card */}
       <div className="relative bg-surface border border-borderLine rounded-2xl overflow-hidden shadow-sm">
-
-        {/* ── Banner ── */}
         <div
           className="relative h-36 w-full overflow-hidden"
           style={{
             background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 40%, #818CF8 70%, #A78BFA 100%)',
           }}
         >
-          {/* Mesh overlay dots */}
           <div
             className="absolute inset-0 opacity-20 pointer-events-none"
             style={{
@@ -138,30 +131,24 @@ export const ProfilePage: React.FC = () => {
               backgroundSize: '24px 24px',
             }}
           />
-          {/* Glow orbs */}
           <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-20 w-32 h-32 rounded-full bg-purple-300/20 blur-2xl pointer-events-none" />
         </div>
 
-        {/* ── Content below banner ── */}
         <div className="px-6 pb-6 md:px-8 md:pb-7 -mt-12 relative">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-
-            {/* Left: avatar + name info */}
             <div className="flex items-end gap-4">
-              {/* Avatar */}
               <div className="relative shrink-0">
                 <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-black text-3xl flex items-center justify-center shadow-xl border-4 border-surface ring-2 ring-brand-primary/20">
                   {initials}
                 </div>
-                {!isViewingOther && (
+                {!isReadOnly && (
                   <button className="absolute -bottom-1.5 -right-1.5 p-1.5 rounded-xl bg-surface border border-borderLine text-textMuted shadow-sm hover:text-textPrimary hover:border-brand-primary transition-all">
                     <Camera className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
 
-              {/* Name & meta */}
               <div className="pb-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-1.5">
                   <h1 className="text-xl md:text-2xl font-extrabold text-textPrimary leading-none">{displayName}</h1>
@@ -169,7 +156,6 @@ export const ProfilePage: React.FC = () => {
                     {displayRollNo}
                   </span>
                 </div>
-                {/* Meta row */}
                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
                   {[
                     (student?.department || 'Department'),
@@ -189,7 +175,6 @@ export const ProfilePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: score badge */}
             {scoreData?.overallScore != null && (
               <div className="shrink-0 flex items-center gap-3 bg-surface-2 border border-borderLine rounded-2xl px-4 py-3 self-end">
                 <div className="text-center">
@@ -206,10 +191,9 @@ export const ProfilePage: React.FC = () => {
         </div>
       </div>
 
-      {/* 8 Deep-Linkable Tabs */}
       <div className="bg-surface border border-borderLine rounded-2xl shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <nav className="flex px-2 pt-2 pb-0 gap-1 border-b border-borderLine">
+        <div className="border-b border-borderLine overflow-x-auto custom-scrollbar">
+          <nav className="flex items-center gap-1 px-4 pt-2 min-w-max" aria-label="Profile Tabs">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = currentTab === tab.slug;
@@ -230,14 +214,13 @@ export const ProfilePage: React.FC = () => {
             })}
           </nav>
         </div>
-        {/* Tab content */}
         <div className="p-6">
-          {currentTab === 'personal-info' && <PersonalInfoTab student={student} academics={academics} onRefresh={handleRefreshAll} readOnly={isViewingOther} />}
-          {currentTab === 'academics' && <AcademicsTab academics={academics} studentYear={student?.year} onRefresh={handleRefreshAll} readOnly={isViewingOther} />}
-          {currentTab === 'tech-skills' && <TechSkillsTab skills={techSkills} onRefresh={handleRefreshAll} readOnly={isViewingOther} />}
-          {currentTab === 'certifications' && <CertificationsTab certifications={certifications} onRefresh={handleRefreshAll} readOnly={isViewingOther} />}
-          {currentTab === 'soft-skills' && <SoftSkillsTab softSkills={softSkills} onRefresh={handleRefreshAll} readOnly={isViewingOther} />}
-          {currentTab === 'achievements' && <AchievementsTab achievements={achievements} onRefresh={handleRefreshAll} readOnly={isViewingOther} />}
+          {currentTab === 'personal-info' && <PersonalInfoTab student={student} academics={academics} onRefresh={handleRefreshAll} readOnly={isReadOnly} />}
+          {currentTab === 'academics' && <AcademicsTab academics={academics} studentYear={student?.year} onRefresh={handleRefreshAll} readOnly={isReadOnly} />}
+          {currentTab === 'tech-skills' && <TechSkillsTab skills={techSkills} onRefresh={handleRefreshAll} readOnly={isReadOnly} />}
+          {currentTab === 'certifications' && <CertificationsTab certifications={certifications} onRefresh={handleRefreshAll} readOnly={isReadOnly} />}
+          {currentTab === 'soft-skills' && <SoftSkillsTab softSkills={softSkills} onRefresh={handleRefreshAll} readOnly={isReadOnly} />}
+          {currentTab === 'achievements' && <AchievementsTab achievements={achievements} onRefresh={handleRefreshAll} readOnly={isReadOnly} />}
           {currentTab === 'placement-preferences' && (
             <PlacementPreferencesTab placement={placement} scoreData={scoreData} onRefresh={handleRefreshAll} />
           )}
@@ -246,4 +229,3 @@ export const ProfilePage: React.FC = () => {
     </div>
   );
 };
-
