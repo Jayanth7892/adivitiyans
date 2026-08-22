@@ -1480,47 +1480,79 @@ app.post('/reports/cron-sync', requireRole('admin', 'hod'), async (_req: Request
   }
 });
 
-// GET /student/mentor — Returns the logged-in student's assigned mentor details + remarks
+// GET /student/mentor — Returns the student's or ward's assigned mentor details + remarks
 app.get('/student/mentor', async (req: Request, res: Response) => {
   try {
-    // Identify the student from Authorization header (email or roll_number)
+    // Identify the student from query, header, or Authorization token
     const authHeader = req.headers.authorization || '';
     const token = authHeader.replace('Bearer ', '').trim();
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
     if (db.isMock) return res.json({ assigned: false });
 
-    // Decode JWT sub claim (Cognito UUID) — we'll match by email attribute
-    let studentEmail = '';
-    let studentRoll = '';
+    let queryRoll = (req.query.rollNumber as string || req.query.roll_number as string || '').trim().toLowerCase();
+    let queryEmail = (req.query.email as string || '').trim().toLowerCase();
+    const callerEmail = (req.headers['x-caller-email'] as string || '').trim().toLowerCase();
+
+    let studentEmail = queryEmail || callerEmail;
+    let studentRoll = queryRoll;
+
+    // Decode JWT sub claim if it is a standard 3-part JWT
     try {
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-      studentEmail = (payload.email || '').toLowerCase();
-      studentRoll  = (payload['custom:reg_no'] || payload['cognito:username'] || '').toLowerCase();
+      if (token.includes('.')) {
+        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+        if (payload.email) studentEmail = payload.email.toLowerCase();
+        if (payload['custom:reg_no'] || payload['cognito:username']) {
+          studentRoll = (payload['custom:reg_no'] || payload['cognito:username']).toLowerCase();
+        }
+      }
     } catch (_) { /* ignore decode errors */ }
+
+    // If demo_token, extract email if not already present
+    if (!studentEmail && token.startsWith('demo_token_')) {
+      const parts = token.split('_');
+      if (parts.length >= 4) {
+        studentEmail = decodeURIComponent(parts[3]).toLowerCase();
+      }
+    }
 
     // Find student record
     let student: any = null;
-    if (studentEmail) {
-      const byEmail = await db.query('SELECT * FROM students WHERE LOWER(email) = $1 LIMIT 1', [studentEmail]);
-      if (byEmail.rows.length > 0) student = byEmail.rows[0];
-    }
-    if (!student && studentRoll) {
+    if (studentRoll) {
       const byRoll = await db.query('SELECT * FROM students WHERE LOWER(roll_number) = $1 LIMIT 1', [studentRoll]);
       if (byRoll.rows.length > 0) student = byRoll.rows[0];
+    }
+    if (!student && studentEmail) {
+      const byEmail = await db.query('SELECT * FROM students WHERE LOWER(email) = $1 LIMIT 1', [studentEmail]);
+      if (byEmail.rows.length > 0) student = byEmail.rows[0];
     }
     if (!student) return res.json({ assigned: false });
 
     const mentorId = student.faculty_mentor_id;
-    if (!mentorId) return res.json({ assigned: false, remarks: student.faculty_remarks || null });
+    let facResult: any = null;
 
-    // Fetch faculty details
-    const facResult = await db.query(
-      'SELECT faculty_id, name, email, department, role FROM faculty WHERE UPPER(faculty_id) = $1 LIMIT 1',
-      [mentorId.toUpperCase()]
-    );
+    if (mentorId) {
+      facResult = await db.query(
+        'SELECT faculty_id, name, email, department, role FROM faculty WHERE UPPER(faculty_id) = $1 OR LOWER(email) = $2 OR LOWER(name) = $3 LIMIT 1',
+        [mentorId.toUpperCase(), mentorId.toLowerCase(), mentorId.toLowerCase()]
+      );
+    }
 
-    if (facResult.rows.length === 0) {
+    // Fallback: check mentor_assignments table if not linked on student record
+    if (!facResult || facResult.rows.length === 0) {
+      const assignResult = await db.query(
+        `SELECT f.faculty_id, f.name, f.email, f.department, f.role 
+         FROM mentor_assignments ma 
+         JOIN faculty f ON UPPER(ma.faculty_id) = UPPER(f.faculty_id) 
+         WHERE LOWER(ma.roll_number) = $1 LIMIT 1`,
+        [student.roll_number.toLowerCase()]
+      );
+      if (assignResult.rows.length > 0) {
+        facResult = assignResult;
+      }
+    }
+
+    if (!facResult || facResult.rows.length === 0) {
       return res.json({ assigned: false, remarks: student.faculty_remarks || null });
     }
 

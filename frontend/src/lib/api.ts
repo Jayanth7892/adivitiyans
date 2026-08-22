@@ -84,8 +84,8 @@ export const api = {
     return fetchWithAuth(`/auth/check-availability?type=${type}&value=${encodeURIComponent(value)}`);
   },
 
-  // My Mentor — student-facing: returns assigned mentor details + faculty remarks
-  getMyMentor: async (): Promise<{
+  // My Mentor — student/parent facing: returns assigned mentor details + faculty remarks
+  getMyMentor: async (rollNumber?: string): Promise<{
     assigned: boolean;
     faculty_id?: string;
     name?: string;
@@ -94,7 +94,8 @@ export const api = {
     role?: string;
     remarks?: string | null;
   }> => {
-    return fetchWithAuth('/student/mentor');
+    const query = rollNumber ? `?rollNumber=${encodeURIComponent(rollNumber)}` : '';
+    return fetchWithAuth(`/student/mentor${query}`);
   },
 
   // Single-Session Enforcement

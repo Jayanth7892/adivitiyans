@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 
 function getInitials(name: string) {
   return name
@@ -21,11 +22,52 @@ function avatarColor(name: string) {
 }
 
 export default function MyMentorPage() {
+  const { user, role } = useAuth();
+  const activeRollNo = user?.rollNumber || '';
+
   const { data: mentor, isLoading, error } = useQuery({
-    queryKey: ['myMentor'],
-    queryFn: () => api.getMyMentor(),
+    queryKey: ['myMentor', activeRollNo],
+    queryFn: async () => {
+      // Step 1: Query backend API with active roll number
+      try {
+        const res = await api.getMyMentor(activeRollNo);
+        if (res && res.assigned) return res;
+      } catch { /* proceed to fallback */ }
+
+      // Step 2: Fallback — resolve via student profile and faculty list
+      if (activeRollNo) {
+        try {
+          const profile = await api.getStudentProfile(activeRollNo);
+          if (profile?.faculty_mentor_id) {
+            const allFaculty = await api.getAllFaculty().catch(() => []);
+            const mId = profile.faculty_mentor_id.trim().toUpperCase();
+            const matched = allFaculty.find(
+              (f: any) =>
+                f.faculty_id?.trim().toUpperCase() === mId ||
+                f.name?.trim().toLowerCase() === profile.faculty_mentor_id?.trim().toLowerCase() ||
+                f.email?.trim().toLowerCase() === profile.faculty_mentor_id?.trim().toLowerCase()
+            );
+            if (matched) {
+              return {
+                assigned: true,
+                faculty_id: matched.faculty_id,
+                name: matched.name,
+                email: matched.email && !matched.email.startsWith('pending_') ? matched.email : null,
+                department: matched.department || profile.department,
+                role: matched.role || 'mentor',
+                remarks: null,
+              };
+            }
+          }
+        } catch { /* ignore fallback errors */ }
+      }
+
+      return { assigned: false, remarks: null };
+    },
     staleTime: 1000 * 60 * 5,
   });
+
+  const studentName = user?.name ? user.name.replace(/^Parent of\s*/i, '') : activeRollNo;
 
   return (
     <div className="bg-background px-4 py-6 sm:px-6 sm:py-8">
@@ -33,9 +75,13 @@ export default function MyMentorPage() {
 
         {/* Page Header */}
         <div>
-          <h1 className="text-2xl font-extrabold text-textPrimary tracking-tight">My Mentor</h1>
+          <h1 className="text-2xl font-extrabold text-textPrimary tracking-tight">
+            {role === 'parent' ? "Ward's Assigned Mentor" : 'My Mentor'}
+          </h1>
           <p className="mt-1 text-sm text-textSecondary">
-            Your assigned faculty mentor and academic guidance
+            {role === 'parent'
+              ? `Faculty mentor and academic guidance for ${studentName} (${activeRollNo})`
+              : 'Your assigned faculty mentor and academic guidance'}
           </p>
         </div>
 
