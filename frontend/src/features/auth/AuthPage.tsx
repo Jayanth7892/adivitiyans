@@ -34,6 +34,8 @@ export const AuthPage: React.FC = () => {
     handleSubmit: handleSignUpSubmit,
     watch: watchSignUp,
     setValue: setValueSignUp,
+    reset: resetSignUp,
+    clearErrors: clearSignUpErrors,
     formState: { errors: signUpErrors, isSubmitting: isSignUpSubmitting },
   } = useForm<StudentSignUpInput>({
     resolver: zodResolver(studentSignUpSchema),
@@ -44,6 +46,8 @@ export const AuthPage: React.FC = () => {
   const {
     register: registerFacultySignUp,
     handleSubmit: handleFacultySignUpSubmit,
+    reset: resetFacultySignUp,
+    clearErrors: clearFacultySignUpErrors,
     formState: { errors: facultySignUpErrors, isSubmitting: isFacultySignUpSubmitting },
   } = useForm<FacultySignUpInput>({
     resolver: zodResolver(facultySignUpSchema),
@@ -57,10 +61,31 @@ export const AuthPage: React.FC = () => {
   const {
     register: registerLogin,
     handleSubmit: handleLoginSubmit,
+    reset: resetLogin,
+    clearErrors: clearLoginErrors,
     formState: { errors: loginErrors, isSubmitting: isLoginSubmitting },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
   });
+
+  const handleTabSwitch = (newRole: UserRole) => {
+    setActiveTab(newRole);
+    setIsSignUp(false);
+    setErrorMessage(null);
+    clearLoginErrors();
+    resetLogin({ email: '', password: '' });
+    clearSignUpErrors();
+    clearFacultySignUpErrors();
+  };
+
+  const handleToggleSignUp = (signUp: boolean) => {
+    setIsSignUp(signUp);
+    setErrorMessage(null);
+    clearLoginErrors();
+    resetLogin({ email: '', password: '' });
+    clearSignUpErrors();
+    clearFacultySignUpErrors();
+  };
 
   // Watch fields for live debounce availability check
   const watchedRegNo = watchSignUp('registrationNumber');
@@ -614,7 +639,7 @@ export const AuthPage: React.FC = () => {
           <div className="grid grid-cols-5 gap-1.5 bg-surface-2 p-1.5 rounded-2xl border border-borderLine mb-7">
             <button
               type="button"
-              onClick={() => { setActiveTab('student'); setIsSignUp(false); }}
+              onClick={() => handleTabSwitch('student')}
               className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'student'
                   ? 'bg-brand-primary text-white shadow-sm shadow-brand/30'
@@ -625,7 +650,7 @@ export const AuthPage: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => { setActiveTab('parent'); setIsSignUp(false); }}
+              onClick={() => handleTabSwitch('parent')}
               className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'parent'
                   ? 'bg-brand-primary text-white shadow-sm shadow-brand/30'
@@ -636,7 +661,7 @@ export const AuthPage: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => { setActiveTab('faculty'); setIsSignUp(false); }}
+              onClick={() => handleTabSwitch('faculty')}
               className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'faculty'
                   ? 'bg-brand-primary text-white shadow-sm shadow-brand/30'
@@ -647,7 +672,7 @@ export const AuthPage: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => { setActiveTab('hod'); setIsSignUp(false); }}
+              onClick={() => handleTabSwitch('hod')}
               className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'hod'
                   ? 'bg-brand-primary text-white shadow-sm shadow-brand/30'
@@ -658,7 +683,7 @@ export const AuthPage: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => { setActiveTab('admin'); setIsSignUp(false); }}
+              onClick={() => handleTabSwitch('admin')}
               className={`py-2 text-xs font-bold rounded-xl transition-all ${
                 activeTab === 'admin'
                   ? 'bg-brand-primary text-white shadow-sm shadow-brand/30'
@@ -958,7 +983,7 @@ export const AuthPage: React.FC = () => {
                 <div className="text-center pt-2">
                   <button
                     type="button"
-                    onClick={() => setIsSignUp(false)}
+                    onClick={() => handleToggleSignUp(false)}
                     className="text-xs font-semibold text-brand-primary hover:underline"
                   >
                     Already registered? Log in here
@@ -1032,7 +1057,7 @@ export const AuthPage: React.FC = () => {
                 <div className="text-center pt-2">
                   <button
                     type="button"
-                    onClick={() => setIsSignUp(true)}
+                    onClick={() => handleToggleSignUp(true)}
                     className="text-xs font-semibold text-brand-primary hover:underline"
                   >
                     New here? Create a Student Account
@@ -1170,7 +1195,7 @@ export const AuthPage: React.FC = () => {
               <div className="text-center pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsSignUp(false)}
+                  onClick={() => handleToggleSignUp(false)}
                   className="text-xs font-semibold text-brand-primary hover:underline"
                 >
                   Already registered? Log in as {activeTab === 'hod' ? 'HOD' : 'Faculty'}
@@ -1262,7 +1287,7 @@ export const AuthPage: React.FC = () => {
                   <div className="text-center pt-2">
                     <button
                       type="button"
-                      onClick={() => setIsSignUp(true)}
+                      onClick={() => handleToggleSignUp(true)}
                       className="text-xs font-semibold text-brand-primary hover:underline"
                     >
                       New Faculty Member? Register Account Here
