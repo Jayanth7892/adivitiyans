@@ -21,6 +21,8 @@ import {
   CheckCircle,
   Github,
   BarChart2,
+  GraduationCap,
+  BookOpen,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { calculateProfileCompletion } from '../../lib/profileCompletion';
@@ -58,6 +60,20 @@ export const DashboardPage: React.FC = () => {
     achievements,
     placement
   );
+
+  // Cumulative CGPA and Semester GPA analytics
+  const validAcademics = academics.filter(
+    (a) => a && typeof a.semester_gpa === 'number' && Number(a.semester_gpa) > 0
+  );
+  const cumulativeCgpa = validAcademics.length > 0
+    ? (validAcademics.reduce((sum, a) => sum + Number(a.semester_gpa), 0) / validAcademics.length).toFixed(2)
+    : null;
+  const avgAttendance = validAcademics.length > 0
+    ? Math.round(validAcademics.reduce((sum, a) => sum + (Number(a.attendance_pct) || 0), 0) / validAcademics.length)
+    : null;
+  const latestSemGpa = validAcademics.length > 0
+    ? Number(validAcademics[validAcademics.length - 1].semester_gpa).toFixed(2)
+    : null;
 
   // Radar chart data from tech skills
   const radarData = techSkills.slice(0, 6).map((skill) => ({
@@ -108,24 +124,33 @@ export const DashboardPage: React.FC = () => {
         {/* Main Column (60% ~ 7 cols in 12 grid) */}
         <div className="lg:col-span-7 space-y-6">
           {/* Stat Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <StatCard
+              icon={<GraduationCap className="w-5 h-5" />}
+              iconBgColor="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+              accentColor="emerald"
+              label="Cumulative CGPA"
+              value={cumulativeCgpa ? `${cumulativeCgpa} / 10.0` : '—'}
+              subtext={validAcademics.length > 0 ? `Across ${validAcademics.length} semester${validAcademics.length > 1 ? 's' : ''}` : 'View academic records'}
+              onClick={() => navigate('/profile?tab=academics')}
+            />
             <StatCard
               icon={<TrendingUp className="w-5 h-5" />}
               iconBgColor="bg-brand-soft text-brand-primary"
               accentColor="brand"
-              label="Academic Performance Score"
+              label="Employability Score"
               value={`${scoreData?.overallScore ?? 0}/100`}
               subtext="Computed from GPA & coding activity"
               onClick={() => navigate('/profile?tab=placement-preferences')}
             />
             <StatCard
-              icon={<CheckCircle2 className="w-5 h-5" />}
-              iconBgColor="bg-success-soft text-success"
-              accentColor="success"
-              label="Certifications Earned"
-              value={certifications.filter((c) => !c.suggested).length}
-              subtext={`${certifications.filter((c) => c.suggested).length} recommended certs`}
-              onClick={() => navigate('/profile?tab=certifications')}
+              icon={<BookOpen className="w-5 h-5" />}
+              iconBgColor="bg-sky-50 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400"
+              accentColor="sky"
+              label="Latest Sem GPA"
+              value={latestSemGpa ? `${latestSemGpa} GPA` : '—'}
+              subtext={avgAttendance != null ? `Avg Attendance: ${avgAttendance}%` : 'Semester performance'}
+              onClick={() => navigate('/profile?tab=academics')}
             />
             <StatCard
               icon={<Code2 className="w-5 h-5" />}
@@ -137,6 +162,15 @@ export const DashboardPage: React.FC = () => {
               onClick={() => navigate('/profile?tab=coding-profiles')}
             />
             <StatCard
+              icon={<CheckCircle2 className="w-5 h-5" />}
+              iconBgColor="bg-success-soft text-success"
+              accentColor="success"
+              label="Certifications Earned"
+              value={certifications.filter((c) => !c.suggested).length}
+              subtext={`${certifications.filter((c) => c.suggested).length} recommended certs`}
+              onClick={() => navigate('/profile?tab=certifications')}
+            />
+            <StatCard
               icon={<Award className="w-5 h-5" />}
               iconBgColor="bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400"
               accentColor="amber"
@@ -146,6 +180,44 @@ export const DashboardPage: React.FC = () => {
               onClick={() => navigate('/profile?tab=tech-skills')}
             />
           </div>
+
+          {/* Semester GPA & CGPA Progress Summary Card */}
+          {validAcademics.length > 0 && (
+            <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-xs">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center font-bold text-sm">
+                    🎓
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-textPrimary">Semester GPA & CGPA History</h3>
+                    <p className="text-xs text-textSecondary mt-0.5">
+                      Cumulative CGPA: <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">{cumulativeCgpa}</strong> (Scale of 10.0)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate('/profile?tab=academics')}
+                  className="text-xs font-semibold text-brand-primary hover:underline flex items-center gap-1"
+                >
+                  <span>Full Grade Sheet</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {validAcademics.map((sem) => (
+                  <div key={sem.semester} className="p-3.5 rounded-xl bg-surface-2 border border-borderLine text-center">
+                    <span className="text-[10px] font-bold text-textMuted uppercase tracking-wider">Semester {sem.semester}</span>
+                    <p className="text-xl font-black text-brand-primary mt-1">{Number(sem.semester_gpa).toFixed(2)}</p>
+                    <span className="text-[11px] text-textSecondary font-medium block mt-0.5">
+                      {sem.attendance_pct ? `${sem.attendance_pct}% Attendance` : 'SGPA'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Skill Snapshot Radar Chart Card */}
           <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-xs">
