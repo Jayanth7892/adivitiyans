@@ -190,29 +190,29 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           {/* Semester GPA & CGPA Progress Summary Card */}
-          {validAcademics.length > 0 && (
-            <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-xs">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center font-bold text-sm">
-                    🎓
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-textPrimary">Semester GPA & CGPA History</h3>
-                    <p className="text-xs text-textSecondary mt-0.5">
-                      Cumulative CGPA: <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">{cumulativeCgpa}</strong> (Scale of 10.0)
-                    </p>
-                  </div>
+          <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-xs">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center justify-center font-bold text-sm">
+                  🎓
                 </div>
-                <button
-                  onClick={() => navigate('/profile?tab=academics')}
-                  className="text-xs font-semibold text-brand-primary hover:underline flex items-center gap-1"
-                >
-                  <span>Full Grade Sheet</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+                <div>
+                  <h3 className="text-sm font-bold text-textPrimary">Semester GPA & CGPA History</h3>
+                  <p className="text-xs text-textSecondary mt-0.5">
+                    Cumulative CGPA: <strong className="text-emerald-600 dark:text-emerald-400 font-extrabold">{cumulativeCgpa || '0.00'}</strong> (Scale of 10.0)
+                  </p>
+                </div>
               </div>
+              <button
+                onClick={() => navigate('/profile?tab=academics')}
+                className="text-xs font-semibold text-brand-primary hover:underline flex items-center gap-1"
+              >
+                <span>Full Grade Sheet</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
+            {validAcademics.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {validAcademics.map((sem) => (
                   <div key={sem.semester} className="p-3.5 rounded-xl bg-surface-2 border border-borderLine text-center">
@@ -224,8 +224,23 @@ export const DashboardPage: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="p-4 rounded-xl bg-surface-2 border border-dashed border-borderLine text-center">
+                <p className="text-xs font-bold text-textPrimary">No Semester Grades Recorded Yet</p>
+                <p className="text-[11px] text-textSecondary mt-1">
+                  Add your Semester marks and attendance in the Academics tab to generate your CGPA trend.
+                </p>
+                {role !== 'parent' && (
+                  <button
+                    onClick={() => navigate('/profile?tab=academics')}
+                    className="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-primary text-white hover:bg-brand-primary/90 transition-all"
+                  >
+                    Add Academic Record
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Skill Snapshot Radar Chart Card */}
           <div className="bg-surface border border-borderLine rounded-2xl p-6 shadow-xs">

@@ -557,9 +557,9 @@ export const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="h-dvh bg-background flex flex-col overflow-hidden relative">
+    <div className="min-h-screen bg-background flex flex-col relative">
 
-      <div className="flex-1 overflow-y-auto flex flex-col justify-center py-4 sm:py-12 sm:px-6 lg:px-8 z-10">
+      <div className="flex-1 flex flex-col justify-start sm:justify-center py-6 sm:py-10 sm:px-6 lg:px-8 z-10">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <div className="inline-flex items-center justify-center w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-[#031B33] p-1.5 shadow-xl shadow-brand-primary/30 mb-2 sm:mb-4 ring-1 ring-white/10 overflow-hidden">
           <img
